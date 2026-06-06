@@ -11,8 +11,6 @@ void Scene_Loading::initialize()
 	log_printf("ローディング初期化開始\n", LogLevel::Info);
 	//スレッド開始
 	_thread = new std::thread(loading_thread, this);
-	//スプライト初期化
-	//_logo_sprite = new sprite(Graphics_Core::instance().get_device(), L"./data/sprites/芹梨なずな.png");
 
 	_timer = 0.0f;
 	log_printf("ローディング初期化終了\n", LogLevel::Info);
