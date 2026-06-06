@@ -1,0 +1,11 @@
+Model Information:
+* title:	Cafe-Misti
+* source:	https://sketchfab.com/3d-models/cafe-misti-419c3293b0e54313be4b1f02845d606a
+* author:	Simit Rajwadi (https://sketchfab.com/asimitree)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Cafe-Misti" (https://sketchfab.com/3d-models/cafe-misti-419c3293b0e54313be4b1f02845d606a) by Simit Rajwadi (https://sketchfab.com/asimitree) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

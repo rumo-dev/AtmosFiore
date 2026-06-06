@@ -1,0 +1,60 @@
+# ========================
+# Visual Studio関連
+# ========================
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.opensdf
+*.tlog/
+*.ipch
+
+# ========================
+# ビルド出力
+# ========================
+*.obj
+*.pch
+*.pdb
+*.ilk
+*.exp
+*.exe
+*.log
+*.tmp
+*.bak
+*.old
+*.dmp
+
+# ========================
+# HLSL関連（CSO, CODを共有除外）
+# ========================
+*.cso
+*.cod
+
+# ========================
+# 中間生成物（CMakeや一時Makefileなど）
+# ========================
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# ========================
+# ImGui設定ファイル
+# ========================
+imgui.ini
+
+# ========================
+# 除外しない注意点（以下は**共有対象**）
+# ========================
+# ↓ .lib や .dll は除外しない。共有用ライブラリとしてGitに含めることを前提。
+# !*.lib
+# !*.dll
+
+# vendor や externals ディレクトリも除外しない（外部ライブラリを同梱）
+# !/vendor/
+# !/externals/
+!data/
+!data/**

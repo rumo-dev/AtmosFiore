@@ -1,0 +1,11 @@
+Model Information:
+* title:	Dirty Street
+* source:	https://sketchfab.com/3d-models/dirty-street-6e6b61361f5e483484f4c8b924a0beee
+* author:	Melissa Descubes (https://sketchfab.com/Melissadescubes)
+
+Model License:
+* license type:	CC-BY-NC-ND-4.0 (http://creativecommons.org/licenses/by-nc-nd/4.0/)
+* requirements:	Author must be credited. No commercial use. Modified versions can not be distributed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Dirty Street" (https://sketchfab.com/3d-models/dirty-street-6e6b61361f5e483484f4c8b924a0beee) by Melissa Descubes (https://sketchfab.com/Melissadescubes) licensed under CC-BY-NC-ND-4.0 (http://creativecommons.org/licenses/by-nc-nd/4.0/)

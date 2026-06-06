@@ -1,0 +1,54 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36212.18
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AtmosFiore", "AtmosFiore.vcxproj", "{9970C797-4C8C-42A1-9C72-6B1BEE18925B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E} = {E0B52AE7-E160-4D32-BF3F-910B785E5A8E}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTK_Desktop_2019", "extentions\DirectXTK-main\DirectXTK_Desktop_2019.vcxproj", "{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+		RenderDog|x64 = RenderDog|x64
+		RenderDog|x86 = RenderDog|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Debug|x64.ActiveCfg = Debug|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Debug|x64.Build.0 = Debug|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Debug|x86.ActiveCfg = Debug|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Debug|x86.Build.0 = Debug|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Release|x64.ActiveCfg = Release|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Release|x64.Build.0 = Release|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Release|x86.ActiveCfg = Release|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Release|x86.Build.0 = Release|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x64.ActiveCfg = RenderDog|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x64.Build.0 = RenderDog|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x86.ActiveCfg = RenderDog|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x86.Build.0 = RenderDog|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x64.ActiveCfg = Debug|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x64.Build.0 = Debug|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x86.ActiveCfg = Debug|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x86.Build.0 = Debug|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Release|x64.ActiveCfg = Release|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Release|x64.Build.0 = Release|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Release|x86.ActiveCfg = Release|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Release|x86.Build.0 = Release|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x64.ActiveCfg = RenderDog|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x64.Build.0 = RenderDog|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x86.ActiveCfg = RenderDog|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x86.Build.0 = RenderDog|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5E067DB0-3B36-4C44-AB77-80A740D92C8E}
+	EndGlobalSection
+EndGlobal
