@@ -53,8 +53,6 @@ private:
 		Texel,
 		Num,
 	};
-	sprite* _sprite_object[static_cast<int>(Sprite_Type::Num)] = {};
-	/*std::unique_ptr<Obj_Model> obj_model;*/
 	std::unique_ptr<Gltf_Model>_gltf_model;
 	Directional_Light _directional_light;
 

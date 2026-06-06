@@ -20,8 +20,6 @@ void Scene_Indoor::initialize()
 	log_printf("objモデルシーン開始\n", LogLevel::Info);
 	log_printf("objモデルシーン初期化開始\n", LogLevel::Info);
 	ID3D11Device* device = Graphics_Core::instance().get_device();
-	_sprite_object[static_cast<int>(Sprite_Type::Default)] = new sprite(device, L"./data/sprites/LuNU5BxC.jpg");
-	_sprite_object[static_cast<int>(Sprite_Type::Texel)] = new sprite(device, L"./data/sprites/seri_nazuna_sd.png");
 
 	//Graphics_Core::instance().get_point_light_manager().add_light({ 0,2,1 });
 	//ライトを1024個追加してみる（）

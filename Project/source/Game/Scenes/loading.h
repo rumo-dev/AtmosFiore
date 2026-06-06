@@ -35,90 +35,86 @@ class Scene_Loading : public Scene_Base
 {
 public:
 
-    /**
-     * @brief コンストラクタ
-     * @param next_scene 遷移先シーン
-     *
-     * @warning
-     * next_scene は有効なポインタである必要がある（nullptr不可）
-     */
-    Scene_Loading(Scene_Base* next_scene)
-        : _next_scene(next_scene) {
-    }
+	/**
+	 * @brief コンストラクタ
+	 * @param next_scene 遷移先シーン
+	 *
+	 * @warning
+	 * next_scene は有効なポインタである必要がある（nullptr不可）
+	 */
+	Scene_Loading(Scene_Base* next_scene)
+		: _next_scene(next_scene) {}
 
-    ~Scene_Loading() {}
+	~Scene_Loading() {}
 
-    /**
-     * @brief 初期化処理
-     *
-     * @details
-     * ・ローディングスレッドを起動
-     * ・ロゴスプライトなどの表示準備
-     */
-    void initialize() override;
+	/**
+	 * @brief 初期化処理
+	 *
+	 * @details
+	 * ・ローディングスレッドを起動
+	 * ・ロゴスプライトなどの表示準備
+	 */
+	void initialize() override;
 
-    /**
-     * @brief 終了処理
-     *
-     * @note
-     * スレッドの終了を保証することが重要
-     */
-    void finalize() override;
+	/**
+	 * @brief 終了処理
+	 *
+	 * @note
+	 * スレッドの終了を保証することが重要
+	 */
+	void finalize() override;
 
-    /**
-     * @brief 更新処理
-     * @param elapsedTime 経過時間
-     *
-     * @details
-     * ロード完了を監視し、完了後にシーン遷移を行う
-     */
-    void update(float elapsedTime) override;
+	/**
+	 * @brief 更新処理
+	 * @param elapsedTime 経過時間www
+	 *
+	 * @details
+	 * ロード完了を監視し、完了後にシーン遷移を行う
+	 */
+	void update(float elapsedTime) override;
 
-    /**
-     * @brief 描画処理
-     * @param elapsedTime 経過時間
-     *
-     * @note
-     * ローディング画面（ロゴ・アニメーションなど）を描画
-     */
-    void render(float elapsedTime) override;
+	/**
+	 * @brief 描画処理
+	 * @param elapsedTime 経過時間
+	 *
+	 * @note
+	 * ローディング画面（ロゴ・アニメーションなど）を描画
+	 */
+	void render(float elapsedTime) override;
 
-    /**
-     * @brief GUI描画
-     */
-    void draw_gui() override;
-
-private:
-
-    /**
-     * @brief ローディングスレッド処理
-     * @param scene このインスタンス
-     *
-     * @details
-     * リソースの読み込み処理を実行する。
-     *
-     * @code
-     * // 例
-     * ResourceManager::instance().load_all();
-     * @endcode
-     *
-     * @warning
-     * ・Direct3Dのデバイスコンテキスト操作は禁止（メインスレッド限定）
-     * ・Scene_Loading のメンバへアクセスする場合は同期に注意
-     */
-    static void loading_thread(Scene_Loading* scene);
+	/**
+	 * @brief GUI描画
+	 */
+	void draw_gui() override;
 
 private:
 
-    ///< 遷移先シーン
-    Scene_Base* _next_scene = nullptr;
+	/**
+	 * @brief ローディングスレッド処理
+	 * @param scene このインスタンス
+	 *
+	 * @details
+	 * リソースの読み込み処理を実行する。
+	 *
+	 * @code
+	 * // 例
+	 * ResourceManager::instance().load_all();
+	 * @endcode
+	 *
+	 * @warning
+	 * ・Direct3Dのデバイスコンテキスト操作は禁止（メインスレッド限定）
+	 * ・Scene_Loading のメンバへアクセスする場合は同期に注意
+	 */
+	static void loading_thread(Scene_Loading* scene);
 
-    ///< ローディング用スレッド
-    std::thread* _thread = nullptr;
+private:
 
-    ///< ロゴスプライト
-    sprite* _logo_sprite = nullptr;
+	///< 遷移先シーン
+	Scene_Base* _next_scene = nullptr;
 
-    ///< 経過時間（アニメーション用）
-    float _timer = 0.0f;
+	///< ローディング用スレッド
+	std::thread* _thread = nullptr;
+
+	///< 経過時間（アニメーション用）
+	float _timer = 0.0f;
 };
