@@ -15,6 +15,7 @@
 #include "Engine/Graphics/UI/text/text.h"
 
 #include "Game/Scenes/scene.h"
+#include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 
 #ifdef USE_IMGUI
 #include "Engine/Graphics/UI/ImGui/imgui.h"
@@ -138,6 +139,7 @@ public:
 		);
 
 		ImGui::StyleColorsDark();
+		Dashboard::Instance().SetupStyle();
 #endif
 
 		while (WM_QUIT != msg.message)

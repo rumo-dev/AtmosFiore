@@ -66,6 +66,7 @@ public:
 	void RegisterModule(const TabModule& mod) { modules.push_back(mod); }
 	void Render();
 	SharedMetricsData data; // ゲームとUIで共有するデータ
+	void SetupStyle();
 
 private:
 	Dashboard() = default;

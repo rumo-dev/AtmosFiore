@@ -112,7 +112,7 @@ public:
 	 * @param entry エントリポイント（省略時 "main"）
 	 * @param target シェーダーモデル（省略時 traits に依存）
 	 * @return シェーダーの共有ポインタ（失敗時 nullptr）
-	 * 
+	 *
 	 * @warning
 	 * - 同じ name に対して異なる型 T を指定すると未定義的な使い方になります。
 	 *   必ず同一 name には同一型を使用してください。
@@ -201,87 +201,78 @@ public:
 	 * - 種類ごとに分類表示
 	 * - 個別リロードボタン
 	 * - グループ単位リロード対応
-	 */
-	void draw_imgui()
-	{
+	 */void draw_imgui()
+	 {
 #ifdef USE_IMGUI
+		 // グループ分類（既存のロジック）
+		 std::unordered_map<std::string, std::vector<std::string>> shaderGroups;
+		 for (auto& pair : m_shaders)
+		 {
+			 const std::string& name = pair.first;
+			 Shader_Base* shader = pair.second.get();
+			 std::string typeName = "Unknown";
 
-		std::unordered_map<std::string, std::vector<std::string>> shaderGroups;
+			 if (dynamic_cast<Vertex_Shader*>(shader))        typeName = "Vertex Shader";
+			 else if (dynamic_cast<Pixel_Shader*>(shader))    typeName = "Pixel Shader";
+			 else if (dynamic_cast<Geometry_Shader*>(shader)) typeName = "Geometry Shader";
+			 else if (dynamic_cast<Hull_Shader*>(shader))     typeName = "Hull Shader";
+			 else if (dynamic_cast<Domain_Shader*>(shader))   typeName = "Domain Shader";
+			 else if (dynamic_cast<Compute_Shader*>(shader))  typeName = "Compute Shader";
 
-		// グループ分類
-		for (auto& pair : m_shaders)
-		{
-			const std::string& name = pair.first;
-			Shader_Base* shader = pair.second.get();
+			 shaderGroups[typeName].push_back(name);
+		 }
 
-			std::string typeName = "Unknown";
+		 // タブ描画の開始
+		 if (ImGui::BeginTabBar("ShaderTabs"))
+		 {
+			 for (auto& group : shaderGroups)
+			 {
+				 const std::string& typeName = group.first;
+				 auto& list = group.second;
 
-			if (dynamic_cast<Vertex_Shader*>(shader))        typeName = "Vertex Shader";
-			else if (dynamic_cast<Pixel_Shader*>(shader))    typeName = "Pixel Shader";
-			else if (dynamic_cast<Geometry_Shader*>(shader)) typeName = "Geometry Shader";
-			else if (dynamic_cast<Hull_Shader*>(shader))     typeName = "Hull Shader";
-			else if (dynamic_cast<Domain_Shader*>(shader))   typeName = "Domain Shader";
-			else if (dynamic_cast<Compute_Shader*>(shader))  typeName = "Compute Shader";
+				 // タブの作成
+				 if (ImGui::BeginTabItem(typeName.c_str()))
+				 {
+					 // グループ単位リロードボタンをタブ内に配置
+					 std::string reloadAllLabel = "Reload All " + typeName;
+					 if (ImGui::Button(reloadAllLabel.c_str()))
+					 {
+						 for (auto& shaderName : list) {
+							 m_shaders[shaderName]->reload();
+						 }
+					 }
+					 ImGui::Separator();
 
-			shaderGroups[typeName].push_back(name);
-		}
+					 // テーブル表示
+					 if (ImGui::BeginTable("ShaderTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+					 {
+						 ImGui::TableSetupColumn("Shader Name");
+						 ImGui::TableSetupColumn("Actions");
+						 ImGui::TableHeadersRow();
 
-		// 描画
-		for (auto& group : shaderGroups)
-		{
-			const std::string& typeName = group.first;
-			auto& list = group.second;
+						 for (auto& shaderName : list)
+						 {
+							 ImGui::TableNextRow();
+							 ImGui::TableSetColumnIndex(0);
+							 ImGui::Text("%s", shaderName.c_str());
 
-			std::string header = typeName + " (" + std::to_string(list.size()) + ")";
-			if (ImGui::TreeNode(header.c_str()))
-			{
-				if (ImGui::BeginTable("ShaderTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-				{
-					ImGui::TableSetupColumn("Shader Name");
-					ImGui::TableSetupColumn("Actions");
-					ImGui::TableHeadersRow();
+							 ImGui::TableSetColumnIndex(1);
+							 if (ImGui::Button(("Reload##" + shaderName).c_str()))
+							 {
+								 if (!m_shaders[shaderName]->reload())
+									 std::cerr << "Failed to reload: " << shaderName << std::endl;
+							 }
+						 }
+						 ImGui::EndTable();
+					 }
 
-					for (auto& shaderName : list)
-					{
-						Shader_Base* shader = m_shaders[shaderName].get();
-
-						ImGui::TableNextRow();
-
-						ImGui::TableSetColumnIndex(0);
-						ImGui::Text("%s", shaderName.c_str());
-
-						ImGui::TableSetColumnIndex(1);
-						std::string buttonLabel = "Reload##" + shaderName;
-
-						if (ImGui::Button(buttonLabel.c_str()))
-						{
-							if (!shader->reload())
-							{
-								std::cerr << "Failed to reload shader: " << shaderName << std::endl;
-							}
-						}
-					}
-
-					ImGui::EndTable();
-				}
-
-				ImGui::TreePop();
-			}
-
-			// グループ単位リロード
-			std::string reloadAllLabel = "Reload All " + typeName;
-			if (ImGui::Button(reloadAllLabel.c_str()))
-			{
-				for (auto& shaderName : list)
-				{
-					Shader_Base* shader = m_shaders[shaderName].get();
-					shader->reload();
-				}
-			}
-		}
-
+					 ImGui::EndTabItem();
+				 }
+			 }
+			 ImGui::EndTabBar();
+		 }
 #endif
-	}
+	 }
 
 private:
 	std::wstring m_hlslDir;  ///< HLSLディレクトリ

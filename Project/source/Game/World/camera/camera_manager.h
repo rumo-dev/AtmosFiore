@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include "camera_base.h"
+#include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
 
 /**
  * @brief カメラ管理マネージャークラス（シングルトン）
@@ -67,37 +68,40 @@ public:
 	 * @brief すべてのカメラの ImGui 管理UIを一括描画する
 	 */
 	void draw_imgui() {
-		// ★ウインドウを新しく作らない（ImGui::Begin を削除）
-		// これにより、呼び出し元の「Dashboard」や「Scene」といったタブの中に直接描画されます。
-
-		// --- 1. アクティブカメラの切り替えコンボボックス ---
-		ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "[ Active Camera Selection ]");
+		// --- 1. アクティブカメラの切り替え ---
+		CustomUI::SectionLabel("[ Active Camera Selection ]");
 
 		std::string current_name = get_active_camera_name();
-		if (ImGui::BeginCombo("Active Camera", current_name.c_str())) {
+		const char* preview_value = current_name.c_str();
+
+		// CustomUI::Combo を活用
+		if (ImGui::BeginCombo("Active Camera", preview_value)) {
 			for (const auto& pair : _cameras) {
 				bool is_selected = (pair.first == current_name);
 				if (ImGui::Selectable(pair.first.c_str(), is_selected)) {
 					switch_camera(pair.first);
 				}
-				if (is_selected) {
-					ImGui::SetItemDefaultFocus();
-				}
 			}
 			ImGui::EndCombo();
 		}
 
-		ImGui::Separator();
+		CustomUI::Separator();
 
-		// --- 2. 各カメラ固有のデバッグUI呼び出し ---
-		if (ImGui::BeginTabBar("CameraTabs")) {
+		// --- 2. タブによるカメラ管理 ---
+		if (ImGui::BeginTabBar("CameraTabs", ImGuiTabBarFlags_FittingPolicyScroll)) {
 			for (const auto& pair : _cameras) {
 				if (ImGui::BeginTabItem(pair.first.c_str())) {
+
 					if (pair.second == _active_camera) {
-						ImGui::TextDisabled("( Currently Active )");
+						ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.2f, 1.0f), "● Currently Active");
+					}
+					else {
+						ImGui::TextDisabled("○ Inactive");
 					}
 
-					// 各カメラのUI
+					ImGui::Spacing();
+
+					// 各カメラ固有のUI描画
 					pair.second->draw_imgui();
 
 					ImGui::EndTabItem();
@@ -105,7 +109,5 @@ public:
 			}
 			ImGui::EndTabBar();
 		}
-
-		// ★ ImGui::End(); も削除
 	}
 };

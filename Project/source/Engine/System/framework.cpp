@@ -19,6 +19,7 @@ bool Frame_Work::initialize()
 	Scene_Manager::instance().change_scene(new Scene_Loading(new Scene_Indoor()));
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();
+
 	return true;
 }
 
