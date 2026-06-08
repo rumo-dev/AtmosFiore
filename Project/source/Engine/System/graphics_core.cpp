@@ -144,8 +144,8 @@ bool Graphics_Core::create_swap_chain() {
 // スワップチェーン設定
 	DXGI_SWAP_CHAIN_DESC desc = {};
 	desc.BufferCount = graphics_constants::BackBufferCount;
-	desc.BufferDesc.Width = SCREEN_WIDTH;
-	desc.BufferDesc.Height = SCREEN_HEIGHT;
+	desc.BufferDesc.Width = _screen_width;
+	desc.BufferDesc.Height = _screen_height;
 	desc.BufferDesc.Format = static_cast<DXGI_FORMAT>(graphics_constants::BackBufferFormat::DEFAULT);
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.OutputWindow = _hwnd;
@@ -169,8 +169,8 @@ bool Graphics_Core::create_swap_chain() {
 			if (SUCCEEDED(adapter->EnumOutputs(0, &output)))
 			{
 				DXGI_MODE_DESC modeDesc = {};
-				modeDesc.Width = SCREEN_WIDTH;
-				modeDesc.Height = SCREEN_HEIGHT;
+				modeDesc.Width = _screen_width;
+				modeDesc.Height = _screen_height;
 				modeDesc.Format = desc.BufferDesc.Format;
 
 				DXGI_MODE_DESC closestMatch = {};
@@ -235,8 +235,8 @@ void Graphics_Core::set_viewport() {
 	log_printf("ビューポートの設定開始\n", LogLevel::Info);
 	_viewport.TopLeftX = 0;
 	_viewport.TopLeftY = 0;
-	_viewport.Width = static_cast<float>(SCREEN_WIDTH);
-	_viewport.Height = static_cast<float>(SCREEN_HEIGHT);
+	_viewport.Width = _screen_width;
+	_viewport.Height = _screen_height;
 	_viewport.MinDepth = graphics_constants::ViewportMinDepth;
 	_viewport.MaxDepth = graphics_constants::ViewportMaxDepth;
 	_immediate_context.Get()->RSSetViewports(1, &_viewport);

@@ -310,6 +310,9 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="Source\Engine\Audio\Visual\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.h" />
     <ClInclude Include="source\Engine\Graphics\Shadow\shadow_map.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes_internal.h" />
@@ -319,6 +322,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\Model\debug_primitive.h" />
     <ClInclude Include="source\Engine\Graphics\Model\gltf_model.h" />
     <ClInclude Include="source\Engine\Graphics\Model\obj_model.h" />
+    <ClInclude Include="source\Engine\SharedData.h" />
     <ClInclude Include="source\Engine\System\Manager\Audio\AudioVisualizer.h" />
     <ClInclude Include="source\Engine\System\Manager\Audio\Spatializer.h" />
     <ClInclude Include="source\Engine\System\Manager\Light\area_light_manager.h" />
@@ -416,6 +420,8 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="Source\Engine\Audio\Visual\AudioGraphEditor.cpp" />
     <ClCompile Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.cpp" />
     <ClCompile Include="source\Engine\Graphics\Shadow\shadow_map.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\imnodes.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\sprite\sprite.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\sprite\sprite_batch.cpp" />
