@@ -136,7 +136,11 @@ public:
 	ToneMapping& GetToneMapping() {
 		return *tone_mapper;
 	};
+	void drawDebugView();
 
+	void drawBloomGUI();
+	void drawAdaptationGUI();
+	void drawToneMappingGUI();
 private:
 	/// フルスクリーン描画用フレームバッファ
 	static Framebuffer fsquad;

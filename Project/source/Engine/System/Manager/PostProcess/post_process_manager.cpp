@@ -116,297 +116,97 @@ void SliderFloatWithTooltip(const char* label, float* value, float min, float ma
 }
 
 
-void Post_Process_Manager::renderGUI() {
-#ifdef _DEBUG
-	ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Gbuffer:");
-	ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
 
-	Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
-	for (int i = 0; i < GBUFFER_COUNT; ++i)
-	{
-		if (srvs[i])
-		{
-			ImGui::Text("GBuffer %d", i);
-			ImGui::Image(
-				(ImTextureID)srvs[i],
-				ImVec2(256, 256)   // 表示サイズ
-			);
-		}
-	}
-	ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "point_frontShadow_depth:");
-	shadower->get_point_shadow_front_map() ? ImGui::Image(
-		(ImTextureID)shadower->get_point_shadow_front_map(),
-		ImVec2(256, 256)   // 表示サイズ
-	) : ImGui::Text("Shadow map not available");
+void Post_Process_Manager::drawDebugView()
+{
 
-	ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "point_back_Shadow_depth:");
-	shadower->get_point_shadow_back_map() ? ImGui::Image(
-		(ImTextureID)shadower->get_point_shadow_back_map(),
-		ImVec2(256, 256)   // 表示サイズ
-	) : ImGui::Text("Shadow map not available");
-
-	ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "directional_Shadow_depth:");
-	shadower->get_directional_shadow_map() ? ImGui::Image(
-		(ImTextureID)shadower->get_directional_shadow_map(),
-		ImVec2(256, 256)   // 表示サイズ
-	) : ImGui::Text("Shadow map not available");
-
-	shadower->shadow_gui();
-	ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Enabled Effects:");
-	ImGui::BeginGroup();
-	CheckboxInt("Bloom", bloomer->is_bloom, "Enable bloom effect");
-	CheckboxInt("Tone Mapping", tone_mapper->is_enabled, "Enable tone mapping post effect");
-	ImGui::EndGroup();
-
-	// Bloom設定（Bloomが有効な場合のみ）
-	if (bloomer->is_bloom) {
-		ImGui::BeginGroup();
-		ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Bloom:");
-		SliderFloatWithTooltip("Threshold", &bloomer->bloom_extraction_threshold, 0.0f, 1.0f, "Brightness threshold for bloom");
-		SliderFloatWithTooltip("Intensity", &bloomer->bloom_intensity, 0.0f, 5.0f, "Strength of bloom effect");
-
-		// ----------- SRV（テクスチャ）プレビュー -----------
-		if (bloomer->getColorMap()) {
-			if (ImGui::CollapsingHeader("Bloom Texture Preview")) {
-				ImVec2 texSize = ImVec2(640, 360); // 表示サイズ
-				ImGui::Image((ImTextureID)bloomer->getColorMap(), texSize);
+	if (ImGui::CollapsingHeader("GBuffer", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
+		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
+		for (int i = 0; i < GBUFFER_COUNT; ++i) {
+			if (srvs[i]) {
+				ImGui::Text("GBuffer %d", i);
+				ImGui::Image((ImTextureID)srvs[i], ImVec2(256, 256));
 			}
 		}
-
-		ImGui::EndGroup();
+	}
+	if (ImGui::CollapsingHeader("Shadow Maps")) {
+		auto drawShadow = [](const char* label, ID3D11ShaderResourceView* srv) {
+			ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s:", label);
+			srv ? ImGui::Image((ImTextureID)srv, ImVec2(256, 256)) : ImGui::Text("Shadow map not available");
+			};
+		drawShadow("point_frontShadow_depth", shadower->get_point_shadow_front_map());
+		drawShadow("point_back_Shadow_depth", shadower->get_point_shadow_back_map());
+		drawShadow("directional_Shadow_depth", shadower->get_directional_shadow_map());
+		shadower->shadow_gui();
 	}
 
-	ImGui::Separator();
-	ImGui::BeginGroup();
-	ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Adaptation:");
+}
+
+void Post_Process_Manager::drawBloomGUI()
+{
+	CheckboxInt("Enable Bloom", bloomer->is_bloom, "Enable bloom effect");
+	if (bloomer->is_bloom) {
+		SliderFloatWithTooltip("Threshold", &bloomer->bloom_extraction_threshold, 0.0f, 1.0f, "Brightness threshold for bloom");
+		SliderFloatWithTooltip("Intensity", &bloomer->bloom_intensity, 0.0f, 5.0f, "Strength of bloom effect");
+		if (bloomer->getColorMap()) {
+			if (ImGui::CollapsingHeader("Bloom Texture Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::Image((ImTextureID)bloomer->getColorMap(), ImVec2(640, 360));
+			}
+		}
+	}
+}
+
+void Post_Process_Manager::drawAdaptationGUI()
+{
 	SliderFloatWithTooltip("target_lum", &adaptation->target_lum, 0.0f, 1.0f, "Target luminance for adaptation");
 	SliderFloatWithTooltip("Speed to Light", &adaptation->speed_to_light, 0.0f, 10.0f, "Speed of adaptation to lighter scenes");
 	SliderFloatWithTooltip("Speed to Dark", &adaptation->speed_to_dark, 0.0f, 10.0f, "Speed of adaptation to darker scenes");
-
-	// ----------- SRV（テクスチャ）プレビュー -----------
 	if (adaptation->get_color_map()) {
-		if (ImGui::CollapsingHeader("Adaptation Texture Preview")) {
-			ImVec2 texSize = ImVec2(640, 360); // 表示サイズ
-			ImGui::Image((ImTextureID)adaptation->get_color_map(), texSize);
+		if (ImGui::CollapsingHeader("Adaptation Texture Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Image((ImTextureID)adaptation->get_color_map(), ImVec2(640, 360));
 		}
 	}
+}
 
-	ImGui::EndGroup();
-
-
-	ImGui::Separator();
-	// Bloom設定（Bloomが有効な場合のみ）
-	if (tone_mapper->is_enabled)
-	{
-		ImGui::BeginGroup();
-
-		if (ImGui::CollapsingHeader(
-			"Tone Mapping Settings",
-			ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			const char* items[] =
-			{
-				"ACES",
-				"Reinhard",
-				"Unreal",
-				"Neutral",
-				"Linear",
-				"Hable",
-				"AgX",
-				"GT",
-
-				"Drago",
-				"Exponential",
-				"Logarithmic",
-				"Ward",
-				"Lottes",
-				"Hejl",
-				"RomBinDaHouse",
-				"ReinhardExtended",
-				"FilmicSimple",
-				"ACESApprox",
-				"PBRNeutral",
-				"Sigmoid",
-				"Piecewise",
-				"Cineon",
-				"Exposure",
-				"GammaOnly",
-				"PQApprox",
-				"HLGApprox",
-				"OpenDRTLike",
-				"CameraResponse",
-				"Uchimura",
-				"ClampOnly",
-				"WhitePreservingLuma",
-				"FilmicALU",
-				"AgXPunchy",
-				"CustomCurve"
-			};
-
-			int current =
-				static_cast<int>(tone_mapper->mapping_type);
-
-			if (ImGui::Combo(
-				"Algorithm",
-				&current,
-				items,
-				IM_ARRAYSIZE(items)))
-			{
-				tone_mapper->mapping_type =
-					static_cast<ToneMapping::ToneMappingType>(current);
-			}
-
-			ImGui::Separator();
-
-			// ----------------------------------------------------
-			// Common Parameters
-			// ----------------------------------------------------
-
-			ImGui::SliderFloat(
-				"Exposure",
-				&tone_mapper->exposure,
-				0.01f,
-				10.0f);
-
-			ImGui::SliderFloat(
-				"Gamma",
-				&tone_mapper->gamma,
-				1.0f,
-				3.0f);
-
-			// ----------------------------------------------------
-			// GT / Uchimura
-			// ----------------------------------------------------
-
-			if (tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::GT ||
-				tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::Uchimura)
-			{
-				ImGui::SeparatorText("GT / Uchimura");
-
-				ImGui::SliderFloat(
-					"Linear Start (m)",
-					&tone_mapper->gt_param,
-					0.01f,
-					1.0f);
-
-				ImGui::SliderFloat(
-					"Max White",
-					&tone_mapper->max_white,
-					1.0f,
-					20.0f);
-			}
-
-			// ----------------------------------------------------
-			// Reinhard Extended
-			// ----------------------------------------------------
-
-			if (tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::ReinhardExtended)
-			{
-				ImGui::SeparatorText("Reinhard Extended");
-
-				ImGui::SliderFloat(
-					"Max White",
-					&tone_mapper->max_white,
-					1.0f,
-					20.0f);
-			}
-
-			// ----------------------------------------------------
-			// Drago / Ward / Logarithmic
-			// ----------------------------------------------------
-
-			if (tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::Drago ||
-
-				tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::Ward ||
-
-				tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::Logarithmic)
-			{
-				ImGui::SeparatorText("HDR Parameters");
-
-				ImGui::SliderFloat(
-					"HDR White",
-					&tone_mapper->max_white,
-					1.0f,
-					50.0f);
-			}
-
-			// ----------------------------------------------------
-			// Exposure-based
-			// ----------------------------------------------------
-
-			if (tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::Exposure ||
-
-				tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::Exponential)
-			{
-				ImGui::SeparatorText("Exposure");
-
-				ImGui::SliderFloat(
-					"Exposure Strength",
-					&tone_mapper->exposure,
-					0.01f,
-					20.0f);
-			}
-
-			// ----------------------------------------------------
-			// Custom Curve
-			// ----------------------------------------------------
-
-			if (tone_mapper->mapping_type ==
-				ToneMapping::ToneMappingType::CustomCurve)
-			{
-				ImGui::SeparatorText("Custom Curve");
-
-				ImGui::SliderFloat(
-					"Shoulder",
-					&tone_mapper->shoulder,
-					0.01f,
-					2.0f);
-
-				ImGui::SliderFloat(
-					"Linear Strength",
-					&tone_mapper->linear_strength,
-					0.01f,
-					2.0f);
-
-				ImGui::SliderFloat(
-					"Linear Angle",
-					&tone_mapper->linear_angle,
-					0.01f,
-					2.0f);
-
-				ImGui::SliderFloat(
-					"Toe Strength",
-					&tone_mapper->toe_strength,
-					0.01f,
-					2.0f);
-			}
-
-			// ----------------------------------------------------
-			// Debug Info
-			// ----------------------------------------------------
-
-			ImGui::Separator();
-
-			ImGui::Text(
-				"Current Mode : %s",
-				items[current]);
+void Post_Process_Manager::drawToneMappingGUI()
+{
+	CheckboxInt("Enable Tone Mapping", tone_mapper->is_enabled, "Enable tone mapping post effect");
+	if (tone_mapper->is_enabled) {
+		const char* items[] = { "ACES", "Reinhard", "Unreal", "Neutral", "Linear", "Hable", "AgX", "GT", "Drago", "Exponential", "Logarithmic", "Ward", "Lottes", "Hejl", "RomBinDaHouse", "ReinhardExtended", "FilmicSimple", "ACESApprox", "PBRNeutral", "Sigmoid", "Piecewise", "Cineon", "Exposure", "GammaOnly", "PQApprox", "HLGApprox", "OpenDRTLike", "CameraResponse", "Uchimura", "ClampOnly", "WhitePreservingLuma", "FilmicALU", "AgXPunchy", "CustomCurve" };
+		int current = static_cast<int>(tone_mapper->mapping_type);
+		if (ImGui::Combo("Algorithm", &current, items, IM_ARRAYSIZE(items))) {
+			tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(current);
 		}
+		ImGui::Separator();
+		ImGui::SliderFloat("Exposure", &tone_mapper->exposure, 0.01f, 10.0f);
+		ImGui::SliderFloat("Gamma", &tone_mapper->gamma, 1.0f, 3.0f);
 
-		ImGui::EndGroup();
+		if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::GT || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Uchimura) {
+			ImGui::SeparatorText("GT / Uchimura");
+			ImGui::SliderFloat("Linear Start (m)", &tone_mapper->gt_param, 0.01f, 1.0f);
+			ImGui::SliderFloat("Max White", &tone_mapper->max_white, 1.0f, 20.0f);
+		}
+		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::ReinhardExtended) {
+			ImGui::SeparatorText("Reinhard Extended");
+			ImGui::SliderFloat("Max White", &tone_mapper->max_white, 1.0f, 20.0f);
+		}
+		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::Drago || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Ward || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Logarithmic) {
+			ImGui::SeparatorText("HDR Parameters");
+			ImGui::SliderFloat("HDR White", &tone_mapper->max_white, 1.0f, 50.0f);
+		}
+		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::Exposure || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Exponential) {
+			ImGui::SeparatorText("Exposure");
+			ImGui::SliderFloat("Exposure Strength", &tone_mapper->exposure, 0.01f, 20.0f);
+		}
+		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::CustomCurve) {
+			ImGui::SeparatorText("Custom Curve");
+			ImGui::SliderFloat("Shoulder", &tone_mapper->shoulder, 0.01f, 2.0f);
+			ImGui::SliderFloat("Linear Strength", &tone_mapper->linear_strength, 0.01f, 2.0f);
+			ImGui::SliderFloat("Linear Angle", &tone_mapper->linear_angle, 0.01f, 2.0f);
+			ImGui::SliderFloat("Toe Strength", &tone_mapper->toe_strength, 0.01f, 2.0f);
+		}
+		ImGui::Text("Current Mode : %s", items[current]);
+
 	}
-
-
-	ImGui::Separator();
-
-
-
-#endif
 }

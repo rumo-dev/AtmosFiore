@@ -22,6 +22,7 @@
 CONST LONG SCREEN_WIDTH{ 1280 };
 CONST LONG SCREEN_HEIGHT{ 720 };
 
+
 CONST BOOL FULLSCREEN{ FALSE };
 
 class Graphics_Core
@@ -180,7 +181,7 @@ public:
 		//SetWindowLong(hwnd_, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
 
 	};
-	void resize_window(int target_width = SCREEN_WIDTH, int target_height = SCREEN_HEIGHT)
+	void resize_window(int target_width, int target_height)
 	{
 		// 現在のウィンドウスタイル取得
 		DWORD style = static_cast<DWORD>(GetWindowLong(_hwnd, GWL_STYLE));
@@ -216,7 +217,7 @@ public:
 
 
 	float get_aspect_ratio() const { return _screen_width / _screen_height; }
-	float get_primary_aspect_ratio() const { return static_cast<float>(SCREEN_WIDTH) / static_cast<float>(SCREEN_HEIGHT); }
+	float get_primary_aspect_ratio() const { return _screen_width / _screen_height; }
 
 	void create_constant_buffer()
 	{

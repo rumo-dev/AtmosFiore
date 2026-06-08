@@ -15,6 +15,7 @@
 #include "Engine/Graphics/UI/text/text.h"
 
 #include "Game/Scenes/scene.h"
+#include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 
 #ifdef USE_IMGUI
 #include "Engine/Graphics/UI/ImGui/imgui.h"
@@ -114,17 +115,23 @@ public:
 #ifdef USE_IMGUI
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
-		const char* font_path = "./data/fonts/imgui.ttf";
 
 		ImGuiIO& io = ImGui::GetIO();
 
+
+
 		const ImWchar* ranges = io.Fonts->GetGlyphRangesJapanese();
 
-		io.Fonts->AddFontFromFileTTF(font_path, 16.0f, nullptr, ranges);
-		unsigned char* pixels;
-		int width, height;
-		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+		io.Fonts->AddFontFromFileTTF(
+			"./data/fonts/imgui.ttf",
+			16.0f,
+			nullptr,
+			ranges
+		);
 
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;
+		io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;
 		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplDX11_Init(
 			Graphics_Core::instance().get_device(),
@@ -132,6 +139,7 @@ public:
 		);
 
 		ImGui::StyleColorsDark();
+		Dashboard::Instance().SetupStyle();
 #endif
 
 		while (WM_QUIT != msg.message)
@@ -279,6 +287,4 @@ private:
 		}
 	}
 
-	/// リソース監視（メモリ・GPUなど）
-	Resource_Monitor _monitor;
 };
