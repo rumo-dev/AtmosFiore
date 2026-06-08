@@ -18,12 +18,12 @@ bool Frame_Work::initialize()
 
 	Scene_Manager::instance().change_scene(new Scene_Loading(new Scene_Indoor()));
 	Text::initialize();
+	Dashboard::Instance().InitializeUI();
 	return true;
 }
 
 void Frame_Work::update(float elapsed_time/*Elapsed seconds from last frame*/)
 {
-	_monitor.update();
 
 
 #ifdef USE_IMGUI
@@ -53,9 +53,8 @@ void Frame_Work::render(float elapsed_time) {
 	// --- ImGuiの描画 ---
 #ifdef USE_IMGUI
 	if (!_hide_imgui) {
-		static SharedMetricsData sharedData;
-		sharedData.UpdateMetrics(1.0f / elapsed_time);
-		Dashboard::Instance().Render(sharedData);
+		Dashboard::Instance().data.UpdateFPS(1.0f / elapsed_time);
+		Dashboard::Instance().Render();
 	}
 
 	ImGui::Render();

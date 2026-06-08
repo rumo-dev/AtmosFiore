@@ -285,6 +285,4 @@ private:
 		}
 	}
 
-	/// リソース監視（メモリ・GPUなど）
-	Resource_Monitor _monitor;
 };

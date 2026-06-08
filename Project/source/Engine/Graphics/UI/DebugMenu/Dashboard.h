@@ -1,58 +1,81 @@
 #pragma once
 #include <vector>
 #include <string>
-#include <mutex>
-#include <unordered_map>
+#include <functional>
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 
-// ゲーム側とデバッグツール間で共有するデータ
-struct SharedMetricsData {
-	std::mutex mtx;
-	float fps = 0.0f;
-	std::vector<float> graph_history;
+#include "Engine/utilities/resource_monitor.h"
 
-	// カテゴリごとの設定フラグ
+#include <mutex>
+#include <unordered_map>
+
+struct SharedMetricsData {
+	// スレッドセーフのためのミューテックス
+	mutable std::mutex mtx;
+
+	// --- 設定項目 (Settings) ---
+	// UIとゲームロジックの間で同期するフラグや数値
 	std::unordered_map<std::string, bool> feature_toggles;
-	// 数値設定
 	std::unordered_map<std::string, float> feature_values;
 
-	void Initialize() {
-		// 初期値を設定
-		feature_toggles["FeatherEnabled"] = true;
-		feature_values["FeatherSlider"] = 50.0f;
+	// --- パフォーマンス計測 (Metrics) ---
+	float fps = 0.0f;
+	float frame_time = 0.0f;
+	std::vector<float> graph_history;
 
-		for (int i = 1; i <= 11; ++i) {
-			std::string key = "CrownToggle_" + std::to_string(i);
-			feature_toggles[key] = false;
+	// データの安全な更新用メソッド
+	void SetToggle(const std::string& key, bool value) {
+		std::lock_guard<std::mutex> lock(mtx);
+		feature_toggles[key] = value;
+	}
+
+	bool GetToggle(const std::string& key) const {
+		std::lock_guard<std::mutex> lock(mtx);
+		return feature_toggles.count(key) ? feature_toggles.at(key) : false;
+	}
+
+	void UpdateFPS(float current_fps) {
+		std::lock_guard<std::mutex> lock(mtx);
+		fps = current_fps;
+		graph_history.push_back(current_fps);
+		if (graph_history.size() > 100) {
+			graph_history.erase(graph_history.begin());
 		}
 	}
+};
 
-	void UpdateMetrics(float new_fps) {
-		std::lock_guard<std::mutex> lock(mtx);
-		fps = new_fps;
-		graph_history.push_back(new_fps / 100.0f); // グラフ用に正規化
-		if (graph_history.size() > 50) graph_history.erase(graph_history.begin());
-	}
+// 各タブの中身を定義する型
+using RenderFunc = std::function<void(SharedMetricsData&)>;
+
+struct SubTab {
+	std::string name;
+	RenderFunc render_func;
+};
+
+struct TabModule {
+	std::string name;
+	std::vector<SubTab> subtabs;
 };
 
 class Dashboard {
 public:
-	static Dashboard& Instance() {
-		static Dashboard instance;
-		return instance;
-	}
-	Dashboard() = default;
+	static Dashboard& Instance() { static Dashboard instance; return instance; }
 
-	// メインの描画ルーチン
-	void Render(SharedMetricsData& data);
+	// UIモジュールを外部から登録する
+	void InitializeUI();
+	void RegisterModule(const TabModule& mod) { modules.push_back(mod); }
+	void Render();
+	SharedMetricsData data; // ゲームとUIで共有するデータ
 
 private:
-	void SetupBaseStyle(); // 全体の色味と角丸
-	void RenderSideBar(); // 左側のアイコンメニュー
-	void RenderMainContent(SharedMetricsData& data); // 右側の設定項目エリア
+	Dashboard() = default;
+	std::vector<TabModule> modules;
+	int active_mod_idx = 0;
+	int active_sub_idx = 0;
 
-	// カスタムパーツ
-	void CustomHeader(const char* label); // カテゴリ見出し
-	bool CustomToggle(const char* label, bool* v); // モダンなトグル
-	void CustomSlider(const char* label, float* v, float v_min, float v_max); // モダンなスライダー
+	void RenderSideBar();
+	void RenderMainContent();
+
+	/// リソース監視（メモリ・GPUなど）
+	Resource_Monitor _monitor;
 };
