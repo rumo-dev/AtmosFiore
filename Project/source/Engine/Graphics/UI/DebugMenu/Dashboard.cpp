@@ -21,7 +21,7 @@ void Dashboard::RenderSideBar() {
 	// 少し大きめのフォントを使用する場合の想定（事前にLoadFontが必要）
 	// ImGui::PushFont(font_large); 
 	ImGui::Indent(20);
-	ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "NEVERLOSE");
+	ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "AtmosFiore");
 	ImGui::Unindent(20);
 
 	// ImGui::PopFont();

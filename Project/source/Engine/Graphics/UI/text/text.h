@@ -257,7 +257,7 @@ public:
 	 * @param shadow 影を描画するか
 	 * @return HRESULT 結果コード
 	 */
-	HRESULT draw_text(std::string str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
+	HRESULT draw_text(std::wstring str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
 
 	/**
 	 * @brief 文字列を指定領域に描画する
@@ -267,7 +267,7 @@ public:
 	 * @param shadow 影を描画するか
 	 * @return HRESULT 結果コード
 	 */
-	HRESULT draw_text(std::string str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
+	HRESULT draw_text(std::wstring str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
 
 	/**
 	 * @brief 指定されたパスのフォントを読み込む
@@ -342,12 +342,7 @@ private:
 	 */
 	WCHAR* get_font_file_name_without_extension(const std::wstring& filePath);
 
-	/**
-	 * @brief string型をwstring型へ変換する
-	 * @param oString 変換元文字列
-	 * @return 変換後のwstring
-	 */
-	std::wstring string_to_wstring(std::string oString);
+
 };
 
 class Text {
@@ -363,11 +358,11 @@ public:
 
 	static Text_Write* text;
 	static void initialize();
-	static void draw(std::string str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
-	static void draw(std::string str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
+	static void draw(std::wstring str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
+	static void draw(std::wstring str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow = false);
 
-	static std::string culculate_type_writer_string(
-		const std::string& str,
+	static std::wstring culculate_type_writer_string(
+		const std::wstring& str,
 		float elapsedTime,
 		float charsPerSecond,
 		TypeWriterEnding ending,
@@ -376,7 +371,7 @@ public:
 	);
 
 	static void draw_type_writer(
-		const std::string& str,
+		const std::wstring& str,
 		dx::XMFLOAT2 pos,
 		float elapsedTime,
 		float charsPerSecond = 15,
@@ -388,7 +383,7 @@ public:
 	);
 
 	static void draw_type_writer(
-		const std::string& str,
+		const std::wstring& str,
 		D2D1_RECT_F rect,
 		float elapsedTime,
 		float charsPerSecond = 15,

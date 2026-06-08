@@ -430,7 +430,7 @@ HRESULT Text_Write::set_font(WCHAR const* fontname, DWRITE_FONT_WEIGHT fontWeigh
  * @param shadow 影を描画するか
  * @return HRESULT
  */
-HRESULT Text_Write::draw_text(std::string str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
+HRESULT Text_Write::draw_text(std::wstring str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
 {
 	if (!_render_target) {
 		return E_FAIL; // または初期化処理を再試行
@@ -438,14 +438,14 @@ HRESULT Text_Write::draw_text(std::string str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_
 	HRESULT result = S_OK;
 #if USE_FONT
 	// 文字列の変換
-	std::wstring wstr = string_to_wstring(str.c_str());
+
 
 	// ターゲットサイズの取得
 	D2D1_SIZE_F TargetSize = _render_target->GetSize();
 
 
 	// テキストレイアウトを作成
-	result = _dwrite_factory->CreateTextLayout(wstr.c_str(), static_cast<UINT32>(wstr.size()), _text_format.Get(), TargetSize.width, TargetSize.height, _text_layout.GetAddressOf());
+	result = _dwrite_factory->CreateTextLayout(str.c_str(), static_cast<UINT32>(str.size()), _text_format.Get(), TargetSize.width, TargetSize.height, _text_layout.GetAddressOf());
 	if (FAILED(result)) { return result; }
 
 	// 描画位置の確定
@@ -485,14 +485,13 @@ HRESULT Text_Write::draw_text(std::string str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_
  * @param shadow 影を描画するか
  * @return HRESULT
  */
-HRESULT Text_Write::draw_text(std::string str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
+HRESULT Text_Write::draw_text(std::wstring str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
 {
 
 
 	HRESULT result = S_OK;
 #if USE_FONT
 	// 文字列の変換
-	std::wstring wstr = string_to_wstring(str.c_str());
 
 	// 描画の開始
 	_render_target->BeginDraw();
@@ -500,15 +499,15 @@ HRESULT Text_Write::draw_text(std::string str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_
 	if (shadow)
 	{
 		// 影の描画
-		_render_target->DrawText(wstr.c_str(),
-			static_cast<UINT32>(wstr.size()),
+		_render_target->DrawText(str.c_str(),
+			static_cast<UINT32>(str.size()),
 			_text_format.Get(),
 			D2D1::RectF(rect.left - _setting.shadowOffset.x, rect.top - _setting.shadowOffset.y, rect.right - _setting.shadowOffset.x, rect.bottom - _setting.shadowOffset.y),
 			_shadow_brush.Get(), options);
 	}
 
 	// 描画処理
-	_render_target->DrawText(wstr.c_str(), static_cast<UINT32>(wstr.size()), _text_format.Get(), rect, _brush.Get(), options);
+	_render_target->DrawText(str.c_str(), static_cast<UINT32>(str.size()), _text_format.Get(), rect, _brush.Get(), options);
 
 	// 描画の終了
 	result = _render_target->EndDraw();
@@ -664,35 +663,6 @@ WCHAR* Text_Write::get_font_file_name_without_extension(const std::wstring& file
 	return nullptr;
 #endif // USE_FONT
 }
-/**
- * @brief std::stringをstd::wstringに変換。
- * @param oString 変換対象の文字列（SJIS）
- * @return 変換後のワイド文字列
- */
-std::wstring Text_Write::string_to_wstring(std::string oString)
-{
-#if USE_FONT
-	// SJIS → wstring
-	int iBufferSize = MultiByteToWideChar(CP_ACP, 0, oString.c_str(), -1, (wchar_t*)NULL, 0);
-
-	// バッファの取得
-	wchar_t* cpUCS2 = new wchar_t[iBufferSize];
-
-	// SJIS → wstring
-	MultiByteToWideChar(CP_ACP, 0, oString.c_str(), -1, cpUCS2, iBufferSize);
-
-	// stringの生成
-	std::wstring oRet(cpUCS2, cpUCS2 + iBufferSize - 1);
-
-	// バッファの破棄
-	delete[] cpUCS2;
-
-	// 変換結果を返す
-	return(oRet);
-#else
-	return L"";
-#endif // USE_FONT
-}
 Text_Write* Text::text = nullptr;
 Font_Data Text::text_data;
 void Text::initialize()
@@ -709,14 +679,14 @@ void Text::initialize()
 
 
 }
-void Text::draw(std::string str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
+void Text::draw(std::wstring str, dx::XMFLOAT2 pos, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
 {
 	if (text)
 	{
 		text->draw_text(str, pos, options, shadow);
 	}
 }
-void Text::draw(std::string str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
+void Text::draw(std::wstring str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS options, bool shadow)
 {
 	if (text)
 	{
@@ -724,7 +694,7 @@ void Text::draw(std::string str, D2D1_RECT_F rect, D2D1_DRAW_TEXT_OPTIONS option
 	}
 }
 void Text::draw_type_writer(
-	const std::string& str,
+	const std::wstring& str,
 	dx::XMFLOAT2 pos,
 	float elapsedTime,
 	float charsPerSecond,
@@ -738,7 +708,7 @@ void Text::draw_type_writer(
 	draw(culculate_type_writer_string(str, elapsedTime, charsPerSecond, ending, cursor, cursorBlinkSpeed), pos, options, shadow);
 }
 void Text::draw_type_writer(
-	const std::string& str,
+	const std::wstring& str,
 	D2D1_RECT_F rect,
 	float elapsedTime,
 	float charsPerSecond,
@@ -751,8 +721,8 @@ void Text::draw_type_writer(
 {
 	draw(culculate_type_writer_string(str, elapsedTime, charsPerSecond, ending, cursor, cursorBlinkSpeed), rect, options, shadow);
 }
-std::string Text::culculate_type_writer_string(
-	const std::string& str,
+std::wstring Text::culculate_type_writer_string(
+	const std::wstring& str,
 	float elapsedTime,
 	float charsPerSecond,
 	TypeWriterEnding ending,
@@ -763,7 +733,7 @@ std::string Text::culculate_type_writer_string(
 	float totalTime = length / charsPerSecond;
 
 	size_t maxChars = 0;
-	std::string sub;
+	std::wstring sub;
 
 	switch (ending)
 	{
@@ -810,10 +780,10 @@ std::string Text::culculate_type_writer_string(
 	case TypeWriterEnding::Chat:
 	{
 		// 改行で分割
-		std::vector<std::string> lines;
+		std::vector<std::wstring> lines;
 		{
-			std::stringstream ss(str);
-			std::string line;
+			std::wstringstream ss(str);
+			std::wstring line;
 			while (std::getline(ss, line)) {
 				lines.push_back(line);
 			}
@@ -879,7 +849,7 @@ std::string Text::culculate_type_writer_string(
 		bool showCursor = fmod(elapsedTime, cursorBlinkSpeed * 2) < cursorBlinkSpeed;
 
 		if (showCursor || maxChars < length) {
-			sub += "|";
+			sub += L"|";
 		}
 	}
 

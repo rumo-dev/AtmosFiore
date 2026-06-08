@@ -82,11 +82,11 @@ void Scene_Loading::render(float elapsedTime)
 		Text::text->set_font(Text::text_data);
 		if (_timer > 0.f)
 		{
-			Text::text->draw_text("スペースキーでタイトル", D2D1::RectF(0, 0, 1280, 720), D2D1_DRAW_TEXT_OPTIONS_NONE);
+			Text::text->draw_text(L"スペースキーでタイトル", D2D1::RectF(0, 0, 1280, 720), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
 		}
 		else {
-			Text::text->draw_text("スプラッシュスクリーン", D2D1::RectF(0, 0, 1280, 720), D2D1_DRAW_TEXT_OPTIONS_NONE);
+			Text::text->draw_text(L"スプラッシュスクリーン", D2D1::RectF(0, 0, 1280, 720), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
 		}
 
@@ -98,7 +98,7 @@ void Scene_Loading::render(float elapsedTime)
 		Graphics_Core::instance().clear(Color_Utils::from_hex("#261F30"));
 		Text::text_data.Color = Color_Utils::hex_to_colorF("#D1B8F0");
 
-		Text::text->draw_text("ローディング", DirectX::XMFLOAT2(100, 200), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+		Text::text->draw_text(L"ローディング", DirectX::XMFLOAT2(100, 200), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 
 	}
 }
