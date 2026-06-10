@@ -4,9 +4,9 @@
 /**
  * @brief カメラ制御基底クラス
  */
-class Camera_Base {
+class ICamera {
 public:
-	virtual ~Camera_Base() = default;
+	virtual ~ICamera() = default;
 
 	// 毎フレームのカメラ挙動更新（派生クラスでオーバーライド）
 	virtual void update(float deltaTime) = 0;

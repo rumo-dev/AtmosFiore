@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief スペクテイター（凝視・デバッグ自由移動）カメラクラス
  */
-class Spectator_Camera : public Camera_Base {
+class Spectator_Camera : public ICamera {
 private:
 	// 初期状態リセット用のバックアップパラメータ
 	dx::XMVECTOR default_position;

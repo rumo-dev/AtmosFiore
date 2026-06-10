@@ -195,6 +195,7 @@ public: // shadow settings
 
 	// last computed light view-projection (stored for culling)
 	DirectX::XMFLOAT4X4 last_light_view_projection{ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
+	DirectX::XMFLOAT4X4 light_view_projection;
 	// per-face view-projection matrices for point shadow (cube faces)
 	DirectX::XMFLOAT4X4 point_face_viewproj[6];
 	// current point shadow face group being rendered (Front/Back)

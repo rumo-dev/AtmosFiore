@@ -28,14 +28,6 @@ CONST BOOL FULLSCREEN{ FALSE };
 class Graphics_Core
 {
 public:
-	struct Scene_Constants
-	{
-		DirectX::XMFLOAT4X4 view_projection;         //ビュー・プロジェクション変換行列
-		DirectX::XMFLOAT4X4 inv_view_projection;         //ビュー・プロジェクション変換行列
-		DirectX::XMFLOAT4 camera_position;          //カメラの位置
-		DirectX::XMFLOAT4X4 light_view_projection;
-
-	};
 	struct Light_Constants
 	{
 		DirectX::XMFLOAT4 ambient_color;
@@ -43,12 +35,15 @@ public:
 		DirectX::XMFLOAT4 directional_light_color;
 
 	};
+
 	enum class Conastant_Buffer_Type
 	{
 		Scene,
 		Light,
+		Camera,
 		Num
 	};
+
 private:
 	DirectX::XMFLOAT4 ambient_color{ 0.2f, 0.2f, 0.2f, 0.2f };
 	DirectX::XMFLOAT4 directional_light_direction{ 0.0f, -1.0f, 1.0f, 1.0f };
@@ -224,13 +219,13 @@ public:
 		HRESULT hr{ S_OK };
 		D3D11_BUFFER_DESC buffer_desc{};
 		{
-			buffer_desc.ByteWidth = sizeof(Scene_Constants);
+			buffer_desc.ByteWidth = sizeof(Camera_Constants);
 			buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 			buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 			buffer_desc.CPUAccessFlags = 0;
 			buffer_desc.MiscFlags = 0;
 			buffer_desc.StructureByteStride = 0;
-			hr = _device->CreateBuffer(&buffer_desc, nullptr, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Scene)].GetAddressOf());
+			hr = _device->CreateBuffer(&buffer_desc, nullptr, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
 		}
 		{
 			buffer_desc.ByteWidth = sizeof(Light_Constants);

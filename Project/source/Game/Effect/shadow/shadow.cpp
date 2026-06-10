@@ -107,9 +107,8 @@ void shadow::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVi
 void shadow::make_directional_shadow_begin() {
 	using namespace DirectX;
 
-	Graphics_Core::Scene_Constants data{};
-	XMStoreFloat4(&data.camera_position, Camera_Manager::instance().get_active_camera()->get_camera().position);
 
+	XMFLOAT4X4 VP;
 	const float aspect_ratio = directional_shadow_map->viewport.Width / directional_shadow_map->viewport.Height;
 	XMVECTOR F{ XMLoadFloat4(&light_view_focus) };
 	DirectX::XMFLOAT4 directional_light_direction = Graphics_Core::instance().get_directional_light_direction();
@@ -118,12 +117,10 @@ void shadow::make_directional_shadow_begin() {
 	XMMATRIX V{ XMMatrixLookAtLH(E, F, U) };
 	XMMATRIX P{ XMMatrixOrthographicLH(light_view_size * aspect_ratio, light_view_size, light_view_near_z, light_view_far_z) };
 
-	DirectX::XMStoreFloat4x4(&data.view_projection, V * P);
+	DirectX::XMStoreFloat4x4(&VP, V * P);
 	// store for culling usage
-	last_light_view_projection = data.view_projection;
-	data.light_view_projection = data.view_projection;
-	Graphics_Core::instance().get_device_context()->UpdateSubresource(Graphics_Core::instance().get_constant_buffer(Graphics_Core::Conastant_Buffer_Type::Scene), 0, 0, &data, 0, 0);
-	Graphics_Core::instance().get_device_context()->VSSetConstantBuffers(1, 1, Graphics_Core::instance().get_constant_buffer_address(Graphics_Core::Conastant_Buffer_Type::Scene));
+	last_light_view_projection = VP;
+	light_view_projection = VP;
 
 	active_shadow_map = directional_shadow_map.get();
 	active_shadow_map->clear(Graphics_Core::instance().get_device_context(), 1.0f);

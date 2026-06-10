@@ -11,8 +11,8 @@
  */
 class Camera_Manager {
 private:
-	std::unordered_map<std::string, std::shared_ptr<Camera_Base>> _cameras;
-	std::shared_ptr<Camera_Base> _active_camera;
+	std::unordered_map<std::string, std::shared_ptr<ICamera>> _cameras;
+	std::shared_ptr<ICamera> _active_camera;
 
 	Camera_Manager() = default;
 
@@ -23,7 +23,7 @@ public:
 	}
 
 	// カメラの登録
-	void register_camera(const std::string& name, std::shared_ptr<Camera_Base> camera) {
+	void register_camera(const std::string& name, std::shared_ptr<ICamera> camera) {
 		_cameras[name] = camera;
 		if (!_active_camera) {
 			_active_camera = camera; // 最初の一台を自動的にアクティブにする
@@ -50,7 +50,7 @@ public:
 	}
 
 	// 現在アクティブなカメラの取得
-	std::shared_ptr<Camera_Base> get_active_camera() {
+	std::shared_ptr<ICamera> get_active_camera() {
 		return _active_camera;
 	}
 

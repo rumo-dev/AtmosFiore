@@ -29,6 +29,10 @@ void Resource_Manager::load_shaders() {
 		"POINT_SHADOW_VS",
 		"point_shadow_vs"
 	);
+	shader_manager.load<Vertex_Shader>(
+		"DIRECTIONAL_SHADOW_VS",
+		"directional_shadow_vs"
+	);
 	shader_manager.load<Pixel_Shader>(
 		"POINT_SHADOW_PS",
 		"point_shadow_ps"

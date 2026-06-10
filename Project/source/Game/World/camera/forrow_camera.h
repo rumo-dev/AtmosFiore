@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief 対象追従カメラ（TPS/三人称視点など）クラス
  */
-class Follow_Camera : public Camera_Base {
+class Follow_Camera : public ICamera {
 private:
 	HWND _hwnd{};
 

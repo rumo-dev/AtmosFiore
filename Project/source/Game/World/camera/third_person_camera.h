@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief サードパーソン（三人称・キャラクター追従）カメラクラス
  */
-class Third_Person_Camera : public Camera_Base {
+class Third_Person_Camera : public ICamera {
 private:
 	HWND _hwnd{};
 	bool _first_mouse = true;

@@ -23,7 +23,7 @@ struct Camera_Way_Point {
 /**
  * @brief シネマティック（スプライン曲線移動）カメラクラス
  */
-class Cinematic_Camera : public Camera_Base {
+class Cinematic_Camera : public ICamera {
 private:
 	std::vector<Camera_Way_Point> _user_way_points;
 	std::vector<Camera_Way_Point> _spline_nodes;

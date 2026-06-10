@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief クォータービュー（定点・俯瞰・RTS）カメラクラス
  */
-class Quarter_View_Camera : public Camera_Base {
+class Quarter_View_Camera : public ICamera {
 private:
 	// ImGui から調整できるように const を外しました
 	float _fixed_pitch = 45.0f;

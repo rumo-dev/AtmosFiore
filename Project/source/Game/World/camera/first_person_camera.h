@@ -11,7 +11,7 @@ namespace dx = DirectX;
 /**
  * @brief ファーストパーソン（一人称・FPS）カメラクラス
  */
-class First_Person_Camera : public Camera_Base {
+class First_Person_Camera : public ICamera {
 private:
 	HWND _hwnd{};
 	bool _first_mouse = true;

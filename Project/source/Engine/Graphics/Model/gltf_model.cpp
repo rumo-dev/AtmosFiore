@@ -117,6 +117,8 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 		input_element_desc, _countof(input_element_desc));
 	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("POINT_SHADOW_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
+	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("DIRECTIONAL_SHADOW_VS")->create_input_layout(
+		input_element_desc, _countof(input_element_desc));
 	//create_ps_from_cso(device, "gltf_model_ps.cso", pixel_shader.ReleaseAndGetAddressOf());
 
 	D3D11_BUFFER_DESC buffer_desc{};
@@ -680,7 +682,21 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	using namespace DirectX;
 	const std::vector<node>& nodes{ animated_nodes.size() > 0 ? animated_nodes : Gltf_Model::nodes };
 
-	const char* vertex_shader_name = pass == pass_mode::shadow ? "POINT_SHADOW_VS" : "GLTF_VS";
+	const char* vertex_shader_name;
+
+	switch (pass)
+	{
+	case pass_mode::directional_shadow:
+
+		vertex_shader_name = "DIRECTIONAL_SHADOW_VS";
+		break;
+	case pass_mode::shadow:
+		vertex_shader_name = "POINT_SHADOW_VS";
+		break;
+	default:
+		vertex_shader_name = "GLTF_VS";
+		break;
+	}
 	auto vs = Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name);
 	//assert(vs != nullptr); // デバッグ用
 	//immediate_context->VSSetShader(vertex_shader.Get(), nullptr, 0);

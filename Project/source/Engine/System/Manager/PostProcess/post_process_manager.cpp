@@ -87,7 +87,7 @@ void Post_Process_Manager::draw() {
 
 void Post_Process_Manager::render() {
 	Graphics_Core::instance().get_fullscreen_quad()->Blit(Graphics_Core::instance().get_device_context(),
-		adaptation->get_color_map_Adress(), 0, 1);
+		tone_mapper->get_color_map_address(), 0, 1);
 
 }
 bool CheckboxInt(const char* label, int& value, const char* tooltip = nullptr) {

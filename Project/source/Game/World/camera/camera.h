@@ -16,10 +16,32 @@ struct Camera {
 
 	DirectX::XMMATRIX view{ DirectX::XMMatrixIdentity() };       // ビュー行列
 	DirectX::XMMATRIX projection{ DirectX::XMMatrixIdentity() }; // プロジェクション行列
+	DirectX::XMMATRIX inv_view{ DirectX::XMMatrixIdentity() };    // ビュー行列の逆行列	
+	DirectX::XMMATRIX inv_projection{ DirectX::XMMatrixIdentity() }; // プロジェクション行列の逆行列
+	DirectX::XMMATRIX view_projection{ DirectX::XMMatrixIdentity() }; // ビュー・プロジェクション行列
+	DirectX::XMMATRIX inv_view_projection{ DirectX::XMMatrixIdentity() }; // ビュー・プロジェクション行列の逆行列
+
 
 	// 現在のパラメータから行列を再計算するヘルパー関数
 	void identity() {
 		view = DirectX::XMMatrixLookAtLH(position, target, up);
 		projection = DirectX::XMMatrixPerspectiveFovLH(fov, aspect_ratio, near_z, far_z);
+		inv_view = DirectX::XMMatrixInverse(nullptr, view);
+		inv_projection = DirectX::XMMatrixInverse(nullptr, projection);
+		view_projection = view * projection;
+		inv_view_projection = DirectX::XMMatrixInverse(nullptr, view_projection);
 	}
+};
+struct Camera_Constants
+{
+
+	DirectX::XMFLOAT4 camera_position;              //カメラのワールド空間位置;
+	DirectX::XMFLOAT4X4 view_projection;         //ビュー・プロジェクション変換行列;
+	DirectX::XMFLOAT4X4 inv_view_projection;         //ビュー・プロジェクション変換行列;
+	DirectX::XMFLOAT4X4 view;//ビュー変換行列;
+	DirectX::XMFLOAT4X4 projection;//プロジェクション変換行列;
+	DirectX::XMFLOAT4X4 inv_view;//ビュー変換行列;
+	DirectX::XMFLOAT4X4 inv_projection;//プロジェクション変換行列;
+
+	DirectX::XMFLOAT4X4 light_view_projection;// ライトのビュー・プロジェクション行列（シャドウマッピング用）;
 };

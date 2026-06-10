@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief オービット（注視点中心・ターンテーブル）カメラクラス
  */
-class Orbit_Camera : public Camera_Base {
+class Orbit_Camera : public ICamera {
 private:
 	HWND _hwnd{};
 	bool _first_mouse = true;
