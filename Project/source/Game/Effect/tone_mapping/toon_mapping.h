@@ -12,7 +12,7 @@ class ToneMapping
 {
 public:
 	// シェーダー定数バッファ構造体（HLSL と同期）
-	struct ToneMappingConfig {
+	struct alignas(16) ToneMappingConfig {
 		int mapping_type = 0;
 		float exposure = 1.0f;
 		float gamma = 2.2f;
@@ -27,6 +27,7 @@ public:
 		int is_enabled = 1;
 		float padding[2]{};
 	};
+	static_assert(sizeof(ToneMappingConfig) % 16 == 0, "ToneMappingConfig must be 16-byte aligned");
 	enum class ToneMappingType {
 		ACES = 0, Reinhard,
 		Unreal, Neutral,

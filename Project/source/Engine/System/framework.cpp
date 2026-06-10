@@ -4,8 +4,10 @@
 #include "Engine/Utilities/misc.h"
 #include "Engine/Graphics/UI/DebugMenu/DebugMenu.h"
 #include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
+#include "Engine/Extentions/Tracy/tracy/Tracy.hpp"
 Frame_Work::Frame_Work(HWND hwnd) : hwnd(hwnd)
-{}
+{
+}
 
 bool Frame_Work::initialize()
 
@@ -19,13 +21,12 @@ bool Frame_Work::initialize()
 	Scene_Manager::instance().change_scene(new Scene_Loading(new Scene_Indoor()));
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();
-
 	return true;
 }
 
 void Frame_Work::update(float elapsed_time/*Elapsed seconds from last frame*/)
 {
-
+	ZoneScoped;
 
 #ifdef USE_IMGUI
 	ImGui_ImplDX11_NewFrame();
@@ -43,6 +44,7 @@ void Frame_Work::update(float elapsed_time/*Elapsed seconds from last frame*/)
 #endif
 }
 void Frame_Work::render(float elapsed_time) {
+	ZoneScoped;
 	using namespace Color_Utils;
 
 	// --- ゲームのメイン描画 ---
@@ -74,6 +76,7 @@ void Frame_Work::render(float elapsed_time) {
 #endif
 
 	UINT sync_interval{ 1 }; // ちらつき防止のため 1 (垂直同期) を推奨
+	FrameMark;
 	Graphics_Core::instance().present(sync_interval);
 }
 

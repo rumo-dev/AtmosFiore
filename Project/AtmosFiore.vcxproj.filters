@@ -269,6 +269,7 @@
     </ClCompile>
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.cpp" />
+    <ClCompile Include="source\Engine\Extentions\Tracy\TracyClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">

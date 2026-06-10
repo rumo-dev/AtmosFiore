@@ -18,6 +18,8 @@ Global
 		Release|x86 = Release|x86
 		RenderDog|x64 = RenderDog|x64
 		RenderDog|x86 = RenderDog|x86
+		Tracy|x64 = Tracy|x64
+		Tracy|x86 = Tracy|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Debug|x64.ActiveCfg = Debug|x64
@@ -32,6 +34,10 @@ Global
 		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x64.Build.0 = RenderDog|x64
 		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x86.ActiveCfg = RenderDog|Win32
 		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.RenderDog|x86.Build.0 = RenderDog|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Tracy|x64.ActiveCfg = Tracy|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Tracy|x64.Build.0 = Tracy|x64
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Tracy|x86.ActiveCfg = Tracy|Win32
+		{9970C797-4C8C-42A1-9C72-6B1BEE18925B}.Tracy|x86.Build.0 = Tracy|Win32
 		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x64.ActiveCfg = Debug|x64
 		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x64.Build.0 = Debug|x64
 		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Debug|x86.ActiveCfg = Debug|Win32
@@ -44,6 +50,10 @@ Global
 		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x64.Build.0 = RenderDog|x64
 		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x86.ActiveCfg = RenderDog|Win32
 		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.RenderDog|x86.Build.0 = RenderDog|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Tracy|x64.ActiveCfg = Tracy|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Tracy|x64.Build.0 = Tracy|x64
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Tracy|x86.ActiveCfg = Tracy|Win32
+		{E0B52AE7-E160-4D32-BF3F-910B785E5A8E}.Tracy|x86.Build.0 = Tracy|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

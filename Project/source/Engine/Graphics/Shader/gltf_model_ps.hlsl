@@ -168,7 +168,7 @@ float4 main(VS_OUT pin, bool is_front_face : SV_IsFrontFace) : SV_TARGET
     {
         const float3 R = reflect(-L, N);
         const float3 H = normalize(V + L);
-		//return sample_specular_pmrem(R, 0.0);
+		//return                       (R, 0.0);
 
         const float NoH = max(0.0, dot(N, H));
         const float HoV = max(0.0, dot(H, V));
