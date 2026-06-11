@@ -8,6 +8,7 @@
 #include <filesystem>
 #include "Engine/Graphics/UI/ImGui/ImGui.h"
 #include "camera_manager.h"
+#include "Engine/Utilities/JsonDataManager.h"
 
 namespace dx = DirectX;
 namespace fs = std::filesystem;
@@ -34,6 +35,7 @@ private:
 	float _current_time = 0.0f;
 	float _time_per_segment = 2.0f;
 
+	JsonDataManager _json_manager;
 	std::string _root_directory = "data/cinematic_paths/";
 	char _save_name_buffer[64] = "new_path";
 	std::string _selected_file_path = "";
@@ -42,7 +44,7 @@ private:
 	std::unordered_map<size_t, bool> _wp_expanded;
 
 public:
-	Cinematic_Camera() {
+	Cinematic_Camera() : _json_manager("", false) { // 追加：初期化
 		camera_.position = dx::XMVectorSet(0.0f, 5.0f, -10.0f, 1.0f);
 		camera_.target = dx::XMVectorZero();
 		camera_.up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -52,7 +54,6 @@ public:
 		}
 		refresh_file_list();
 	}
-
 	void refresh_file_list() {
 		_detected_files.clear();
 		if (!fs::exists(_root_directory)) return;
@@ -164,9 +165,51 @@ public:
 	}
 
 	// (save_to_file, load_from_file, add_way_point, clear_way_points は前回同様のため実装割愛)
-	bool save_to_file(const std::string& filename) { std::string full_path = _root_directory + filename; if (filename.find(".txt") == std::string::npos) { full_path += ".txt"; } std::ofstream ofs(full_path); if (!ofs.is_open()) return false; ofs << _user_way_points.size() << "\n"; for (const auto& wp : _user_way_points) { dx::XMFLOAT4 pos, tar; dx::XMStoreFloat4(&pos, wp.position); dx::XMStoreFloat4(&tar, wp.target); ofs << pos.x << " " << pos.y << " " << pos.z << " " << pos.w << " " << tar.x << " " << tar.y << " " << tar.z << " " << tar.w << "\n"; } refresh_file_list(); return true; }
-	bool load_from_file(const std::string& filename) { std::string full_path = _root_directory + filename; std::ifstream ifs(full_path); if (!ifs.is_open()) return false; stop(); _user_way_points.clear(); size_t size = 0; if (!(ifs >> size)) return false; _user_way_points.reserve(size); for (size_t i = 0; i < size; ++i) { dx::XMFLOAT4 pos, tar; ifs >> pos.x >> pos.y >> pos.z >> pos.w >> tar.x >> tar.y >> tar.z >> tar.w; Camera_Way_Point wp; wp.position = dx::XMLoadFloat4(&pos); wp.target = dx::XMLoadFloat4(&tar); _user_way_points.push_back(wp); } return true; }
-	void add_way_point(const dx::XMVECTOR& pos, const dx::XMVECTOR& target) { _user_way_points.push_back({ pos, target }); }
+
+
+	// JSON版 保存関数
+	bool save_to_file(const std::string& filename) {
+		_json_manager.Clear();
+
+		// 各ウェイポイントをJSON形式へ変換
+		for (const auto& wp : _user_way_points) {
+			dx::XMFLOAT4 pos, tar;
+			dx::XMStoreFloat4(&pos, wp.position);
+			dx::XMStoreFloat4(&tar, wp.target);
+
+			json item;
+			item["pos"] = { pos.x, pos.y, pos.z };
+			item["tar"] = { tar.x, tar.y, tar.z };
+			_json_manager.Append("waypoints", item);
+		}
+
+		_json_manager.SetFilepath(_root_directory + filename);
+		bool success = _json_manager.Save();
+		if (success) refresh_file_list();
+		return success;
+	}
+
+	// JSON版 ロード関数
+	bool load_from_file(const std::string& filename) {
+		_json_manager.SetFilepath(_root_directory + filename);
+		if (!_json_manager.Load()) return false;
+
+		stop();
+		_user_way_points.clear();
+
+		// 配列データを取得して展開
+		const auto& wps = _json_manager.All()["waypoints"];
+		for (const auto& item : wps) {
+			auto p = item["pos"];
+			auto t = item["tar"];
+
+			_user_way_points.push_back({
+				dx::XMVectorSet(p[0], p[1], p[2], 1.0f),
+				dx::XMVectorSet(t[0], t[1], t[2], 1.0f)
+				});
+		}
+		return true;
+	}void add_way_point(const dx::XMVECTOR& pos, const dx::XMVECTOR& target) { _user_way_points.push_back({ pos, target }); }
 	void clear_way_points() { _user_way_points.clear(); _spline_nodes.clear(); stop(); }
 	/**
  * @brief 指定したインデックスの「直後」にウェイポイントを挿入する
@@ -188,310 +231,272 @@ public:
 	}
 	/**
 	 * @brief [オーバーライド] ImGui用デバッグUIの描画
-	 */
-	void draw_imgui() override {
+	 */void draw_tab_storage() {
+		 ImGui::TextDisabled("Location: %s", _root_directory.c_str());
 
-		// ===== Path Storage Explorer =====
-		if (ImGui::CollapsingHeader("  Path Storage Explorer", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::TextDisabled("Location: %s", _root_directory.c_str());
+		 ImGui::BeginGroup();
+		 ImGui::Text("Available Paths:");
+		 ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
+		 if (ImGui::Button("Refresh")) { refresh_file_list(); }
+		 ImGui::EndGroup();
 
-			ImGui::BeginGroup();
-			ImGui::Text("Available Paths:");
-			ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
-			if (ImGui::Button("Refresh")) { refresh_file_list(); }
-			ImGui::EndGroup();
+		 ImGui::BeginChild("FileBrowser", ImVec2(0, 80), true);
+		 if (_detected_files.empty()) {
+			 ImGui::TextDisabled(" (No .txt paths found) ");
+		 }
+		 else {
+			 for (const auto& file : _detected_files) {
+				 bool is_selected = (_selected_file_path == file);
+				 ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.16f, 0.19f, 0.31f, 1.0f));
+				 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.20f, 0.24f, 0.40f, 1.0f));
+				 if (ImGui::Selectable(file.c_str(), is_selected)) {
+					 _selected_file_path = file;
+					 size_t dot_pos = file.find(".txt");
+					 std::string name = (dot_pos != std::string::npos) ? file.substr(0, dot_pos) : file;
+					 strcpy_s(_save_name_buffer, name.c_str());
+				 }
+				 ImGui::PopStyleColor(2);
+			 }
+		 }
+		 ImGui::EndChild();
 
-			ImGui::BeginChild("FileBrowser", ImVec2(0, 80), true);
-			if (_detected_files.empty()) {
-				ImGui::TextDisabled(" (No .txt paths found) ");
-			}
-			else {
-				for (const auto& file : _detected_files) {
-					bool is_selected = (_selected_file_path == file);
-					ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.16f, 0.19f, 0.31f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.20f, 0.24f, 0.40f, 1.0f));
-					if (ImGui::Selectable(file.c_str(), is_selected)) {
-						_selected_file_path = file;
-						size_t dot_pos = file.find(".txt");
-						std::string name_without_ext = (dot_pos != std::string::npos) ? file.substr(0, dot_pos) : file;
-						strcpy_s(_save_name_buffer, name_without_ext.c_str());
-					}
-					ImGui::PopStyleColor(2);
-				}
-			}
-			ImGui::EndChild();
+		 if (!_selected_file_path.empty()) {
+			 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.40f, 0.85f, 0.40f, 1.0f));
+			 ImGui::TextUnformatted(_selected_file_path.c_str());
+			 ImGui::PopStyleColor();
 
-			if (!_selected_file_path.empty()) {
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.40f, 0.85f, 0.40f, 1.0f));
-				ImGui::TextUnformatted(_selected_file_path.c_str());
-				ImGui::PopStyleColor();
+			 float btn_w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+			 if (ImGui::Button("Load", ImVec2(btn_w, 24))) { load_from_file(_selected_file_path); }
+			 ImGui::SameLine();
+			 if (ImGui::Button("Delete", ImVec2(btn_w, 24))) {
+				 fs::remove(_root_directory + _selected_file_path);
+				 _selected_file_path = "";
+				 refresh_file_list();
+			 }
+		 }
 
-				float btn_w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.18f, 0.13f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.22f, 0.16f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.89f, 0.63f, 1.0f));
-				if (ImGui::Button("Load", ImVec2(btn_w, 24))) { load_from_file(_selected_file_path); }
-				ImGui::PopStyleColor(3);
+		 ImGui::Separator();
+		 ImGui::TextDisabled("Save current waypoints:");
+		 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 70);
+		 ImGui::InputText(".txt", _save_name_buffer, IM_ARRAYSIZE(_save_name_buffer));
+		 ImGui::SameLine();
+		 if (ImGui::Button("Save")) {
+			 if (strlen(_save_name_buffer) > 0) {
+				 std::string save_name = std::string(_save_name_buffer) + ".txt";
+				 if (save_to_file(save_name)) { _selected_file_path = save_name; }
+			 }
+		 }
+	 }
+	 void draw_tab_playback() {
+		 static float durationPerNode = 2.0f;
+		 static bool loopPlayback = false;
 
-				ImGui::SameLine();
+		 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 140);
+		 ImGui::SliderFloat("Duration / node", &durationPerNode, 0.5f, 10.0f, "%.1f s");
+		 ImGui::Checkbox("Loop playback", &loopPlayback);
 
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.10f, 0.10f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.12f, 0.12f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.66f, 1.0f));
-				if (ImGui::Button("Delete", ImVec2(btn_w, 24))) {
-					fs::remove(_root_directory + _selected_file_path);
-					_selected_file_path = "";
-					refresh_file_list();
-				}
-				ImGui::PopStyleColor(3);
-			}
+		 float btn_w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+		 if (ImGui::Button("Play", ImVec2(btn_w, 28))) { play(loopPlayback, durationPerNode); }
+		 ImGui::SameLine();
+		 if (ImGui::Button("Stop", ImVec2(btn_w, 28))) { stop(); }
 
-			ImGui::Separator();
-			ImGui::TextDisabled("Save current waypoints:");
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 70);
-			ImGui::InputText(".txt", _save_name_buffer, IM_ARRAYSIZE(_save_name_buffer));
-			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.14f, 0.23f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.17f, 0.28f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
-			if (ImGui::Button("Save")) {
-				if (strlen(_save_name_buffer) > 0) {
-					std::string save_name = std::string(_save_name_buffer) + ".txt";
-					if (save_to_file(save_name)) { _selected_file_path = save_name; }
-				}
-			}
-			ImGui::PopStyleColor(3);
-		}
+		 if (_is_playing) {
+			 float total_segments = _is_loop ? static_cast<float>(_user_way_points.size()) : static_cast<float>(_user_way_points.size() - 1);
+			 float total_duration = total_segments * _time_per_segment;
+			 ImGui::ProgressBar(_current_time / total_duration, ImVec2(-1, 0), "Playing...");
+		 }
+	 }
+	 void draw_tab_waypoints() {
+		 char wp_header[64];
+		 sprintf_s(wp_header, "  Registered Waypoints  (%d pts)", static_cast<int>(_user_way_points.size()));
 
-		// ===== Playback Control =====
-		if (ImGui::CollapsingHeader("  Playback Control", ImGuiTreeNodeFlags_DefaultOpen)) {
+		 if (ImGui::CollapsingHeader(wp_header, ImGuiTreeNodeFlags_DefaultOpen)) {
 
-			static float durationPerNode = 2.0f;
-			static bool  loopPlayback = false;
+			 // --- ツールバー: Capture / Clear All ---
+			 if (ImGui::Button("+ Capture Current Camera", ImVec2(ImGui::GetContentRegionAvail().x - 90, 24))) {
+				 auto activeCam = Camera_Manager::instance().get_active_camera();
+				 if (activeCam && activeCam.get() != this) {
+					 const auto& data = activeCam->get_camera();
+					 add_way_point(data.position, data.target);
+				 }
+			 }
+			 ImGui::SameLine();
+			 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.10f, 0.10f, 1.0f));
+			 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.12f, 0.12f, 1.0f));
+			 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.66f, 1.0f));
+			 if (ImGui::Button("Clear All", ImVec2(-1, 24))) { clear_way_points(); }
+			 ImGui::PopStyleColor(3);
 
-			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 140);
-			ImGui::SliderFloat("Duration / node", &durationPerNode, 0.5f, 10.0f, "%.1f s");
-			ImGui::Checkbox("Loop playback", &loopPlayback);
+			 ImGui::Spacing();
 
-			float btn_w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+			 // --- テーブルヘッダー ---
+			 constexpr ImGuiTableFlags tbl_flags =
+				 ImGuiTableFlags_BordersInnerV |
+				 ImGuiTableFlags_ScrollY |
+				 ImGuiTableFlags_RowBg;
 
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.18f, 0.13f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.22f, 0.16f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.89f, 0.63f, 1.0f));
-			if (ImGui::Button("Play", ImVec2(btn_w, 28))) { play(loopPlayback, durationPerNode); }
-			ImGui::PopStyleColor(3);
+			 if (ImGui::BeginTable("WaypointTable", 4, tbl_flags, ImVec2(0, 220))) {
+				 ImGui::TableSetupScrollFreeze(0, 1);
+				 ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 28.0f);
+				 ImGui::TableSetupColumn("Position (x / y / z)", ImGuiTableColumnFlags_WidthStretch);
+				 ImGui::TableSetupColumn("Target (x / y / z)", ImGuiTableColumnFlags_WidthStretch);
+				 ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 160.0f);
+				 ImGui::TableHeadersRow();
 
-			ImGui::SameLine();
+				 for (size_t i = 0; i < _user_way_points.size(); ++i) {
+					 ImGui::PushID(static_cast<int>(i));
 
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.10f, 0.10f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.12f, 0.12f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.66f, 1.0f));
-			if (ImGui::Button("Stop", ImVec2(btn_w, 28))) { stop(); }
-			ImGui::PopStyleColor(3);
+					 dx::XMFLOAT4 pos, tar;
+					 dx::XMStoreFloat4(&pos, _user_way_points[i].position);
+					 dx::XMStoreFloat4(&tar, _user_way_points[i].target);
 
-			if (_is_playing) {
-				float total_segments = _is_loop
-					? static_cast<float>(_user_way_points.size())
-					: static_cast<float>(_user_way_points.size() - 1);
-				float total_duration = total_segments * _time_per_segment;
-				ImGui::ProgressBar(_current_time / total_duration, ImVec2(-1, 0), "Playing...");
-			}
-		}
+					 // --- サマリー行 ---
+					 ImGui::TableNextRow();
 
-		// ===== Registered Waypoints =====
-		char wp_header[64];
-		sprintf_s(wp_header, "  Registered Waypoints  (%d pts)", static_cast<int>(_user_way_points.size()));
-		if (ImGui::CollapsingHeader(wp_header, ImGuiTreeNodeFlags_DefaultOpen)) {
+					 ImGui::TableSetColumnIndex(0);
+					 ImGui::TextDisabled("%d", static_cast<int>(i));
 
-			// --- ツールバー: Capture / Clear All ---
-			if (ImGui::Button("+ Capture Current Camera", ImVec2(ImGui::GetContentRegionAvail().x - 90, 24))) {
-				auto activeCam = Camera_Manager::instance().get_active_camera();
-				if (activeCam && activeCam.get() != this) {
-					const auto& data = activeCam->get_camera();
-					add_way_point(data.position, data.target);
-				}
-			}
-			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.10f, 0.10f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.12f, 0.12f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.66f, 1.0f));
-			if (ImGui::Button("Clear All", ImVec2(-1, 24))) { clear_way_points(); }
-			ImGui::PopStyleColor(3);
+					 ImGui::TableSetColumnIndex(1);
+					 ImGui::Text("%.2f / %.2f / %.2f", pos.x, pos.y, pos.z);
 
-			ImGui::Spacing();
+					 ImGui::TableSetColumnIndex(2);
+					 ImGui::Text("%.2f / %.2f / %.2f", tar.x, tar.y, tar.z);
 
-			// --- テーブルヘッダー ---
-			constexpr ImGuiTableFlags tbl_flags =
-				ImGuiTableFlags_BordersInnerV |
-				ImGuiTableFlags_ScrollY |
-				ImGuiTableFlags_RowBg;
+					 ImGui::TableSetColumnIndex(3);
 
-			if (ImGui::BeginTable("WaypointTable", 4, tbl_flags, ImVec2(0, 220))) {
-				ImGui::TableSetupScrollFreeze(0, 1);
-				ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 28.0f);
-				ImGui::TableSetupColumn("Position (x / y / z)", ImGuiTableColumnFlags_WidthStretch);
-				ImGui::TableSetupColumn("Target (x / y / z)", ImGuiTableColumnFlags_WidthStretch);
-				ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 160.0f);
-				ImGui::TableHeadersRow();
+					 // Jump ボタン
+					 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.15f, 0.08f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.19f, 0.10f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.98f, 0.89f, 0.68f, 1.0f));
+					 if (ImGui::SmallButton("Jump")) {
+						 stop();
+						 auto activeCam = Camera_Manager::instance().get_active_camera();
+						 if (activeCam) {
+							 dx::XMVECTOR forward = dx::XMVector3Normalize(dx::XMVectorSubtract(_user_way_points[i].target, _user_way_points[i].position));
+							 dx::XMFLOAT4 f4; dx::XMStoreFloat4(&f4, forward);
+							 float pitch_deg = dx::XMConvertToDegrees(asinf(f4.y));
+							 float yaw_deg = dx::XMConvertToDegrees(atan2f(f4.z, f4.x));
+							 if (auto sp = std::dynamic_pointer_cast<Spectator_Camera>(activeCam))
+								 sp->set_rotation(yaw_deg, pitch_deg, _user_way_points[i].position, _user_way_points[i].target);
+							 else if (auto tp = std::dynamic_pointer_cast<Third_Person_Camera>(activeCam))
+								 tp->set_rotation(yaw_deg, pitch_deg, _user_way_points[i].position, _user_way_points[i].target);
+							 else {
+								 auto& c = const_cast<Camera&>(activeCam->get_camera());
+								 c.position = _user_way_points[i].position;
+								 c.target = _user_way_points[i].target;
+								 c.identity();
+							 }
+						 }
+					 }
+					 ImGui::PopStyleColor(3);
 
-				for (size_t i = 0; i < _user_way_points.size(); ++i) {
-					ImGui::PushID(static_cast<int>(i));
+					 ImGui::SameLine(0, 3);
 
-					dx::XMFLOAT4 pos, tar;
-					dx::XMStoreFloat4(&pos, _user_way_points[i].position);
-					dx::XMStoreFloat4(&tar, _user_way_points[i].target);
+					 // Insert ボタン
+					 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.14f, 0.23f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.17f, 0.28f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
+					 if (ImGui::SmallButton("Ins")) {
+						 auto activeCam = Camera_Manager::instance().get_active_camera();
+						 if (activeCam && activeCam.get() != this) {
+							 const auto& data = activeCam->get_camera();
+							 insert_way_point_after(i, data.position, data.target);
+						 }
+					 }
+					 ImGui::PopStyleColor(3);
 
-					// --- サマリー行 ---
-					ImGui::TableNextRow();
+					 ImGui::SameLine(0, 3);
 
-					ImGui::TableSetColumnIndex(0);
-					ImGui::TextDisabled("%d", static_cast<int>(i));
+					 // Overwrite ボタン
+					 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.18f, 0.13f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.22f, 0.16f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.89f, 0.63f, 1.0f));
+					 if (ImGui::SmallButton("Ovr")) {
+						 auto activeCam = Camera_Manager::instance().get_active_camera();
+						 if (activeCam && activeCam.get() != this) {
+							 const auto& data = activeCam->get_camera();
+							 _user_way_points[i].position = data.position;
+							 _user_way_points[i].target = data.target;
+							 if (_is_playing) stop();
+						 }
+					 }
+					 ImGui::PopStyleColor(3);
 
-					ImGui::TableSetColumnIndex(1);
-					ImGui::Text("%.2f / %.2f / %.2f", pos.x, pos.y, pos.z);
+					 ImGui::SameLine(0, 3);
 
-					ImGui::TableSetColumnIndex(2);
-					ImGui::Text("%.2f / %.2f / %.2f", tar.x, tar.y, tar.z);
-					ImGui::TableSetColumnIndex(3);
+					 // Delete ボタン
+					 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.10f, 0.10f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.12f, 0.12f, 1.0f));
+					 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.66f, 1.0f));
+					 if (ImGui::SmallButton("Del")) {
+						 _user_way_points.erase(_user_way_points.begin() + i);
+						 stop();
+					 }
+					 ImGui::PopStyleColor(3);
 
-					// Jump ボタン
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.15f, 0.08f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.19f, 0.10f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.98f, 0.89f, 0.68f, 1.0f));
-					if (ImGui::SmallButton("Jump")) {
-						stop();
-						auto activeCam = Camera_Manager::instance().get_active_camera();
-						if (activeCam) {
-							dx::XMVECTOR forward = dx::XMVector3Normalize(
-								dx::XMVectorSubtract(_user_way_points[i].target, _user_way_points[i].position));
-							dx::XMFLOAT4 f4; dx::XMStoreFloat4(&f4, forward);
-							float pitch_deg = dx::XMConvertToDegrees(asinf(f4.y));
-							float yaw_deg = dx::XMConvertToDegrees(atan2f(f4.z, f4.x));
-							if (auto sp = std::dynamic_pointer_cast<Spectator_Camera>(activeCam))
-								sp->set_rotation(yaw_deg, pitch_deg, _user_way_points[i].position, _user_way_points[i].target);
-							else if (auto tp = std::dynamic_pointer_cast<Third_Person_Camera>(activeCam))
-								tp->set_rotation(yaw_deg, pitch_deg, _user_way_points[i].position, _user_way_points[i].target);
-							else {
-								auto& c = const_cast<Camera&>(activeCam->get_camera());
-								c.position = _user_way_points[i].position;
-								c.target = _user_way_points[i].target;
-								c.identity();
-							}
-						}
-					}
-					ImGui::PopStyleColor(3);
+					 // --- 展開行 ---
+					 bool& expanded = _wp_expanded[i];
+					 ImGui::TableNextRow();
+					 ImGui::TableSetColumnIndex(1);
+					 char sel_lbl[32]; sprintf_s(sel_lbl, "##sel%zu", i);
+					 if (ImGui::Selectable(sel_lbl, expanded, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
+						 expanded = !expanded;
+					 }
 
-					ImGui::SameLine(0, 3);
+					 if (expanded) {
+						 ImGui::TableNextRow();
+						 ImGui::TableSetColumnIndex(1);
+						 ImGui::Spacing();
+						 const float btn_w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
 
-					// Insert ボタン
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.14f, 0.23f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.17f, 0.28f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
-					if (ImGui::SmallButton("Ins")) {
-						auto activeCam = Camera_Manager::instance().get_active_camera();
-						if (activeCam && activeCam.get() != this) {
-							const auto& data = activeCam->get_camera();
-							insert_way_point_after(i, data.position, data.target);
-							ImGui::PopStyleColor(3);
-							ImGui::PopID();
-							break;
-						}
-					}
-					ImGui::PopStyleColor(3);
+						 // Insert After (詳細)
+						 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.14f, 0.23f, 1.0f));
+						 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.17f, 0.28f, 1.0f));
+						 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
+						 char ins_lbl[64]; sprintf_s(ins_lbl, "Insert after [%zu]", i);
+						 if (ImGui::Button(ins_lbl, ImVec2(btn_w, 22))) {
+							 auto activeCam = Camera_Manager::instance().get_active_camera();
+							 if (activeCam && activeCam.get() != this) {
+								 const auto& data = activeCam->get_camera();
+								 insert_way_point_after(i, data.position, data.target);
+							 }
+						 }
+						 ImGui::PopStyleColor(3);
+						 ImGui::SameLine();
 
-					ImGui::SameLine(0, 3);
-
-					// Overwrite ボタン
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.18f, 0.13f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.22f, 0.16f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.89f, 0.63f, 1.0f));
-					if (ImGui::SmallButton("Ovr")) {
-						auto activeCam = Camera_Manager::instance().get_active_camera();
-						if (activeCam && activeCam.get() != this) {
-							const auto& data = activeCam->get_camera();
-							_user_way_points[i].position = data.position;
-							_user_way_points[i].target = data.target;
-							if (_is_playing) stop();
-						}
-					}
-					ImGui::PopStyleColor(3);
-
-					ImGui::SameLine(0, 3);
-
-					// Delete ボタン
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.10f, 0.10f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.12f, 0.12f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.55f, 0.66f, 1.0f));
-					if (ImGui::SmallButton("Del")) {
-						_user_way_points.erase(_user_way_points.begin() + i);
-						stop();
-						ImGui::PopStyleColor(3);
-						ImGui::PopID();
-						break;
-					}
-					ImGui::PopStyleColor(3);
-
-					// --- 展開行: クリックで開閉 ---
-					bool& expanded = _wp_expanded[i]; // std::unordered_map<size_t,bool> を持たせる想定
-					ImGui::TableNextRow();
-					ImGui::TableSetColumnIndex(0);
-
-					// 行全体をクリック可能にするため Selectable を透明で敷く
-					ImGui::TableSetColumnIndex(1);
-					char sel_lbl[32]; sprintf_s(sel_lbl, "##sel%zu", i);
-					if (ImGui::Selectable(sel_lbl, expanded,
-						ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
-						ImVec2(0, 0)))
-					{
-						expanded = !expanded;
-					}
-
-					if (expanded) {
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(1);
-						ImGui::Spacing();
-
-						const float btn_w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-
-						// Insert After ボタン
-						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.14f, 0.23f, 1.0f));
-						ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.17f, 0.28f, 1.0f));
-						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
-						char ins_lbl[64]; sprintf_s(ins_lbl, "Insert after [%zu]", i);
-						if (ImGui::Button(ins_lbl, ImVec2(btn_w, 22))) {
-							auto activeCam = Camera_Manager::instance().get_active_camera();
-							if (activeCam && activeCam.get() != this) {
-								const auto& data = activeCam->get_camera();
-								insert_way_point_after(i, data.position, data.target);
-								ImGui::PopStyleColor(3);
-								ImGui::PopID();
-								break;
-							}
-						}
-						ImGui::PopStyleColor(3);
-
-						ImGui::SameLine();
-
-						// Overwrite ボタン
-						if (ImGui::Button("Overwrite", ImVec2(btn_w, 22))) {
-							auto activeCam = Camera_Manager::instance().get_active_camera();
-							if (activeCam && activeCam.get() != this) {
-								const auto& data = activeCam->get_camera();
-								_user_way_points[i].position = data.position;
-								_user_way_points[i].target = data.target;
-								if (_is_playing) stop();
-							}
-						}
-
-						ImGui::Spacing();
-
-					}
-
-					ImGui::PopID();
-				}
-
-				ImGui::EndTable();
-			}
-		}
-	}
+						 // Overwrite (詳細)
+						 if (ImGui::Button("Overwrite", ImVec2(btn_w, 22))) {
+							 auto activeCam = Camera_Manager::instance().get_active_camera();
+							 if (activeCam && activeCam.get() != this) {
+								 const auto& data = activeCam->get_camera();
+								 _user_way_points[i].position = data.position;
+								 _user_way_points[i].target = data.target;
+								 if (_is_playing) stop();
+							 }
+						 }
+						 ImGui::Spacing();
+					 }
+					 ImGui::PopID();
+				 }
+				 ImGui::EndTable();
+			 }
+		 }
+	 }
+	 void draw_imgui() override {
+		 if (ImGui::BeginTabBar("WaypointSystemTabs")) {
+			 if (ImGui::BeginTabItem("Storage")) {
+				 draw_tab_storage();
+				 ImGui::EndTabItem();
+			 }
+			 if (ImGui::BeginTabItem("Playback")) {
+				 draw_tab_playback();
+				 ImGui::EndTabItem();
+			 }
+			 if (ImGui::BeginTabItem("Waypoints")) {
+				 draw_tab_waypoints();
+				 ImGui::EndTabItem();
+			 }
+			 ImGui::EndTabBar();
+		 }
+	 }
 };

@@ -152,35 +152,112 @@ void Post_Process_Manager::drawDebugView()
 
 void Post_Process_Manager::drawBloomGUI()
 {
+	const float available_w = ImGui::GetContentRegionAvail().x;
+	const float left_w = available_w * 0.4f;   // 左：パラメーター 40%
+	const float right_w = available_w * 0.6f;   // 右：テクスチャ   60%
+
+	// ── 左ペイン：パラメーター ──────────────────────────────────
+	ImGui::BeginChild("##bloom_left", ImVec2(left_w, 0), false);
+
 	CheckboxInt("Enable Bloom", bloomer->is_bloom, "Enable bloom effect");
 	if (bloomer->is_bloom) {
-		SliderFloatWithTooltip("Threshold", &bloomer->bloom_extraction_threshold, 0.0f, 1.0f, "Brightness threshold for bloom");
-		SliderFloatWithTooltip("Intensity", &bloomer->bloom_intensity, 0.0f, 5.0f, "Strength of bloom effect");
-		if (bloomer->getColorMap()) {
-			if (ImGui::CollapsingHeader("Bloom Texture Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
-				ImGui::Image((ImTextureID)bloomer->getColorMap(), ImVec2(640, 360));
-			}
-		}
+		SliderFloatWithTooltip("Threshold", &bloomer->bloom_extraction_threshold,
+			0.0f, 1.0f, "Brightness threshold for bloom");
+		SliderFloatWithTooltip("Intensity", &bloomer->bloom_intensity,
+			0.0f, 5.0f, "Strength of bloom effect");
 	}
-}
 
+	ImGui::EndChild();
+
+	// ── 仕切り線 ────────────────────────────────────────────────
+	ImGui::SameLine();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	float h = ImGui::GetContentRegionAvail().y;
+	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
+	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));  // 仕切り線分だけ右にずらす
+
+	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
+	ImGui::BeginChild("##bloom_right", ImVec2(right_w - 6.0f, 0), false);
+
+	if (bloomer->is_bloom && bloomer->getColorMap()) {
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		// アスペクト比 16:9 を保ってフィット
+		float tex_w = avail.x;
+		float tex_h = tex_w * (9.0f / 16.0f);
+		if (tex_h > avail.y) {
+			tex_h = avail.y;
+			tex_w = tex_h * (16.0f / 9.0f);
+		}
+		ImGui::Image((ImTextureID)bloomer->getColorMap(), ImVec2(tex_w, tex_h));
+	}
+	else {
+		// Bloom オフ時はプレースホルダー
+		ImGui::TextDisabled("(Bloom disabled)");
+	}
+
+	ImGui::EndChild();
+}
 void Post_Process_Manager::drawAdaptationGUI()
 {
-	SliderFloatWithTooltip("target_lum", &adaptation->target_lum, 0.0f, 1.0f, "Target luminance for adaptation");
+	const float available_w = ImGui::GetContentRegionAvail().x;
+	const float left_w = available_w * 0.4f;
+	const float right_w = available_w * 0.6f;
+
+	// ── 左ペイン：パラメーター ──────────────────────────────────
+	ImGui::BeginChild("##adapt_left", ImVec2(left_w, 0), false);
+
+	SliderFloatWithTooltip("Target Lum", &adaptation->target_lum, 0.0f, 1.0f, "Target luminance for adaptation");
 	SliderFloatWithTooltip("Speed to Light", &adaptation->speed_to_light, 0.0f, 10.0f, "Speed of adaptation to lighter scenes");
 	SliderFloatWithTooltip("Speed to Dark", &adaptation->speed_to_dark, 0.0f, 10.0f, "Speed of adaptation to darker scenes");
+
+	ImGui::EndChild();
+
+	// ── 仕切り線 ────────────────────────────────────────────────
+	ImGui::SameLine();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	float h = ImGui::GetContentRegionAvail().y;
+	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
+	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
+
+	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
+	ImGui::BeginChild("##adapt_right", ImVec2(right_w - 6.0f, 0), false);
+
 	if (adaptation->get_color_map()) {
-		if (ImGui::CollapsingHeader("Adaptation Texture Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::Image((ImTextureID)adaptation->get_color_map(), ImVec2(640, 360));
-		}
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		float tex_w = avail.x;
+		float tex_h = tex_w * (9.0f / 16.0f);
+		if (tex_h > avail.y) { tex_h = avail.y; tex_w = tex_h * (16.0f / 9.0f); }
+		ImGui::Image((ImTextureID)adaptation->get_color_map(), ImVec2(tex_w, tex_h));
 	}
+	else {
+		ImGui::TextDisabled("(No texture available)");
+	}
+
+	ImGui::EndChild();
 }
 
 void Post_Process_Manager::drawToneMappingGUI()
 {
+	const float available_w = ImGui::GetContentRegionAvail().x;
+	const float left_w = available_w * 0.55f;  // パラメーター多いので広め
+	const float right_w = available_w * 0.45f;
+
+	// ── 左ペイン：アルゴリズム選択 + 共通パラメーター ───────────
+	ImGui::BeginChild("##tonemapping_left", ImVec2(left_w, 0), false);
+
 	CheckboxInt("Enable Tone Mapping", tone_mapper->is_enabled, "Enable tone mapping post effect");
+
 	if (tone_mapper->is_enabled) {
-		const char* items[] = { "ACES", "Reinhard", "Unreal", "Neutral", "Linear", "Hable", "AgX", "GT", "Drago", "Exponential", "Logarithmic", "Ward", "Lottes", "Hejl", "RomBinDaHouse", "ReinhardExtended", "FilmicSimple", "ACESApprox", "PBRNeutral", "Sigmoid", "Piecewise", "Cineon", "Exposure", "GammaOnly", "PQApprox", "HLGApprox", "OpenDRTLike", "CameraResponse", "Uchimura", "ClampOnly", "WhitePreservingLuma", "FilmicALU", "AgXPunchy", "CustomCurve" };
+		const char* items[] = {
+			"ACES", "Reinhard", "Unreal", "Neutral", "Linear", "Hable", "AgX", "GT",
+			"Drago", "Exponential", "Logarithmic", "Ward", "Lottes", "Hejl",
+			"RomBinDaHouse", "ReinhardExtended", "FilmicSimple", "ACESApprox",
+			"PBRNeutral", "Sigmoid", "Piecewise", "Cineon", "Exposure", "GammaOnly",
+			"PQApprox", "HLGApprox", "OpenDRTLike", "CameraResponse", "Uchimura",
+			"ClampOnly", "WhitePreservingLuma", "FilmicALU", "AgXPunchy", "CustomCurve"
+		};
 		int current = static_cast<int>(tone_mapper->mapping_type);
 		if (ImGui::Combo("Algorithm", &current, items, IM_ARRAYSIZE(items))) {
 			tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(current);
@@ -188,32 +265,67 @@ void Post_Process_Manager::drawToneMappingGUI()
 		ImGui::Separator();
 		ImGui::SliderFloat("Exposure", &tone_mapper->exposure, 0.01f, 10.0f);
 		ImGui::SliderFloat("Gamma", &tone_mapper->gamma, 1.0f, 3.0f);
+	}
 
-		if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::GT || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Uchimura) {
+	ImGui::EndChild();
+
+	// ── 仕切り線 ────────────────────────────────────────────────
+	ImGui::SameLine();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	float h = ImGui::GetContentRegionAvail().y;
+	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
+	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
+
+	// ── 右ペイン：アルゴリズム固有パラメーター ──────────────────
+	ImGui::BeginChild("##tonemapping_right", ImVec2(right_w - 6.0f, 0), false);
+
+	if (tone_mapper->is_enabled) {
+		const char* items[] = {
+			"ACES", "Reinhard", "Unreal", "Neutral", "Linear", "Hable", "AgX", "GT",
+			"Drago", "Exponential", "Logarithmic", "Ward", "Lottes", "Hejl",
+			"RomBinDaHouse", "ReinhardExtended", "FilmicSimple", "ACESApprox",
+			"PBRNeutral", "Sigmoid", "Piecewise", "Cineon", "Exposure", "GammaOnly",
+			"PQApprox", "HLGApprox", "OpenDRTLike", "CameraResponse", "Uchimura",
+			"ClampOnly", "WhitePreservingLuma", "FilmicALU", "AgXPunchy", "CustomCurve"
+		};
+		int current = static_cast<int>(tone_mapper->mapping_type);
+
+		using TM = ToneMapping::ToneMappingType;
+		if (tone_mapper->mapping_type == TM::GT || tone_mapper->mapping_type == TM::Uchimura) {
 			ImGui::SeparatorText("GT / Uchimura");
 			ImGui::SliderFloat("Linear Start (m)", &tone_mapper->gt_param, 0.01f, 1.0f);
 			ImGui::SliderFloat("Max White", &tone_mapper->max_white, 1.0f, 20.0f);
 		}
-		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::ReinhardExtended) {
+		else if (tone_mapper->mapping_type == TM::ReinhardExtended) {
 			ImGui::SeparatorText("Reinhard Extended");
 			ImGui::SliderFloat("Max White", &tone_mapper->max_white, 1.0f, 20.0f);
 		}
-		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::Drago || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Ward || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Logarithmic) {
+		else if (tone_mapper->mapping_type == TM::Drago ||
+			tone_mapper->mapping_type == TM::Ward ||
+			tone_mapper->mapping_type == TM::Logarithmic) {
 			ImGui::SeparatorText("HDR Parameters");
 			ImGui::SliderFloat("HDR White", &tone_mapper->max_white, 1.0f, 50.0f);
 		}
-		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::Exposure || tone_mapper->mapping_type == ToneMapping::ToneMappingType::Exponential) {
+		else if (tone_mapper->mapping_type == TM::Exposure ||
+			tone_mapper->mapping_type == TM::Exponential) {
 			ImGui::SeparatorText("Exposure");
 			ImGui::SliderFloat("Exposure Strength", &tone_mapper->exposure, 0.01f, 20.0f);
 		}
-		else if (tone_mapper->mapping_type == ToneMapping::ToneMappingType::CustomCurve) {
+		else if (tone_mapper->mapping_type == TM::CustomCurve) {
 			ImGui::SeparatorText("Custom Curve");
 			ImGui::SliderFloat("Shoulder", &tone_mapper->shoulder, 0.01f, 2.0f);
 			ImGui::SliderFloat("Linear Strength", &tone_mapper->linear_strength, 0.01f, 2.0f);
 			ImGui::SliderFloat("Linear Angle", &tone_mapper->linear_angle, 0.01f, 2.0f);
 			ImGui::SliderFloat("Toe Strength", &tone_mapper->toe_strength, 0.01f, 2.0f);
 		}
-		ImGui::Text("Current Mode : %s", items[current]);
+		else {
+			ImGui::TextDisabled("(No extra parameters)");
+		}
 
+		ImGui::Spacing();
+		ImGui::TextDisabled("Current: %s", items[current]);
 	}
+
+	ImGui::EndChild();
 }

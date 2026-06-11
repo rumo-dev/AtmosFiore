@@ -605,6 +605,7 @@
     <ClInclude Include="source\Game\World\camera\null_camera.h" />
     <ClInclude Include="source\Game\Effect\dof\dof.h" />
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Icons.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">

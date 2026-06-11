@@ -1,94 +1,147 @@
 #include "Dashboard.h"
+#include "Icons.h"
 
 
 void Dashboard::Render() {
-	if (ImGui::Begin("Nextgen Dashboard")) {
+	if (ImGui::Begin("Dashboard", nullptr, ImGuiWindowFlags_NoTitleBar)) {
 		RenderSideBar();
 		ImGui::SameLine();
 		RenderMainContent();
 	}
 	ImGui::End();
 }
-
 void Dashboard::RenderSideBar() {
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 10));
-	ImGui::BeginChild("Sidebar", ImVec2(200, 0), false, ImGuiWindowFlags_NoBackground);
+	ImGui::BeginChild("Sidebar", ImVec2(180, 0), false, ImGuiWindowFlags_NoBackground);
 
-	// --- プロジェクト名の表示エリア ---
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10); // 上部に余白
-
-	// 少し大きめのフォントを使用する場合の想定（事前にLoadFontが必要）
-	// ImGui::PushFont(font_large); 
+	// タイトル
+// --- 修正箇所 ---
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20);
 	ImGui::Indent(20);
-	ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "AtmosFiore");
+
+	// font_large を事前に保持していると仮定
+	ImGui::PushFont(font_large);
+	ImGui::TextColored(ImVec4(1, 1, 1, 1), "AtmosFiore");
+	ImGui::PopFont();
+
 	ImGui::Unindent(20);
+	// ----------------
 
-	// ImGui::PopFont();
+	ImGui::Dummy(ImVec2(0, 20));
 
-	ImGui::Separator(); // ロゴの下に区切り線
-	ImGui::Dummy(ImVec2(0, 15)); // 下のメニューとの余白
-	ImGui::PopStyleVar();
-	// ---------------------------------
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
 
 	for (size_t i = 0; i < modules.size(); ++i) {
-		bool is_selected = (active_mod_idx == i);
+		bool is_selected = (active_mod_idx == (int)i);
+		ImVec2 cursor = ImGui::GetCursorScreenPos();
 
-		// 項目を描画
-		if (ImGui::Selectable(modules[i].name.c_str(), is_selected, ImGuiSelectableFlags_None, ImVec2(0, 30))) {
-			active_mod_idx = (int)i;
-		}
+		ImGui::InvisibleButton(modules[i].name.c_str(), ImVec2(160, 35));
+		if (ImGui::IsItemClicked()) active_mod_idx = (int)i;
 
-		// アクティブな左側のラインを描画
 		if (is_selected) {
-			ImVec2 p0 = ImGui::GetItemRectMin();
-			ImVec2 p1 = ImGui::GetItemRectMax();
-			ImGui::GetWindowDrawList()->AddRectFilled(p0, ImVec2(p0.x + 3, p1.y), IM_COL32(80, 150, 255, 255));
+			draw_list->AddRectFilled(cursor, ImVec2(cursor.x + 160, cursor.y + 35), IM_COL32(30, 30, 35, 255), 4.0f);
+			draw_list->AddRectFilled(cursor, ImVec2(cursor.x + 3, cursor.y + 35), IM_COL32(80, 150, 255, 255), 2.0f);
 		}
+
+		// アイコンとテキストを結合して描画
+		std::string display_text = std::string(get_icon(modules[i].name)) + "   " + modules[i].name;
+
+		draw_list->AddText(ImVec2(cursor.x + 20, cursor.y + 10),
+			is_selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(150, 150, 150, 255),
+			display_text.c_str());
 	}
 	ImGui::EndChild();
-	ImGui::PopStyleVar();
+
 }
+
+
+
+void Dashboard::RenderGroupCard(const char* label, ImVec2 size, std::function<void()> content) {
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.13f, 1.0f));
+	ImGui::BeginChild(label, size, false, ImGuiWindowFlags_None);
+
+	// タイトルと装飾
+	ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", label);
+	ImGui::Separator();
+	ImGui::Dummy(ImVec2(0, 10));
+
+	content(); // ここにトグルやスライダーを配置
+
+	ImGui::EndChild();
+	ImGui::PopStyleColor();
+}
+
 void Dashboard::RenderMainContent() {
-	// 1. モジュールが登録されているかチェック
-	if (modules.empty()) {
-		ImGui::Text("No modules registered.");
-		return;
-	}
+	if (modules.empty()) return;
 
-	// インデックスが範囲内か再確認（念のため）
-	if (active_mod_idx < 0 || active_mod_idx >= modules.size()) {
-		active_mod_idx = 0;
-	}
-
-	ImGui::BeginChild("MainContent", ImVec2(0, 0), true);
 	auto& current_mod = modules[active_mod_idx];
 
-	// 2. サブタブが空でないかチェック
-	if (current_mod.subtabs.empty()) {
-		ImGui::Text("No subtabs in this module.");
+	ImGui::BeginChild("MainContent", ImVec2(0, 0), true);
+
+	if (active_sub_idx < 0 || active_sub_idx >= (int)current_mod.subtabs.size()) {
+		active_sub_idx = 0;
 	}
-	else {
-		// 安全なインデックス範囲チェック
-		if (active_sub_idx < 0 || active_sub_idx >= current_mod.subtabs.size()) {
-			active_sub_idx = 0;
+
+	// ── サブタブ（アンダーライン型） ──────────────────────────────
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	const float tab_height = 32.0f;
+	const float tab_pad_x = 14.0f;   // タブ左右の余白
+	const float underline_h = 2.0f;    // 下線の太さ
+	const ImU32 col_active = IM_COL32(80, 150, 255, 255);   // 選択中：青
+	const ImU32 col_hover = IM_COL32(80, 150, 255, 120);   // ホバー：薄青
+	const ImU32 col_text_on = IM_COL32(255, 255, 255, 255);
+	const ImU32 col_text_off = IM_COL32(150, 150, 150, 255);
+
+	for (size_t i = 0; i < current_mod.subtabs.size(); ++i) {
+		bool is_active = (active_sub_idx == (int)i);
+		const char* label = current_mod.subtabs[i].name.c_str();
+
+		// テキスト幅からタブ幅を決定
+		float text_w = ImGui::CalcTextSize(label).x;
+		float tab_w = text_w + tab_pad_x * 2.0f;
+
+		ImVec2 cursor = ImGui::GetCursorScreenPos();
+		ImGui::InvisibleButton(label, ImVec2(tab_w, tab_height));
+
+		bool hovered = ImGui::IsItemHovered();
+		if (ImGui::IsItemClicked()) active_sub_idx = (int)i;
+
+		// テキスト描画（垂直中央）
+		float text_x = cursor.x + tab_pad_x;
+		float text_y = cursor.y + (tab_height - ImGui::GetTextLineHeight()) * 0.5f;
+		dl->AddText(ImVec2(text_x, text_y),
+			is_active ? col_text_on : col_text_off, label);
+
+		// 下線
+		ImVec2 line_p1(cursor.x, cursor.y + tab_height - underline_h);
+		ImVec2 line_p2(cursor.x + tab_w, cursor.y + tab_height - underline_h);
+		if (is_active) {
+			dl->AddLine(line_p1, line_p2, col_active, underline_h);
+		}
+		else if (hovered) {
+			dl->AddLine(line_p1, line_p2, col_hover, underline_h);
 		}
 
-		// 上部タブの描画
-		for (size_t i = 0; i < current_mod.subtabs.size(); ++i) {
-			if (ImGui::Button(current_mod.subtabs[i].name.c_str())) {
-				active_sub_idx = (int)i;
-			}
-			ImGui::SameLine();
-		}
-		ImGui::Dummy(ImVec2(0, 20));
-		ImGui::Separator();
+		ImGui::SameLine(0, 4.0f);   // タブ間隔 4px
+	}
+	// ─────────────────────────────────────────────────────────────
 
-		// 3. 描画関数の呼び出し（念のためnullptrチェックも有効）
-		if (current_mod.subtabs[active_sub_idx].render_func) {
-			current_mod.subtabs[active_sub_idx].render_func(data);
+	ImGui::Dummy(ImVec2(0, 0));     // SameLine の後に改行
+	ImGui::Dummy(ImVec2(0, 8.0f));
+	ImGui::Separator();
+	ImGui::Dummy(ImVec2(0, 10.0f));
+
+	// コンテンツ描画
+	if (!current_mod.subtabs.empty()) {
+		auto& target_tab = current_mod.subtabs[active_sub_idx];
+		if (target_tab.render_func) {
+			target_tab.render_func(data);
+		}
+		else {
+			ImGui::Text("Error: Render function is null.");
 		}
 	}
+
 	ImGui::EndChild();
 }
 #include "Engine/utilities/misc.h"
@@ -100,7 +153,6 @@ void Dashboard::RenderMainContent() {
 #include "Game/Scenes/scene.h"
 void Dashboard::InitializeUI() {
 	auto& dash = Dashboard::Instance();
-
 	// Dashboard本体の登録
 
 	/// リソース監視（メモリ・GPUなど）

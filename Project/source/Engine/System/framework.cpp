@@ -73,7 +73,7 @@ void Frame_Work::render(float elapsed_time) {
 	}
 #endif
 
-	UINT sync_interval{ 1 }; // ちらつき防止のため 1 (垂直同期) を推奨
+	UINT sync_interval{ 0 }; // ちらつき防止のため 1 (垂直同期) を推奨
 	FrameMark;
 	Graphics_Core::instance().present(sync_interval);
 }

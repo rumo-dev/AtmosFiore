@@ -68,6 +68,7 @@ public:
 	SharedMetricsData data; // ゲームとUIで共有するデータ
 	void SetupStyle();
 
+	ImFont* font_large = nullptr;
 private:
 	Dashboard() = default;
 	std::vector<TabModule> modules;
@@ -75,8 +76,10 @@ private:
 	int active_sub_idx = 0;
 
 	void RenderSideBar();
+	void RenderGroupCard(const char* label, ImVec2 size, std::function<void()> content);
 	void RenderMainContent();
-
+	bool some_bool = false;
+	float some_float = 0.0f;
 	/// リソース監視（メモリ・GPUなど）
 	Resource_Monitor _monitor;
 };

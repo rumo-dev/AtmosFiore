@@ -402,6 +402,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\Shadow\shadow_map.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Icons.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes_internal.h" />

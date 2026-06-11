@@ -123,12 +123,22 @@ public:
 
 		const ImWchar* ranges = io.Fonts->GetGlyphRangesJapanese();
 
-		io.Fonts->AddFontFromFileTTF(
-			"./data/fonts/imgui.ttf",
-			16.0f,
-			nullptr,
-			ranges
-		);
+		// 1. まず全フォントの「親」となるフォントをロード
+		ImFont* base_font = io.Fonts->AddFontFromFileTTF("./data/fonts/imgui.ttf", 20.0f, nullptr, ranges);
+
+		// 2. font_large も「親」を同じにする（または個別にロードせず、あとでサイズ指定で使う）
+		Dashboard::Instance().font_large = io.Fonts->AddFontFromFileTTF("./data/fonts/imgui.ttf", 28.0f, nullptr, ranges);
+
+		// 3. Phosphor Icons を読み込む (base_font に重ねる)
+		ImFontConfig icons_config;
+		icons_config.MergeMode = true;
+		icons_config.PixelSnapH = true;
+		icons_config.GlyphMinAdvanceX = 16.0f;
+		static const ImWchar icons_ranges[] = { 0xE000, 0xF8FF, 0 };
+
+		// ★重要: ここでフォントを指定
+		icons_config.DstFont = base_font;
+		io.Fonts->AddFontFromFileTTF("./data/fonts/imfont.ttf", 20.0f, &icons_config, icons_ranges);
 
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 		io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;
