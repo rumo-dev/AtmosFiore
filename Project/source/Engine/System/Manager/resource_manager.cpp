@@ -42,6 +42,10 @@ void Resource_Manager::load_shaders() {
 		"FOG_PS",
 		"fog_ps"
 	);
+	shader_manager.load<Pixel_Shader>(
+		"DOF_PS",
+		"dof_ps"
+	);
 
 	//gltf
 	shader_manager.load<Pixel_Shader>(

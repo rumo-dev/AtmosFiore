@@ -138,7 +138,13 @@ void Dashboard::InitializeUI() {
 		{"Models",  [](SharedMetricsData& d) { Resource_Manager::instance().model_manager.draw_imgui(); }},
 
 		} });
-	dash.RegisterModule({ "Camera",   {{"View",   [](SharedMetricsData& d) { Camera_Manager::instance().draw_imgui(); }}} });
+
+	dash.RegisterModule({ "Camera",   {
+
+		{"Setting",   [](SharedMetricsData& d) { Camera_Manager::instance().get_active_camera()->get_camera().DrawCameraSettingsUI(); }},
+		{"View",   [](SharedMetricsData& d) { Camera_Manager::instance().draw_imgui(); }},
+
+		} });
 }
 
 

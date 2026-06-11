@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "camera_base.h"
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
+#include "null_camera.h"
 
 /**
  * @brief カメラ管理マネージャークラス（シングルトン）
@@ -13,8 +14,13 @@ class Camera_Manager {
 private:
 	std::unordered_map<std::string, std::shared_ptr<ICamera>> _cameras;
 	std::shared_ptr<ICamera> _active_camera;
+	std::shared_ptr<ICamera> _dummy_camera; // Fallback camera
 
-	Camera_Manager() = default;
+	Camera_Manager() {
+		// Initialize with a dummy camera implementation if necessary
+		_dummy_camera = std::make_shared<NullCamera>();
+	}
+	//Camera_Manager() = default;
 
 public:
 	static Camera_Manager& instance() {
@@ -51,6 +57,10 @@ public:
 
 	// 現在アクティブなカメラの取得
 	std::shared_ptr<ICamera> get_active_camera() {
+		if (!_active_camera)
+		{
+			return _dummy_camera;
+		}
 		return _active_camera;
 	}
 

@@ -402,7 +402,6 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\Shadow\shadow_map.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.h" />
-    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes_internal.h" />
@@ -420,8 +419,10 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\System\Manager\Light\spot_light_manager.h" />
     <ClInclude Include="source\Engine\System\Manager\Shader\InputLayout\input_layout_parser.h" />
     <ClInclude Include="source\Engine\System\samplers.h" />
+    <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Utilities\math_util.h" />
     <ClInclude Include="source\Game\Effect\adaptation\adaptation.h" />
+    <ClInclude Include="source\Game\Effect\dof\dof.h" />
     <ClInclude Include="source\Game\Effect\fog\fog.h" />
     <ClInclude Include="source\Game\Effect\shadow\shadow.h" />
     <ClInclude Include="source\Game\World\camera\camera.h" />
@@ -430,6 +431,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\World\camera\cinematic_camera.h" />
     <ClInclude Include="source\Game\World\camera\first_person_camera.h" />
     <ClInclude Include="source\Game\World\camera\forrow_camera.h" />
+    <ClInclude Include="source\Game\World\camera\null_camera.h" />
     <ClInclude Include="source\Game\World\camera\orbit_camera.h" />
     <ClInclude Include="source\Game\World\camera\quarter_view_camera.h" />
     <ClInclude Include="source\Game\World\camera\spectator_camera.h" />
@@ -511,8 +513,8 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Engine\Extentions\Tracy\TracyClient.cpp" />
     <ClCompile Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.cpp" />
     <ClCompile Include="source\Engine\Graphics\Shadow\shadow_map.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.cpp" />
-    <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\imnodes.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\sprite\sprite.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\sprite\sprite_batch.cpp" />
@@ -548,6 +550,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Game\Effect\adaptation\adaptation.cpp" />
     <ClCompile Include="source\Game\Effect\bloom\Bloom.cpp" />
     <ClCompile Include="source\Engine\System\Manager\PostProcess\post_process_manager.cpp" />
+    <ClCompile Include="source\Game\Effect\dof\dof.cpp" />
     <ClCompile Include="source\Game\Effect\fog\fog.cpp" />
     <ClCompile Include="source\Game\Effect\shadow\shadow.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp" />
@@ -626,6 +629,16 @@ if exist export rmdir /s /q export</Command>
       <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">
       </EnableDebuggingInformation>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\dof_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\error_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

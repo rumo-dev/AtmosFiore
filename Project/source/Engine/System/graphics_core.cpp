@@ -280,6 +280,15 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	dx::XMStoreFloat4x4(&data.inv_view, camera.inv_view);
 	dx::XMStoreFloat4x4(&data.inv_projection, camera.inv_projection);
 	data.light_view_projection = post_procss.GetShadow().light_view_projection;
+	data.fov = camera.fov;
+	data.near_z = camera.near_z;
+	data.far_z = camera.far_z;
+
+	data.FNumber = camera.FNumber;
+	data.FocalLength = camera.FocalLength;
+	data.SensorSize = camera.SensorSize;
+	data.FocusDist = camera.FocalLength;
+	data.MaxBlurRadius = camera.MaxBlurRadius;
 
 
 	_immediate_context->UpdateSubresource(_constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].Get(), 0, nullptr, &data, 0, 0);

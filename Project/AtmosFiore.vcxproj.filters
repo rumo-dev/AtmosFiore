@@ -89,6 +89,7 @@
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\directional_shadow_vs.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\dof_ps.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">
@@ -268,9 +269,10 @@
     <ClCompile Include="source\Game\Effect\tone_mapping\toon_mapping.cpp">
       <Filter>source\Game\Effect\tone_mapping</Filter>
     </ClCompile>
-    <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.cpp" />
     <ClCompile Include="source\Engine\Extentions\Tracy\TracyClient.cpp" />
+    <ClCompile Include="source\Game\Effect\dof\dof.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
@@ -597,10 +599,12 @@
     <ClInclude Include="source\Game\World\Light\spot_light.h">
       <Filter>source\Game\World\Light</Filter>
     </ClInclude>
-    <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\DebugMenu.h" />
     <ClInclude Include="source\Engine\SharedData.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.h" />
+    <ClInclude Include="source\Game\World\camera\null_camera.h" />
+    <ClInclude Include="source\Game\Effect\dof\dof.h" />
+    <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">

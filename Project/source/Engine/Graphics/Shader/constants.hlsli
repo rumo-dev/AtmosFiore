@@ -24,6 +24,12 @@ cbuffer CAMERA_CONSTANT_BUFFER : register(b1)
     row_major float4x4 inv_projection; //プロジェクション変換行列;
     row_major float4x4 light_view_projection; // ライトのビュー・プロジェクション行列（シャドウマッピング用）;
     
+    float FNumber; // 絞り値 (例: 1.4, 2.8)
+    float FocalLength; // 焦点距離 (mm)
+    float SensorSize; // センサーサイズ (mm)
+    float FocusDist; // 焦点が合っている距離 (m)
     
+    float MaxBlurRadius; // 最大ボケ半径 (ピクセル単位)
+    float3 Padding;
 };
 #endif

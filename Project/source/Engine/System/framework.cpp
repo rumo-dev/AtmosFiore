@@ -2,12 +2,10 @@
 #include"graphics_core.h"
 #include "Engine/system/manager/resource_manager.h"
 #include "Engine/Utilities/misc.h"
-#include "Engine/Graphics/UI/DebugMenu/DebugMenu.h"
 #include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 #include "Engine/Extentions/Tracy/tracy/Tracy.hpp"
 Frame_Work::Frame_Work(HWND hwnd) : hwnd(hwnd)
-{
-}
+{}
 
 bool Frame_Work::initialize()
 

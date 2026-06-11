@@ -9,6 +9,7 @@
 #include "Game/Effect/shadow/shadow.h"
 #include "Game/Effect/adaptation/adaptation.h"
 #include "Game/Effect/tone_mapping/toon_mapping.h"
+#include "Game/Effect/dof/dof.h"
 
 /**
  * @brief ポストプロセス管理クラス
@@ -136,6 +137,9 @@ public:
 	ToneMapping& GetToneMapping() {
 		return *tone_mapper;
 	};
+	dof& GetDof() {
+		return *dofer;
+	}
 	void drawDebugView();
 
 	void drawBloomGUI();
@@ -161,6 +165,9 @@ private:
 
 	/// トーンマッピングエフェクト
 	static std::unique_ptr<ToneMapping> tone_mapper;
+
+
+	static std::unique_ptr<dof> dofer;
 
 	/// 経過時間
 	float time = 0.0f;
