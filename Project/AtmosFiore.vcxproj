@@ -426,6 +426,10 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\Effect\dof\dof.h" />
     <ClInclude Include="source\Game\Effect\fog\fog.h" />
     <ClInclude Include="source\Game\Effect\shadow\shadow.h" />
+    <ClInclude Include="source\Game\Effect\Sky\Sky.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
     <ClInclude Include="source\Game\World\camera\camera.h" />
     <ClInclude Include="source\Game\World\camera\camera_base.h" />
     <ClInclude Include="source\Game\World\camera\camera_manager.h" />
@@ -554,6 +558,10 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Game\Effect\dof\dof.cpp" />
     <ClCompile Include="source\Game\Effect\fog\fog.cpp" />
     <ClCompile Include="source\Game\Effect\shadow\shadow.cpp" />
+    <ClCompile Include="source\Game\Effect\Sky\Sky.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_title.cpp" />
     <ClCompile Include="source\Game\Scenes\loading.cpp" />
@@ -716,6 +724,16 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\sky_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\sprite_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

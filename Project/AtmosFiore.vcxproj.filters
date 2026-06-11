@@ -90,6 +90,7 @@
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\directional_shadow_vs.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\dof_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\sky_ps.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">
@@ -273,6 +274,7 @@
     <ClCompile Include="source\Engine\Extentions\Tracy\TracyClient.cpp" />
     <ClCompile Include="source\Game\Effect\dof\dof.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.cpp" />
+    <ClCompile Include="source\Game\Effect\Sky\Sky.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
@@ -606,6 +608,7 @@
     <ClInclude Include="source\Game\Effect\dof\dof.h" />
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Icons.h" />
+    <ClInclude Include="source\Game\Effect\Sky\Sky.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">

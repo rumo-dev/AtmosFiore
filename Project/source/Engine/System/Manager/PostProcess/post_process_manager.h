@@ -10,6 +10,7 @@
 #include "Game/Effect/adaptation/adaptation.h"
 #include "Game/Effect/tone_mapping/toon_mapping.h"
 #include "Game/Effect/dof/dof.h"
+#include "Game/Effect/Sky/Sky.h"
 
 /**
  * @brief ポストプロセス管理クラス
@@ -168,6 +169,8 @@ private:
 
 
 	static std::unique_ptr<dof> dofer;
+
+	static std::unique_ptr<Sky> skyer;
 
 	/// 経過時間
 	float time = 0.0f;

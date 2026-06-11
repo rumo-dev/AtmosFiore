@@ -46,6 +46,10 @@ void Resource_Manager::load_shaders() {
 		"DOF_PS",
 		"dof_ps"
 	);
+	shader_manager.load<Pixel_Shader>(
+		"SKY_PS",
+		"sky_ps"
+	);
 
 	//gltf
 	shader_manager.load<Pixel_Shader>(

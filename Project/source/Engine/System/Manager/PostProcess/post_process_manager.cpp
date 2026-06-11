@@ -10,6 +10,7 @@ std::unique_ptr<shadow> Post_Process_Manager::shadower = nullptr;
 std::unique_ptr<Adaptation> Post_Process_Manager::adaptation = nullptr;
 std::unique_ptr<ToneMapping> Post_Process_Manager::tone_mapper = nullptr;
 std::unique_ptr<dof> Post_Process_Manager::dofer = nullptr;
+std::unique_ptr<Sky> Post_Process_Manager::skyer = nullptr;
 
 
 
@@ -55,12 +56,18 @@ void Post_Process_Manager::initialize() {
 		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
 		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
 	);
+	skyer = std::make_unique<Sky>(
+		Graphics_Core::instance().get_device(),
+		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
+		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
+	);
 
 }
 
 void Post_Process_Manager::update(float elapsedtime) {
 	fogger->fog_constans.Time += elapsedtime;
 	adaptation->delta_time = elapsedtime;
+	skyer->time += elapsedtime;
 
 }
 void Post_Process_Manager::begin() {
@@ -82,7 +89,8 @@ void Post_Process_Manager::end() {
 }
 void Post_Process_Manager::draw() {
 	dofer->make(Graphics_Core::instance().get_device_context(), fsquad.GetColorMap());
-	bloomer->make(Graphics_Core::instance().get_device_context(), dofer->getColorMap());
+	skyer->make(Graphics_Core::instance().get_device_context(), dofer->getColorMap());
+	bloomer->make(Graphics_Core::instance().get_device_context(), skyer->get_color_map());
 	//Graphics_Core::instance().get_device_context()->GenerateMips(bloomer->getColorMap());
 	adaptation->make(Graphics_Core::instance().get_device_context(), bloomer->getColorMap());
 	tone_mapper->make(Graphics_Core::instance().get_device_context(), adaptation->get_color_map());
