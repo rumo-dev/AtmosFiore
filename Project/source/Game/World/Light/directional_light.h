@@ -1,3 +1,5 @@
+#pragma once
+#include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
 class Directional_Light : public Light_Base
 {
 public:
@@ -10,7 +12,7 @@ private:
 	// ===== 時間管理 =====
 	float time_of_day = 12.0f;     // 0～24
 	float day_duration = 60.0f;    // 60秒で1日
-	bool auto_rotate = false;
+	bool auto_rotate = true;
 
 private:
 
@@ -86,54 +88,76 @@ public:
 
 	void draw_imgui(const char* label = "DirectionalLight")
 	{
-		if (!ImGui::CollapsingHeader(label,
-			ImGuiTreeNodeFlags_DefaultOpen))
-			return;
 
-		if (ImGui::ColorEdit3("Ambient", (float*)&ambientColor))
+		CustomUI::SectionLabel(label);
+
+		if (CustomUI::ColorEdit3("Ambient", (float*)&ambientColor))
 			update();
 
-		if (ImGui::ColorEdit3("Diffuse", (float*)&diffuseColor))
+		if (CustomUI::ColorEdit3("Diffuse", (float*)&diffuseColor))
 			update();
 
-		ImGui::Checkbox("Auto Day Cycle", &auto_rotate);
+		CustomUI::Checkbox("Auto Day Cycle", &auto_rotate);
 
-		if (ImGui::SliderFloat(
-			"Time",
-			&time_of_day,
-			0.0f,
-			24.0f,
-			"%.1f h"))
+		if (CustomUI::SliderFloat("Time", &time_of_day, 0.0f, 24.0f, "%.1f h"))
 		{
 			update_from_time();
 		}
 
-		ImGui::SliderFloat(
-			"Day Duration(sec)",
-			&day_duration,
-			10.0f,
-			300.0f);
+		ImGui::SliderFloat("Day Duration(sec)", &day_duration, 10.0f, 300.0f);
+
+		CustomUI::Separator();
+
+		// 自動回転中は手動操作できないように無効化
+		if (auto_rotate)
+		{
+			ImGui::BeginDisabled();
+		}
+
+		CustomUI::SectionLabel("Manual Rotation");
 
 		bool changed = false;
 
-		if (!auto_rotate)
+		// =========================================================================
+		// ヨーとピッチを横並びにするグループ
+		// =========================================================================
+		ImGui::BeginGroup();
+
+		// ---- 1. Pitch ダイヤル (UI上は -90～90、0で真上) ----
+		float pitch_ui_deg = pitch + 90.0f;
+		float pitch_ui_rad = dx::XMConvertToRadians(pitch_ui_deg);
+
+		if (CustomUI::RotationDial("Pitch (上下)", &pitch_ui_rad, 30.0f, -1.570796f, 1.570796f))
 		{
-			if (ImGui::SliderFloat(
-				"Pitch",
-				&pitch,
-				-90,
-				90))
-				changed = true;
+			pitch_ui_deg = dx::XMConvertToDegrees(pitch_ui_rad);
+			pitch = pitch_ui_deg - 90.0f;
+			changed = true; // 変更フラグを立てる
+		}
 
-			if (ImGui::SliderFloat(
-				"Yaw",
-				&yaw,
-				-180,
-				180))
-				changed = true;
+		// 横並びの間隔。ダイヤルのサイズ＋数値テキストの幅を考慮して少し広め（60px～80px程度）に設定
+		ImGui::SameLine(0, 70.0f);
 
-			if (changed)
-				update_from_angles();
+		// ---- 2. Yaw ダイヤル (UI・内部ともに -180～180の360度全方位) ----
+		float yaw_rad = dx::XMConvertToRadians(yaw);
+
+		if (CustomUI::RotationDial("Yaw (左右)", &yaw_rad, 30.0f, -3.14159265f, 3.14159265f))
+		{
+			yaw = dx::XMConvertToDegrees(yaw_rad);
+			changed = true; // ★ここが漏れているとヨーを回しても光源が更新されません
+		}
+
+		ImGui::EndGroup();
+		// =========================================================================
+
+		// ピッチ、またはヨーのどちらかが動かされたら、まとめて方向ベクトルを再計算
+		if (changed)
+		{
+			update_from_angles();
+		}
+
+		if (auto_rotate)
+		{
+			ImGui::EndDisabled();
 		}
 	}
 };
