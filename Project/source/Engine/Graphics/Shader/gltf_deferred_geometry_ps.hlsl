@@ -107,7 +107,7 @@ struct PS_OUT_GBUFFER
     float4 gbuffer3 : SV_TARGET3; // Emissive + Subsurface/Clearcoat
 };
 
-#if 1
+#if 0
 // If you enable earlydepthstencil, 'clip', 'discard' and 'Alpha to coverage' won't work!
 [earlydepthstencil]
 #endif

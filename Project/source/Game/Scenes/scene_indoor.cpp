@@ -37,28 +37,28 @@ void Scene_Indoor::initialize()
 	//);
 	//spotLightを1024個Intencity以外ランダムで追加
 
-	for (int i = 0; i < 100; i++) {
-		float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
-		float r = Random::Range(5.0f, 15.0f); // 半径をランダム化
-		float intensity = Random::Range(5.0f, 15.0f); // 強度をランダム化
-		float innerAngle = Random::Range(0.1f, 0.5f); // 内角をランダム化
-		float outerAngle = Random::Range(0.4f, 0.8f); // 外角をランダム化
-		dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) }; // ランダムな方向（下向きが多め）
-		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るいz色
-		Graphics_Core::instance().get_spot_light_manager().add_light({ x, y, z }, direction, r, intensity, innerAngle, outerAngle, diffuseColor);
-	}
+	//for (int i = 0; i < 100; i++) {
+	//	float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+	//	float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+	//	float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
+	//	float r = Random::Range(5.0f, 15.0f); // 半径をランダム化
+	//	float intensity = Random::Range(5.0f, 15.0f); // 強度をランダム化
+	//	float innerAngle = Random::Range(0.1f, 0.5f); // 内角をランダム化
+	//	float outerAngle = Random::Range(0.4f, 0.8f); // 外角をランダム化
+	//	dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) }; // ランダムな方向（下向きが多め）
+	//	dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るいz色
+	//	Graphics_Core::instance().get_spot_light_manager().add_light({ x, y, z }, direction, r, intensity, innerAngle, outerAngle, diffuseColor);
+	//}
 
-	for (int i = 0; i < 100; i++) {
-		float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
-		float r = 5.0f; // 半径は固定（必要に応じてランダム化も可能）
-		float intensity = 10.0f; // 強度は固定（必要に応じてランダム化も可能）
-		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るい色
-		Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
-	}
+	//for (int i = 0; i < 100; i++) {
+	//	float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+	//	float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+	//	float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
+	//	float r = 5.0f; // 半径は固定（必要に応じてランダム化も可能）
+	//	float intensity = 10.0f; // 強度は固定（必要に応じてランダム化も可能）
+	//	dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るい色
+	//	Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
+	//}
 	Graphics_Core::instance().get_area_light_manager().add_light();
 
 	ModelInstance s;
@@ -188,6 +188,7 @@ void Scene_Indoor::update(float elapsedTime)
 
 	// _directional_light.set_camera(Camera_Manager::instance().get_active_camera()->get_camera());
 	_directional_light.update();
+	_directional_light.tick(elapsedTime);
 	IBL::Bind(Graphics_Core::instance().get_device_context());
 	Graphics_Core::instance().get_point_light_manager().update();
 	Graphics_Core::instance().get_point_light_manager().upload_to_gpu(Graphics_Core::instance().get_device_context());
@@ -240,15 +241,15 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 
 void Scene_Indoor::render_forward(float elapsedTime) {
 	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	immediate_context->OMSetRenderTargets(1, Graphics_Core::instance().get_render_target_view().GetAddressOf(), NULL);
+	immediate_context->OMSetRenderTargets(1, Graphics_Core::instance().get_render_target_view().GetAddressOf(), Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
 
 	Render_State::instance().set_2d_render_states(immediate_context);
 	Graphics_Core::instance().clear(Color_Utils::from_hex("#291F32"));
 
 	Graphics_Core::instance().post_procss.begin();
-	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CCW);
+	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 
-	Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
+	//Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
 }
 
 void Scene_Indoor::render_UI(float elapsedTime) {

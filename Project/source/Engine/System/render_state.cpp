@@ -441,7 +441,7 @@ void Render_State::set_render_states(ID3D11DeviceContext* immediate_context,
 	set_sampler_state(immediate_context);
 }
 
-void Render_State::set_3d_render_states(ID3D11DeviceContext* immediate_context, Rasterizer_State rs)
+void Render_State::set_3d_render_states(ID3D11DeviceContext* immediate_context, Rasterizer_State rs, Depth_State ds)
 {
 	set_depth_stencil_state(immediate_context, Depth_State::Test_Enable_Write_Enable, Stencil_Ref::Default);
 	set_blend_state(immediate_context, Blend_State::Alpha, Color_Utils::Colors::transparent, 0xFFFFFFFF);

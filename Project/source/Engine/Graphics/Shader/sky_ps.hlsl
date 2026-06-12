@@ -24,7 +24,7 @@ Texture2D depth : register(t1); // ShaderToyのiChannel0に相当するノイズ
 #define SIMPLE_SUN 0
 #define NICE_HACK_SUN 1
 #define SOFT_SUN 1
-#define cloudy  0.5
+#define cloudy  1
 #define haze    (0.01 * (cloudy * 20.0))
 #define rainmulti 5.0
 #define rainy   (10.0 - rainmulti)
@@ -364,7 +364,7 @@ float4 main(VS_OUT pin) : SV_Target
     // -----------------------------------------------------------
     // 平行光源はカメラに向かってくる方向（ライトベクトル）の逆をとるか、
     // C++側で事前に「太陽の位置への方向ベクトル」を入れておいてください。
-    float3 Ds = normalize(directional_light_direction);
+    float3 Ds = normalize(-directional_light_direction);
 
     // -----------------------------------------------------------
     // 3. レイの原点（カメラ位置ベース）
@@ -376,6 +376,9 @@ float4 main(VS_OUT pin) : SV_Target
     float3 color = float3(0, 0, 0);
     float3 scat = float3(0, 0, 0);
     float att = 1.0;
+    float sunHeight = saturate(Ds.y * 4.0);
+    float staratt = 1.0 - sunHeight;
+    float scatatt = 1.0 - sunHeight;
     float3 star = float3(0, 0, 0);
     float4 aur = float4(0, 0, 0, 0);
     
@@ -406,11 +409,13 @@ float4 main(VS_OUT pin) : SV_Target
     scatter(O, D, color, scat, gTime, Ds);
     
     color *= att;
+
     scat *= att;
+    scat *= scatatt;
 
     color += scat;
     color += star;
-    color += aur.rgb; // オーロラを加算
+    color += aur.rgb * scatatt;
     
     return float4(color, 1.0);
 }
