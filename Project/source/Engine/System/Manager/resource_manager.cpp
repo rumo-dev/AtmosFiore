@@ -130,6 +130,10 @@ void Resource_Manager::load_models() {
 		"Cafe_Anime",
 		"./data/model/cafe_anime/scene.gltf"
 	);
+	model_manager.load(
+		"Rain",
+		"./data/model/City/scene.gltf"
+	);
 
 	//model_manager.load(
 	//	"Warehouse_FBX_Model_Free",

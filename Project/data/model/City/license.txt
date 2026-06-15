@@ -1,0 +1,8 @@
+Model Information:
+* title:	Procedural City 5
+* source:	https://sketchfab.com/3d-models/procedural-city-5-c2a33cf0165b497cabd5e4a22599277b
+* author:	abhayexe (https://sketchfab.com/abhayexe)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

@@ -68,7 +68,7 @@ void Scene_Indoor::initialize()
 		{ 1,1,1 },
 		{ 0,3.5f,0 },
 		{ 0,0,0 },
-		1.f);
+		1.0f);
 	s.is_animation = false;
 	s.animation_index = 12;
 	s.animation_time = 0.f;
