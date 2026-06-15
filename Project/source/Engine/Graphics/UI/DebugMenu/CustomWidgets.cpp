@@ -959,10 +959,14 @@ bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_f
 
 	ImVec2 pos = window->DC.CursorPos;
 	ImVec2 size = ImGui::CalcItemSize(size_arg, ImGui::CalcItemWidth(), 40.0f);
+	if (size.x <= 0.0f) size.x = 1.0f; // [追加] ゼロ除算防止（極端に幅が小さい場合の安全策）
 	ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
 
 	ImGui::ItemSize(size, g.Style.FramePadding.y);
 	if (!ImGui::ItemAdd(bb, id)) return false;
+
+	// [追加] 外部から不正な値（範囲外）が来てもクランプして安全に表示する
+	*current_frame = ImClamp(*current_frame, 0, max_frames);
 
 	bool hovered, held;
 	bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
@@ -971,55 +975,61 @@ bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_f
 	ImGuiIO& io = ImGui::GetIO();
 	float mouse_x_in_widget = io.MousePos.x - pos.x;
 	float t = ImClamp(mouse_x_in_widget / size.x, 0.0f, 1.0f);
-	int hovered_frame = (int)(t * max_frames);
+	// [変更] 単純な切り捨てではなく四捨五入にすることで、見た目の位置と選択フレームの誤差を減らす
+	int hovered_frame = (int)(t * max_frames + 0.5f);
 	hovered_frame = ImClamp(hovered_frame, 0, max_frames);
 
-	// [追加] ImGuiのステート領域を使って、現在ドラッグ中のキーフレームのインデックスを記憶する
+	// ドラッグ中のキーフレームインデックスを記憶する
 	ImGuiStorage* storage = ImGui::GetStateStorage();
 	const ImGuiID drag_id = window->GetID("##kf_dragging_idx");
 	int dragging_kf_idx = storage->GetInt(drag_id, -1);
 
-	const float snap_pixel_radius = 6.0f; // クリック判定の甘さ（ピクセル）
+	// [変更] 当たり判定を少し広げて掴みやすくする（6px -> 8px）
+	const float snap_pixel_radius = 8.0f;
+
+	// [追加] 「今どのキーフレームの上にマウスがあるか」を1回だけ判定し、
+	// カーソル変更・ツールチップ・ハイライト・右クリック削除のすべてで共通利用する
+	// （以前は左クリックと右クリックで別々に最近傍探索しており、判定基準が分かりにくかった）
+	int hovered_kf_idx = -1;
+	if (hovered) {
+		float min_dist = snap_pixel_radius;
+		for (size_t i = 0; i < keyframes.size(); ++i) {
+			float kf_x = ((float)keyframes[i] / max_frames) * size.x;
+			float dist = std::abs(kf_x - mouse_x_in_widget);
+			if (dist < min_dist) {
+				min_dist = dist;
+				hovered_kf_idx = (int)i;
+			}
+		}
+	}
 
 	if (hovered) {
-		// [追加] ツールチップで現在のフレームを表示
-		ImGui::SetTooltip("Frame: %d", hovered_frame);
+		// [追加] キーフレームの上ではカーソルを変えて「つかめる」ことを直感的に伝える
+		if (hovered_kf_idx != -1) {
+			ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		}
+
+		// [変更] ツールチップに操作方法のヒントを追加して、初めて触る人でも分かるようにする
+		if (hovered_kf_idx != -1) {
+			ImGui::SetTooltip("Keyframe: %d\nLeft-drag: Move / Right-click: Remove", keyframes[hovered_kf_idx]);
+		}
+		else {
+			ImGui::SetTooltip("Frame: %d\nRight-click: Add Keyframe / Shift+Drag: Snap", hovered_frame);
+		}
 
 		// 左クリックされた瞬間に、キーフレーム上かどうかを判定
 		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-			float min_dist = snap_pixel_radius;
-			int closest_idx = -1;
-			for (size_t i = 0; i < keyframes.size(); ++i) {
-				float kf_x = ((float)keyframes[i] / max_frames) * size.x;
-				float dist = std::abs(kf_x - mouse_x_in_widget);
-				if (dist < min_dist) {
-					min_dist = dist;
-					closest_idx = (int)i;
-				}
-			}
-			if (closest_idx != -1) {
+			if (hovered_kf_idx != -1) {
 				// キーフレームを掴んだ
-				dragging_kf_idx = closest_idx;
+				dragging_kf_idx = hovered_kf_idx;
 				storage->SetInt(drag_id, dragging_kf_idx);
 			}
 		}
 
 		// 右クリックでキーフレームの追加 / 削除
 		if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-			float min_dist = snap_pixel_radius;
-			auto closest_it = keyframes.end();
-
-			for (auto it = keyframes.begin(); it != keyframes.end(); ++it) {
-				float kf_x = ((float)(*it) / max_frames) * size.x;
-				float dist = std::abs(kf_x - mouse_x_in_widget);
-				if (dist < min_dist) {
-					min_dist = dist;
-					closest_it = it;
-				}
-			}
-
-			if (closest_it != keyframes.end()) {
-				keyframes.erase(closest_it);
+			if (hovered_kf_idx != -1) {
+				keyframes.erase(keyframes.begin() + hovered_kf_idx);
 			}
 			else {
 				keyframes.push_back(hovered_frame);
@@ -1029,10 +1039,15 @@ bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_f
 		}
 	}
 
+	// [追加] ドラッグ中はウィジェット外にマウスが出てもハンドカーソルを維持する
+	if (dragging_kf_idx != -1) {
+		ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+	}
+
 	// --- 左ドラッグによる移動処理 ---
 	int target_frame = hovered_frame;
 
-	// [追加] Shiftキーを押している場合、近くのキーフレームにスナップ（吸着）させる
+	// Shiftキーを押している場合、近くのキーフレームにスナップ（吸着）させる
 	if (io.KeyShift && !keyframes.empty()) {
 		int nearest_kf = keyframes[0];
 		int min_f_dist = std::abs(target_frame - nearest_kf);
@@ -1063,6 +1078,7 @@ bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_f
 			// ドロップ（離した）時にソートして状態をリセット
 			std::sort(keyframes.begin(), keyframes.end());
 			storage->SetInt(drag_id, -1);
+			dragging_kf_idx = -1;
 		}
 	}
 	else if (held) {
@@ -1090,26 +1106,57 @@ bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_f
 		draw_list->AddLine(ImVec2(tx, pos.y + size.y - 8), ImVec2(tx, pos.y + size.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), 1.0f);
 	}
 
+	// [追加] 始点・終点のフレーム番号を表示し、タイムライン全体の長さが一目で分かるようにする
+	{
+		char buf_start[16];
+		char buf_end[16];
+		ImFormatString(buf_start, sizeof(buf_start), "%d", 0);
+		ImFormatString(buf_end, sizeof(buf_end), "%d", max_frames);
+
+		ImU32 label_col = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+		float label_y = bb.Max.y - 8.0f - ImGui::GetFontSize();
+
+		draw_list->AddText(ImVec2(bb.Min.x + 3.0f, label_y), label_col, buf_start);
+
+		ImVec2 end_size = ImGui::CalcTextSize(buf_end);
+		draw_list->AddText(ImVec2(bb.Max.x - end_size.x - 3.0f, label_y), label_col, buf_end);
+	}
+
+	// [追加] ホバー中はクリック/追加位置をプレビューする縦ガイドラインを表示する
+	// （再生ヘッドのドラッグ中やキーフレームのドラッグ中は表示しない）
+	if (hovered && !held && dragging_kf_idx == -1) {
+		float guide_x = pos.x + ((float)hovered_frame / max_frames) * size.x;
+		draw_list->AddLine(ImVec2(guide_x, pos.y), ImVec2(guide_x, pos.y + size.y), IM_COL32(255, 255, 255, 60), 1.0f);
+	}
+
 	// キーフレームの描画
+	// [変更] 四角形 -> ひし形（ダイヤモンド）に変更し、「キーフレーム」であることを視覚的に分かりやすくする
+	// また、ホバー/ドラッグ時にサイズも変化させてフィードバックを強化する
 	const ImU32 kf_color = IM_COL32(255, 160, 0, 255);
 	const ImU32 kf_color_hover = IM_COL32(255, 210, 80, 255);
 	const ImU32 kf_color_drag = IM_COL32(255, 255, 255, 255); // ドラッグ中
 
 	for (size_t i = 0; i < keyframes.size(); ++i) {
 		float kf_x = pos.x + ((float)keyframes[i] / max_frames) * size.x;
+		float kf_center_y = pos.y + (size.y - 8.0f) * 0.5f; // 下部の目盛りエリアを避けて中央寄りに配置
 
-		bool is_kf_hovered = hovered && std::abs((kf_x - pos.x) - mouse_x_in_widget) < snap_pixel_radius;
+		bool is_kf_hovered = (hovered_kf_idx == (int)i);
 		bool is_this_dragging = (dragging_kf_idx == (int)i);
 
 		ImU32 col = kf_color;
-		if (is_this_dragging) col = kf_color_drag;
-		else if (is_kf_hovered) col = kf_color_hover;
+		float radius = 4.0f;
+		if (is_this_dragging) { col = kf_color_drag; radius = 6.0f; }
+		else if (is_kf_hovered) { col = kf_color_hover; radius = 5.5f; }
 
-		ImVec2 p1 = ImVec2(kf_x - 3, pos.y + 5);
-		ImVec2 p2 = ImVec2(kf_x + 3, pos.y + size.y - 12);
+		ImVec2 diamond[4] = {
+			ImVec2(kf_x, kf_center_y - radius), // 上
+			ImVec2(kf_x + radius, kf_center_y), // 右
+			ImVec2(kf_x, kf_center_y + radius), // 下
+			ImVec2(kf_x - radius, kf_center_y), // 左
+		};
 
-		draw_list->AddRectFilled(p1, p2, col, 2.0f);
-		draw_list->AddRect(p1, p2, IM_COL32(0, 0, 0, 100), 2.0f);
+		draw_list->AddConvexPolyFilled(diamond, 4, col);
+		draw_list->AddPolyline(diamond, 4, IM_COL32(0, 0, 0, 120), ImDrawFlags_Closed, 1.5f);
 	}
 
 	// 再生ヘッドの描画
@@ -1121,6 +1168,23 @@ bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_f
 		ImVec2(head_x, pos.y + 6),
 		IM_COL32(255, 50, 50, 255)
 	);
+
+	// [追加] 現在のフレーム番号を常時表示するカウンター（右上に半透明の背景付き）
+	// これまではホバーしないと現在のフレームが分からなかったが、常に一目で確認できるようにする
+	{
+		char counter_buf[32];
+		ImFormatString(counter_buf, sizeof(counter_buf), "%d / %d", *current_frame, max_frames);
+
+		ImVec2 text_size = ImGui::CalcTextSize(counter_buf);
+		ImVec2 text_pos(bb.Max.x - text_size.x - 6.0f, bb.Min.y + 3.0f);
+
+		draw_list->AddRectFilled(
+			ImVec2(text_pos.x - 4.0f, text_pos.y - 2.0f),
+			ImVec2(text_pos.x + text_size.x + 4.0f, text_pos.y + text_size.y + 2.0f),
+			IM_COL32(0, 0, 0, 140), 3.0f
+		);
+		draw_list->AddText(text_pos, IM_COL32(255, 255, 255, 255), counter_buf);
+	}
 
 	draw_list->PopClipRect();
 
