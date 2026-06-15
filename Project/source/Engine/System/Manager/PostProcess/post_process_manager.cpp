@@ -2,6 +2,7 @@
 #include "Engine/System/graphics_core.h"
 #include "Engine/System/Manager/resource_manager.h"
 
+#include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
 Framebuffer Post_Process_Manager::fsquad;
 //std::unique_ptr<Fullscreen_Quad> Post_Process_Manager::bit_block_transfer = nullptr;
 std::unique_ptr<bloom> Post_Process_Manager::bloomer = nullptr;
@@ -186,22 +187,41 @@ void Post_Process_Manager::drawBloomGUI()
 	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));  // 仕切り線分だけ右にずらす
 
 	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
+	//ImGui::BeginChild("##bloom_right", ImVec2(right_w - 6.0f, 0), false);
+
+	//if (bloomer->is_bloom && bloomer->getColorMap()) {
+	//	ImVec2 avail = ImGui::GetContentRegionAvail();
+	//	// アスペクト比 16:9 を保ってフィット
+	//	float tex_w = avail.x;
+	//	float tex_h = tex_w * (9.0f / 16.0f);
+	//	if (tex_h > avail.y) {
+	//		tex_h = avail.y;
+	//		tex_w = tex_h * (16.0f / 9.0f);
+	//	}
+	//	ImGui::Image((ImTextureID)bloomer->getColorMap(), ImVec2(tex_w, tex_h));
+	//}
+	//else {
+	//	// Bloom オフ時はプレースホルダー
+	//	ImGui::TextDisabled("(Bloom disabled)");
+	//}
+
+	//ImGui::EndChild();
 	ImGui::BeginChild("##bloom_right", ImVec2(right_w - 6.0f, 0), false);
 
-	if (bloomer->is_bloom && bloomer->getColorMap()) {
-		ImVec2 avail = ImGui::GetContentRegionAvail();
-		// アスペクト比 16:9 を保ってフィット
-		float tex_w = avail.x;
-		float tex_h = tex_w * (9.0f / 16.0f);
-		if (tex_h > avail.y) {
-			tex_h = avail.y;
-			tex_w = tex_h * (16.0f / 9.0f);
-		}
-		ImGui::Image((ImTextureID)bloomer->getColorMap(), ImVec2(tex_w, tex_h));
+	if (bloomer->is_bloom) {
+		// 1. Bloom用のデバッグアセットリストを取得
+		static int selected_index = 0;
+		auto assets = bloomer->GetDebugAssets();
+
+		// 2. ギャラリー＆プレビューウィジェットの呼び出し
+		// 第4引数のサイズ（64.0f）は必要に応じて調整してください
+		CustomUI::ImageGallery("BloomBufferGallery", assets, &selected_index, 64.0f);
 	}
 	else {
-		// Bloom オフ時はプレースホルダー
-		ImGui::TextDisabled("(Bloom disabled)");
+		// Bloom オフ時は中央にメッセージを表示
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		ImGui::SetCursorPos(ImVec2(avail.x * 0.3f, avail.y * 0.5f));
+		ImGui::TextDisabled("Bloom effect is disabled.");
 	}
 
 	ImGui::EndChild();

@@ -1265,6 +1265,143 @@ void CustomUI::RenderToasts(float delta_time) {
 	}
 }
 
+
+// 検索窓ウィジェット
+bool CustomUI::SearchBar(const char* label, char* buf, size_t buf_size, const char* hint) {
+	ImGui::PushID(label);
+	ImGui::Text("Filter:");
+	ImGui::SameLine();
+	bool changed = ImGui::InputTextWithHint("##SearchInput", hint, buf, buf_size);
+	ImGui::PopID();
+	return changed;
+}
+
+// 画像ギャラリー
+bool CustomUI::ImageGallery(const char* label, const std::vector<ImageAsset>& images, int* selected_index, float thumbnail_size) {
+	bool selection_changed = false;
+
+	// 状態管理（静的変数）
+	static char filter_buf[128] = "";
+	static bool show_full_preview = false;
+
+	ImGui::PushID(label);
+
+	// 1. 検索窓
+	CustomUI::SearchBar("GallerySearch", filter_buf, IM_ARRAYSIZE(filter_buf), "Search images...");
+	ImGui::Separator();
+
+	// 2. サムネイル一覧エリア
+	const float preview_height = 250.0f;
+	ImGui::BeginChild("##GalleryGrid", ImVec2(0, -preview_height), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	float window_visible_x2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+
+	for (int i = 0; i < (int)images.size(); i++) {
+		// フィルター処理
+		if (filter_buf[0] != '\0' && images[i].name.find(filter_buf) == std::string::npos)
+			continue;
+
+		ImGui::PushID(i);
+		bool is_selected = (*selected_index == i);
+
+		if (is_selected) {
+			ImGui::PushStyleColor(ImGuiCol_Button, theme.accent);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme.accent);
+		}
+
+		// サムネイルボタン
+		if (ImGui::ImageButton("##thumb", images[i].tex_id, ImVec2(thumbnail_size, thumbnail_size))) {
+			if (*selected_index != i) {
+				*selected_index = i;
+				selection_changed = true;
+			}
+		}
+
+		if (is_selected) ImGui::PopStyleColor(2);
+
+		// ダブルクリックで拡大ウィンドウを表示
+		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+			show_full_preview = true;
+		}
+
+		// 折り返しレイアウト
+		float last_button_x2 = ImGui::GetItemRectMax().x;
+		float next_button_x2 = last_button_x2 + style.ItemSpacing.x + thumbnail_size;
+		if (i + 1 < (int)images.size() && next_button_x2 < window_visible_x2)
+			ImGui::SameLine();
+
+		ImGui::PopID();
+	}
+	ImGui::EndChild();
+
+	// 3. 下部固定プレビュー（元の機能）
+	ImGui::Separator();
+	ImGui::BeginChild("##EmbeddedPreview", ImVec2(0, 0), false);
+	if (*selected_index >= 0 && *selected_index < (int)images.size()) {
+		const auto& img = images[*selected_index];
+		ImGui::Text("Selected: %s", img.name.c_str());
+
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		float aspect = img.size.x / img.size.y;
+		ImVec2 draw_size = avail;
+		if (avail.x / avail.y > aspect) draw_size.x = avail.y * aspect;
+		else draw_size.y = avail.x / aspect;
+
+		ImGui::Image(img.tex_id, draw_size);
+	}
+	ImGui::EndChild();
+
+	// 4. 独立拡大ウィンドウ（自由移動・リサイズ）
+	if (show_full_preview && *selected_index >= 0 && *selected_index < (int)images.size()) {
+		const auto& img = images[*selected_index];
+
+		// ウィンドウのパディングを少し絞ってスマートに
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+		ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
+
+		// スクロールバーを消すフラグを追加
+		if (ImGui::Begin("Full Image Preview", &show_full_preview, ImGuiWindowFlags_NoScrollbar)) {
+
+			// --- ヘッダー部分：情報表示 ---
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 0.8f));
+			ImGui::TextUnformatted(img.name.c_str());
+			ImGui::PopStyleColor();
+
+			ImGui::SameLine();
+			ImGui::TextDisabled("- %.0f x %.0f", img.size.x, img.size.y);
+
+			ImGui::Separator();
+			ImGui::Spacing();
+
+			// --- 画像エリア ---
+			ImVec2 avail = ImGui::GetContentRegionAvail();
+
+			// アスペクト比計算
+			float aspect = img.size.x / img.size.y;
+			ImVec2 draw_size = avail;
+			if (avail.x / avail.y > aspect) draw_size.x = avail.y * aspect;
+			else draw_size.y = avail.x / aspect;
+
+			// 中央寄せのためのオフセット計算
+			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			cursor_pos.x += (avail.x - draw_size.x) * 0.5f;
+			cursor_pos.y += (avail.y - draw_size.y) * 0.5f;
+			ImGui::SetCursorPos(cursor_pos);
+
+			// 画像描画
+			ImGui::Image(img.tex_id, draw_size);
+
+		}
+		ImGui::End();
+
+		// スタイル設定を戻す
+		ImGui::PopStyleVar();
+	}
+
+	ImGui::PopID();
+	return selection_changed;
+}
 // 引数を void (なし) に変更
 void CustomUI::DrawCustomUIWidgetsTestWindow()
 {

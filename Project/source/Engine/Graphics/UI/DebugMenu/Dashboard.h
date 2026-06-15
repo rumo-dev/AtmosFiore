@@ -2,19 +2,16 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include "Engine/Graphics/UI/ImGui/imgui.h"
-
-#include "Engine/utilities/resource_monitor.h"
-
 #include <mutex>
 #include <unordered_map>
 
+#include "Engine/Graphics/UI/ImGui/imgui.h"
+#include "Engine/utilities/resource_monitor.h"
+
 struct SharedMetricsData {
-	// スレッドセーフのためのミューテックス
 	mutable std::mutex mtx;
 
 	// --- 設定項目 (Settings) ---
-	// UIとゲームロジックの間で同期するフラグや数値
 	std::unordered_map<std::string, bool> feature_toggles;
 	std::unordered_map<std::string, float> feature_values;
 
@@ -23,7 +20,6 @@ struct SharedMetricsData {
 	float frame_time = 0.0f;
 	std::vector<float> graph_history;
 
-	// データの安全な更新用メソッド
 	void SetToggle(const std::string& key, bool value) {
 		std::lock_guard<std::mutex> lock(mtx);
 		feature_toggles[key] = value;
@@ -44,11 +40,11 @@ struct SharedMetricsData {
 	}
 };
 
-// 各タブの中身を定義する型
 using RenderFunc = std::function<void(SharedMetricsData&)>;
 
 struct SubTab {
 	std::string name;
+	std::string tooltip; // 【改善】ツールチップを追加
 	RenderFunc render_func;
 };
 
@@ -61,14 +57,14 @@ class Dashboard {
 public:
 	static Dashboard& Instance() { static Dashboard instance; return instance; }
 
-	// UIモジュールを外部から登録する
 	void InitializeUI();
 	void RegisterModule(const TabModule& mod) { modules.push_back(mod); }
 	void Render();
-	SharedMetricsData data; // ゲームとUIで共有するデータ
 	void SetupStyle();
 
+	SharedMetricsData data;
 	ImFont* font_large = nullptr;
+
 private:
 	Dashboard() = default;
 	std::vector<TabModule> modules;
@@ -78,8 +74,8 @@ private:
 	void RenderSideBar();
 	void RenderGroupCard(const char* label, ImVec2 size, std::function<void()> content);
 	void RenderMainContent();
+
 	bool some_bool = false;
 	float some_float = 0.0f;
-	/// リソース監視（メモリ・GPUなど）
 	Resource_Monitor _monitor;
 };

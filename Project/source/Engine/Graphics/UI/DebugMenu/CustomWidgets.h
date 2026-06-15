@@ -15,6 +15,11 @@ namespace CustomUI
 	};
 	static Theme theme;
 
+	struct ImageAsset {
+		ImTextureID tex_id;
+		ImVec2 size;
+		std::string name;
+	};
 	// トースト通知用の構造体
 	struct Toast {
 		std::string message;
@@ -66,5 +71,11 @@ namespace CustomUI
 
 	void DrawCustomUIWidgetsTestWindow();
 
+
+	// 検索窓ウィジェット（再利用可能なパーツ）
+	bool SearchBar(const char* label, char* buf, size_t buf_size, const char* hint = "Search...");
+
+	// 画像ギャラリー
+	bool ImageGallery(const char* label, const std::vector<ImageAsset>& images, int* selected_index, float thumbnail_size);
 
 }

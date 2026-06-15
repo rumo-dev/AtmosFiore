@@ -1,6 +1,5 @@
 // BLOOM
 #include "bloom.h"
-
 #include<vector>
 
 #include"Engine/system/render_state.h"

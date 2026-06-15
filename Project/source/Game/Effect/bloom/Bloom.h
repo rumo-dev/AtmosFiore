@@ -9,6 +9,8 @@
 #include "Engine/Graphics/shader/shader.h"
 #include "Engine/utilities/misc.h"
 
+#include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
+
 /**
  * @brief Bloom（ブルーム）ポストエフェクトクラス
  *
@@ -112,7 +114,43 @@ public:
 
 	/** @brief Bloom強度 */
 	float bloom_intensity = 0.673f;
+	// Bloom.h の class bloom に追加
+public:
+	std::vector<CustomUI::ImageAsset> GetDebugAssets() {
+		std::vector<CustomUI::ImageAsset> assets;
 
+		// ImTextureID への明示的なキャストを追加
+		auto to_tex = [](ID3D11ShaderResourceView* srv) -> ImTextureID {
+			return (ImTextureID)srv;
+			};
+
+		// 1. 輝度抽出バッファ
+		assets.push_back(CustomUI::ImageAsset(
+			to_tex(glow_extraction->GetColorMap()),
+			ImVec2(1280.0f, 720.0f),
+			"Glow Extraction"
+		));
+
+		// 2. ダウンサンプリング・ブラー結果
+		for (size_t i = 0; i < downsampled_count; ++i) {
+			std::string name = "Blur Level " + std::to_string(i);
+
+			assets.push_back(CustomUI::ImageAsset(
+				to_tex(gaussian_blur[i][0]->GetColorMap()),
+				ImVec2((float)(1280 >> (i + 1)), (float)(720 >> (i + 1))),
+				name
+			));
+		}
+
+		// 3. 最終出力バッファ
+		assets.push_back(CustomUI::ImageAsset(
+			to_tex(bloom_final->GetColorMap()),
+			ImVec2(1280.0f, 720.0f),
+			"Bloom Final"
+		));
+
+		return assets;
+	}
 private:
 
 	///< フルスクリーン描画用
