@@ -54,12 +54,14 @@ namespace CustomUI
 
 	// 5. テキスト / カラー
 	bool InputText(const char* label, char* buf, size_t buf_size, ImGuiInputTextFlags flags = 0, ImGuiInputTextCallback cb = nullptr, void* user_data = nullptr);
+	ImVec4 SimulateColorBlindness(const ImVec4& color, int mode);
 	bool ColorEdit4(const char* label, float col[4], ImGuiColorEditFlags flags = 0);
 	bool ColorEdit3(const char* label, float col[3], ImGuiColorEditFlags flags = 0);
 
 	// 6. 空間・データ可視化（新規追加）
 	bool RotationDial(const char* label, float* p_angle_rad, float radius, float min_rad, float max_rad);
 	bool Vec2PositionPad(const char* label, float v[2], float min_val = -1.0f, float max_val = 1.0f, const ImVec2& size_arg = ImVec2(0, 0));
+	bool Vec3PositionPad(const char* label, float v[3], float min_val = -1.0f, float max_val = 1.0f, const ImVec2& size_arg = ImVec2(0, 0));
 	void MiniPerformanceGraph(const char* label, const float* values, int values_count, float scale_min = FLT_MAX, float scale_max = FLT_MAX, const ImVec2& size_arg = ImVec2(0, 0));
 	bool CurveEasingEditor(const char* label, ImVec2& cp1, ImVec2& cp2, const ImVec2& size_arg = ImVec2(0, 0));
 
