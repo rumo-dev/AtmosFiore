@@ -28,7 +28,7 @@ namespace CustomUI
 	void SectionLabel(const char* label);
 	void GradientHeader(const char* label, bool* is_open);
 	void Separator();
-
+	void LoadingBar(const char* label, float fraction, const ImVec2& size_arg = ImVec2(0, 0));
 	// 2. 基本コントロール
 	bool Button(const char* label, const ImVec2& size_arg = ImVec2(0, 0));
 	bool Checkbox(const char* label, bool* v);
@@ -37,6 +37,7 @@ namespace CustomUI
 	bool SliderScalar(const char* label, ImGuiDataType data_type, void* p_data, const void* p_min, const void* p_max, const char* format = nullptr, ImGuiSliderFlags flags = 0);
 	bool SliderFloat(const char* label, float* v, float v_min, float v_max, const char* format = "%.1f", ImGuiSliderFlags flags = 0);
 	bool SliderInt(const char* label, int* v, int v_min, int v_max, const char* format = "%d", ImGuiSliderFlags flags = 0);
+	bool SliderRangeFloat(const char* label, float* v_current_min, float* v_current_max, float v_min, float v_max, const char* format = "%.2f", ImGuiSliderFlags flags = 0);
 	bool DragScalar(const char* label, ImGuiDataType data_type, void* p_data, float v_speed, const void* p_min, const void* p_max, const char* format, ImGuiSliderFlags flags = 0);
 	bool DragFloat(const char* label, float* v, float v_speed, float v_min, float v_max, const char* format, ImGuiSliderFlags flags = 0);
 
@@ -57,10 +58,13 @@ namespace CustomUI
 	void MiniPerformanceGraph(const char* label, const float* values, int values_count, float scale_min = FLT_MAX, float scale_max = FLT_MAX, const ImVec2& size_arg = ImVec2(0, 0));
 	bool CurveEasingEditor(const char* label, ImVec2& cp1, ImVec2& cp2, const ImVec2& size_arg = ImVec2(0, 0));
 
+	// 変更後
+	bool EditableTimeline(const char* label, int* current_frame, int max_frames, std::vector<int>& keyframes, const ImVec2& size_arg);
 	// 7. 特殊通知
 	void AddToast(const std::string& message, ImGuiCol type_color, float duration);
 	void RenderToasts(float delta_time);
 
 	void DrawCustomUIWidgetsTestWindow();
+
 
 }

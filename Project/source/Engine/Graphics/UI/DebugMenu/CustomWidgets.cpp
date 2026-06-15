@@ -1,7 +1,7 @@
 #include "CustomWidgets.h"
 #include <unordered_map>
 #include <cmath>
-
+#include <algorithm>
 // =========================================================================
 // Internal helpers
 // =========================================================================
@@ -28,7 +28,6 @@ void CustomUI::Separator() {
 	ImGui::Separator();
 	ImGui::Spacing();
 }
-
 void CustomUI::GradientHeader(const char* label, bool* is_open) {
 	ImGuiWindow* window = ImGui::GetCurrentWindow();
 	if (window->SkipItems) return;
@@ -51,20 +50,146 @@ void CustomUI::GradientHeader(const char* label, bool* is_open) {
 		if (is_open) *is_open = !(*is_open);
 	}
 
-	// 左から右へのグラデーション背景描画
-	ImU32 col_base = ImGui::GetColorU32(ImGuiCol_FrameBg);
-	ImU32 col_fade = col_base & 0x00FFFFFF; // アルファを0にする
+	// --- 1. 背景グラデーションの修正 ---
+	ImU32 col_base = ImGui::GetColorU32(held ? ImGuiCol_HeaderActive : (hovered ? ImGuiCol_HeaderHovered : ImGuiCol_FrameBg));
+
+	// IM_COL32マクロを展開して安全にアルファチャネルだけを0(完全に透明)にする処理
+	// これにより環境に依存せず、確実に左から右へ消えるグラデーションになります
+	ImU32 col_fade = (col_base & 0x00FFFFFF); // 最上位バイト（アルファ）を確実にゼロクリア
+
+	// 時計回りの順序: 左上(base), 右上(fade), 右下(fade), 左下(base)
 	draw->AddRectFilledMultiColor(bb.Min, bb.Max, col_base, col_fade, col_fade, col_base);
 
-	// 開閉を表す三角矢印の描画
-	float arrow_size = g.FontSize * 0.75f;
-	ImGuiDir dir = (is_open && *is_open) ? ImGuiDir_Down : ImGuiDir_Right;
-	ImGui::RenderArrow(draw, ImVec2(bb.Min.x + style.FramePadding.x, bb.Min.y + style.FramePadding.y + 2.0f), ImGui::GetColorU32(ImGuiCol_Text), dir, arrow_size);
+	// --- 2. 三角矢印（手動描画への変更によるバグ回避） ---
+	float text_height = ImGui::CalcTextSize(label).y;
+	float arrow_size = text_height * 0.4f; // テキストの高さに綺麗に収まるサイズに調整
+	ImVec2 arrow_center(bb.Min.x + style.FramePadding.x + arrow_size, bb.Min.y + height * 0.5f);
+	ImU32 arrow_col = ImGui::GetColorU32(ImGuiCol_Text);
 
-	// テキストの描画
-	draw->AddText(ImVec2(bb.Min.x + style.FramePadding.x * 2.0f + arrow_size, bb.Min.y + style.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), label);
+	if (is_open && *is_open) {
+		// 下向き三角形 (開いている状態)
+		ImVec2 p1(arrow_center.x - arrow_size, arrow_center.y - arrow_size * 0.5f);
+		ImVec2 p2(arrow_center.x + arrow_size, arrow_center.y - arrow_size * 0.5f);
+		ImVec2 p3(arrow_center.x, arrow_center.y + arrow_size * 0.5f);
+		draw->AddTriangleFilled(p1, p2, p3, arrow_col);
+	}
+	else {
+		// 右向き三角形 (閉じている状態)
+		ImVec2 p1(arrow_center.x - arrow_size * 0.5f, arrow_center.y - arrow_size);
+		ImVec2 p2(arrow_center.x + arrow_size * 0.5f, arrow_center.y);
+		ImVec2 p3(arrow_center.x - arrow_size * 0.5f, arrow_center.y + arrow_size);
+		draw->AddTriangleFilled(p1, p2, p3, arrow_col);
+	}
+
+	// --- 3. テキストの位置調整 ---
+	// 三角形のサイズに合わせてパディングを動的に計算
+	float text_x = bb.Min.x + style.FramePadding.x * 2.0f + (arrow_size * 2.0f);
+	float text_y = bb.Min.y + style.FramePadding.y;
+	draw->AddText(ImVec2(text_x, text_y), ImGui::GetColorU32(ImGuiCol_Text), label);
 }
+void CustomUI::LoadingBar(const char* label, float fraction, const ImVec2& size_arg) {
+	ImGuiWindow* window = ImGui::GetCurrentWindow();
+	if (window->SkipItems) return;
 
+	ImGuiContext& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
+	const ImGuiID id = window->GetID(label);
+	ImDrawList* draw = window->DrawList;
+	const ImVec2 pos = window->DC.CursorPos;
+
+	// サイズの決定（デフォルトは横幅一杯、高さ12px）
+	float default_width = ImGui::GetContentRegionAvail().x;
+	float default_height = 12.0f;
+	ImVec2 size = ImGui::CalcItemSize(size_arg, default_width, default_height);
+
+	// テキスト（ラベル）がある場合は、テキストの高さ分だけ配置領域（bb）を広げる
+	bool has_text = (label && label[0] != '\0' && !ImGui::FindRenderedTextEnd(label));
+	float text_height = has_text ? (ImGui::CalcTextSize(label).y + 4.0f) : 0.0f;
+
+	const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + text_height + size.y));
+
+	// ImGuiに領域を登録してカーソルを進める
+	ImGui::ItemSize(bb, style.FramePadding.y);
+	if (!ImGui::ItemAdd(bb, id)) return;
+
+	// 1. ラベルテキストがある場合は描画
+	if (has_text) {
+		draw->AddText(pos, ImGui::GetColorU32(ImGuiCol_Text), label);
+	}
+
+	// ローディングバー本体の描画基準座標
+	ImVec2 bar_min(bb.Min.x, bb.Min.y + text_height);
+	ImVec2 bar_max(bb.Max.x, bb.Max.y);
+
+	// 2. 滑らかな進捗アニメーション (Lerp)
+	float& anim_fraction = GetAnim(id);
+	anim_fraction = ImLerp(anim_fraction, ImClamp(fraction, 0.0f, 1.0f), g.IO.DeltaTime * 14.0f);
+
+	// 3. 背景（トラック）の描画
+	ImU32 col_bg = ImGui::GetColorU32(ImGuiCol_FrameBg);
+	float rounding = size.y * 0.5f; // 完全な丸角（カプセル型）にする
+	draw->AddRectFilled(bar_min, bar_max, col_bg, rounding);
+
+	// 4. 進捗バー（アクティブ部分）と動く斜線パターンの描画
+	if (anim_fraction > 0.001f) {
+		float progress_w = size.x * anim_fraction;
+		ImVec2 progress_max(bar_min.x + progress_w, bar_max.y);
+		ImU32 col_accent = ImGui::GetColorU32(ImGuiCol_SliderGrab); // テーマのメイン色
+
+		// 進捗バーのベース（土台）を丸角で描画
+		draw->AddRectFilled(bar_min, progress_max, col_accent, rounding);
+
+		// ★ 修正点: 存在しない PathClip の代わりに標準の四角形クリッピングを適用
+		// これで左右の限界を安全に制限し、ループ内の計算をシンプルにします
+		draw->PushClipRect(bar_min, progress_max, true);
+
+		// アニメーション用の時間オフセット
+		float time = (float)g.Time;
+		float speed = 40.0f;
+		float stripe_spacing = 16.0f; // 斜線の間隔
+		float stripe_width = 8.0f;    // 斜線の太さ
+
+		float offset = ImFmod(time * speed, stripe_spacing);
+		ImU32 col_stripe = IM_COL32(255, 255, 255, 35); // 白の不透明度を少し調整（約14%）
+
+		// 斜線を描画
+		float start_x = bar_min.x - size.y;
+		float end_x = progress_max.x + size.y;
+
+		for (float x = start_x + offset; x < end_x; x += stripe_spacing) {
+			ImVec2 p_tl(x, bar_min.y);
+			ImVec2 p_tr(x + stripe_width, bar_min.y);
+			ImVec2 p_br(x + stripe_width - size.y, bar_max.y);
+			ImVec2 p_bl(x - size.y, bar_max.y);
+
+			draw->AddQuadFilled(p_tl, p_tr, p_br, p_bl, col_stripe);
+		}
+
+		// 四角形クリッピングを解除
+		draw->PopClipRect();
+
+		// ★ 修正点（カプセル型マスク処理）: 
+		// 四角形クリッピングだけだと「両端の丸角部分」から斜線がハミ出て不自然になるため、
+		// バーの一番外側の丸角を補正します。
+		// 進捗バーが完全に満タン（1.0）でない場合、右端の丸みを綺麗にマスクするために
+		// トラックの背景色と同じ色で外側を再レンダリングするか、
+		// アンチエイリアスが崩れないように内側にだけ斜線を収める処理を自動で行います。
+		if (anim_fraction < 0.99f && progress_w > rounding) {
+			// 進捗中の右端部分の丸みを綺麗に補正するため、
+			// アクセントカラーの「右側半分だけの丸角」を上から再描画して斜線のはみ出しを綺麗に上書き隠蔽します。
+			draw->PushClipRect(ImVec2(progress_max.x - rounding, bar_min.y), progress_max, true);
+			draw->AddRectFilled(bar_min, progress_max, col_accent, rounding);
+			draw->PopClipRect();
+		}
+
+		// 左端の丸みからはみ出た斜線を隠すマスク
+		if (progress_w > rounding) {
+			draw->PushClipRect(bar_min, ImVec2(bar_min.x + rounding, bar_max.y), true);
+			draw->AddRectFilled(bar_min, progress_max, col_accent, rounding);
+			draw->PopClipRect();
+		}
+	}
+}
 // =========================================================================
 // 基本コントロール
 // =========================================================================
@@ -179,12 +304,15 @@ bool CustomUI::SliderScalar(const char* label, ImGuiDataType data_type, void* p_
 	bool value_changed = false;
 
 	if (is_editing) {
+		ImVec2 backup_pos = ImGui::GetCursorScreenPos();
+
 		ImGui::SetCursorScreenPos(number_bb.Min);
 		ImGui::PushItemWidth(number_bb.GetWidth());
 		char buf[64];
 		ImGui::DataTypeFormatString(buf, 64, data_type, p_data, format);
 
-		if (ImGui::InputText("##edit", buf, 64, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CharsDecimal)) {
+		// ★ 修正: 入力欄に "##" をつけて内部ラベルを非表示にする
+		if (ImGui::InputText("##edit_slider", buf, 64, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CharsDecimal)) {
 			if (data_type == ImGuiDataType_Float) *(float*)p_data = (float)atof(buf);
 			if (data_type == ImGuiDataType_S32)   *(int*)p_data = atoi(buf);
 			storage->SetInt(id, 0);
@@ -192,6 +320,9 @@ bool CustomUI::SliderScalar(const char* label, ImGuiDataType data_type, void* p_
 		}
 		if (ImGui::IsItemDeactivatedAfterEdit()) storage->SetInt(id, 0);
 		ImGui::PopItemWidth();
+
+		// ★ 追加: カーソル位置を復元
+		ImGui::SetCursorScreenPos(backup_pos);
 	}
 	else {
 		bool hovered, held;
@@ -225,6 +356,144 @@ bool CustomUI::SliderFloat(const char* label, float* v, float v_min, float v_max
 
 bool CustomUI::SliderInt(const char* label, int* v, int v_min, int v_max, const char* format, ImGuiSliderFlags flags) {
 	return SliderScalar(label, ImGuiDataType_S32, v, &v_min, &v_max, format, flags);
+}
+
+// =========================================================================
+// 数値スライダー系 (範囲指定用)
+// =========================================================================
+bool CustomUI::SliderRangeFloat(const char* label, float* v_current_min, float* v_current_max, float v_min, float v_max, const char* format, ImGuiSliderFlags flags) {
+	ImGuiWindow* window = ImGui::GetCurrentWindow();
+	if (window->SkipItems) return false;
+
+	ImGuiContext& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
+	const ImGuiID id = window->GetID(label);
+	const ImVec2 pos = window->DC.CursorPos;
+	const float w = ImGui::GetContentRegionAvail().x;
+
+	const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
+	const float widget_height = 20.0f;
+	const float track_height = 4.0f;
+	const float slider_right_offset = 120.0f; // 数値表示（Min - Max）のために少し幅を確保
+	const float start_y = pos.y + label_size.y + 4.0f;
+	const float slider_y_center = start_y + (widget_height * 0.5f);
+
+	// レイアウトBB計算
+	const ImRect frame_bb(pos.x, slider_y_center - (track_height * 0.5f), pos.x + w - slider_right_offset, slider_y_center + (track_height * 0.5f));
+	const ImRect number_bb(frame_bb.Max.x + 8.0f, start_y, pos.x + w, start_y + widget_height);
+	const ImRect total_bb(pos.x, pos.y, pos.x + w, start_y + widget_height);
+
+	ImGui::ItemSize(total_bb, style.FramePadding.y);
+	if (!ImGui::ItemAdd(total_bb, id, &total_bb)) return false;
+
+	// マウス判定用 (frame_bbだけでなく全体の高さを考慮したヒットボックスを生成)
+	const ImRect interaction_bb(frame_bb.Min.x, start_y, frame_bb.Max.x, start_y + widget_height);
+	bool hovered, held;
+	bool pressed = ImGui::ButtonBehavior(interaction_bb, id, &hovered, &held);
+
+	bool value_changed = false;
+
+	// 状態保持用 (0: 未選択, 1: Minノブを掴んでいる, 2: Maxノブを掴んでいる)
+	ImGuiStorage* storage = ImGui::GetStateStorage();
+	const ImGuiID active_knob_key = window->GetID("##range_active_knob");
+	int active_knob = storage->GetInt(active_knob_key, 0);
+
+	// 各ノブの現在のピクセル位置を計算
+	float width_px = frame_bb.GetWidth();
+	float range = v_max - v_min;
+	if (range <= 0.0f) range = 1.0f;
+
+	float px_min = frame_bb.Min.x + ((*v_current_min - v_min) / range) * width_px;
+	float px_max = frame_bb.Min.x + ((*v_current_max - v_min) / range) * width_px;
+
+	// ドラッグ・操作ロジック
+	if (g.ActiveId == id) {
+		float mouse_x = g.IO.MousePos.x;
+
+		// ドラッグが始まった最初のフレームで、どちらのノブに近いかをロックする
+		if (active_knob == 0) {
+			float dist_to_min = ImAbs(mouse_x - px_min);
+			float dist_to_max = ImAbs(mouse_x - px_max);
+			// 距離が同じ（重なっている）場合はMinを優先、それ以外は近い方をターゲットにする
+			active_knob = (dist_to_min <= dist_to_max) ? 1 : 2;
+			storage->SetInt(active_knob_key, active_knob);
+		}
+
+		// マウス座標から数値を逆算
+		float normalized_t = ImClamp((mouse_x - frame_bb.Min.x) / width_px, 0.0f, 1.0f);
+		float new_val = v_min + normalized_t * range;
+
+		// ターゲットに指定されたノブのみを動かし、もう片方を追い越さないようにガード
+		if (active_knob == 1) {
+			*v_current_min = ImMin(new_val, *v_current_max);
+			value_changed = true;
+		}
+		else if (active_knob == 2) {
+			*v_current_max = ImMax(new_val, *v_current_min);
+			value_changed = true;
+		}
+
+		if (value_changed) {
+			ImGui::MarkItemEdited(id);
+		}
+	}
+	else {
+		// マウスを離したらアクティブなノブの状態を完全にリセット
+		if (active_knob != 0) {
+			active_knob = 0;
+			storage->SetInt(active_knob_key, 0);
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// 描画処理
+	// -------------------------------------------------------------------------
+	// 1. ラベルテキスト
+	window->DrawList->AddText(pos, ImGui::GetColorU32(ImGuiCol_Text), label);
+
+	// 2. トラック背景
+	window->DrawList->AddRectFilled(frame_bb.Min, frame_bb.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), track_height * 0.5f);
+
+	// 既存コントロールに合わせた Lerp（滑らかなイージングアニメーション）処理
+	static std::unordered_map<ImGuiID, ImVec2> s_slider_anims;
+	ImVec2& anim_pos = s_slider_anims[id];
+	if (anim_pos.x == 0.0f && anim_pos.y == 0.0f) { // 初期化
+		anim_pos.x = px_min;
+		anim_pos.y = px_max;
+	}
+	anim_pos.x = ImLerp(anim_pos.x, px_min, g.IO.DeltaTime * 14.0f);
+	anim_pos.y = ImLerp(anim_pos.y, px_max, g.IO.DeltaTime * 14.0f);
+
+	// 3. 選択中範囲のハイライト線
+	ImVec2 fill_min(anim_pos.x, frame_bb.Min.y);
+	ImVec2 fill_max(anim_pos.y, frame_bb.Max.y);
+	ImU32 grab_color = ImGui::GetColorU32((g.ActiveId == id) ? ImGuiCol_SliderGrabActive : ImGuiCol_SliderGrab);
+	window->DrawList->AddRectFilled(fill_min, fill_max, grab_color, track_height * 0.5f);
+
+	// 4. 各ノブ（丸）の描画
+	// Minノブ
+	window->DrawList->AddCircleFilled(ImVec2(anim_pos.x, slider_y_center), 6.0f, (g.ActiveId == id && active_knob == 1) ? ImGui::GetColorU32(ImGuiCol_SliderGrabActive) : ImGui::GetColorU32(ImGuiCol_SliderGrab));
+	window->DrawList->AddCircle(ImVec2(anim_pos.x, slider_y_center), 6.0f, ImGui::GetColorU32(ImGuiCol_Border));
+	// Maxノブ
+	window->DrawList->AddCircleFilled(ImVec2(anim_pos.y, slider_y_center), 6.0f, (g.ActiveId == id && active_knob == 2) ? ImGui::GetColorU32(ImGuiCol_SliderGrabActive) : ImGui::GetColorU32(ImGuiCol_SliderGrab));
+	window->DrawList->AddCircle(ImVec2(anim_pos.y, slider_y_center), 6.0f, ImGui::GetColorU32(ImGuiCol_Border));
+
+	// 5. 右側の数値テキストボックス表示 [Min - Max]
+	char val_buf[64];
+	char fmt_min[24];
+	char fmt_max[24];
+	ImGui::DataTypeFormatString(fmt_min, IM_ARRAYSIZE(fmt_min), ImGuiDataType_Float, v_current_min, format ? format : "%.2f");
+	ImGui::DataTypeFormatString(fmt_max, IM_ARRAYSIZE(fmt_max), ImGuiDataType_Float, v_current_max, format ? format : "%.2f");
+	snprintf(val_buf, sizeof(val_buf), "%s - %s", fmt_min, fmt_max);
+
+	window->DrawList->AddRectFilled(number_bb.Min, number_bb.Max, ImGui::GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), 4.0f);
+	window->DrawList->AddRect(number_bb.Min, number_bb.Max, ImGui::GetColorU32(ImGuiCol_Border), 4.0f);
+
+	ImVec2 text_size = ImGui::CalcTextSize(val_buf);
+	ImVec2 text_pos(number_bb.Min.x + (number_bb.GetWidth() - text_size.x) * 0.5f, number_bb.Min.y + (number_bb.GetHeight() - text_size.y) * 0.5f);
+	window->DrawList->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), val_buf);
+
+	return value_changed;
 }
 
 bool CustomUI::DragScalar(const char* label, ImGuiDataType data_type, void* p_data, float v_speed, const void* p_min, const void* p_max, const char* format, ImGuiSliderFlags flags) {
@@ -651,7 +920,7 @@ bool CustomUI::CurveEasingEditor(const char* label, ImVec2& cp1, ImVec2& cp2, co
 		cp1.y = ImClamp((box_bb.Max.y - g.IO.MousePos.y) / box_size.y, 0.0f, 1.0f);
 		value_changed = true;
 	}
-
+	ImVec2 backup_pos = ImGui::GetCursorScreenPos();
 	// 制御点2のドラッグ判定 (手動計算に修正)
 	ImGui::SetCursorScreenPos(ImVec2(p2.x - 6.0f, p2.y - 6.0f));
 	ImGui::InvisibleButton("##p2_btn", ImVec2(12.0f, 12.0f));
@@ -660,7 +929,7 @@ bool CustomUI::CurveEasingEditor(const char* label, ImVec2& cp1, ImVec2& cp2, co
 		cp2.y = ImClamp((box_bb.Max.y - g.IO.MousePos.y) / box_size.y, 0.0f, 1.0f);
 		value_changed = true;
 	}
-
+	ImGui::SetCursorScreenPos(backup_pos);
 	// 背景とベジエ曲線の描画
 	draw->AddRectFilled(box_bb.Min, box_bb.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), style.FrameRounding);
 	draw->AddRect(box_bb.Min, box_bb.Max, ImGui::GetColorU32(ImGuiCol_Border), style.FrameRounding);
@@ -679,7 +948,184 @@ bool CustomUI::CurveEasingEditor(const char* label, ImVec2& cp1, ImVec2& cp2, co
 
 	return value_changed;
 }
+bool CustomUI::EditableTimeline(const char* label, int* current_frame, int max_frames, std::vector<int>& keyframes, const ImVec2& size_arg) {
+	ImGuiWindow* window = ImGui::GetCurrentWindow();
+	if (window->SkipItems) return false;
 
+	ImGuiContext& g = *GImGui;
+	const ImGuiID id = window->GetID(label);
+
+	if (max_frames <= 0) max_frames = 1;
+
+	ImVec2 pos = window->DC.CursorPos;
+	ImVec2 size = ImGui::CalcItemSize(size_arg, ImGui::CalcItemWidth(), 40.0f);
+	ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+
+	ImGui::ItemSize(size, g.Style.FramePadding.y);
+	if (!ImGui::ItemAdd(bb, id)) return false;
+
+	bool hovered, held;
+	bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+	bool value_changed = false;
+
+	ImGuiIO& io = ImGui::GetIO();
+	float mouse_x_in_widget = io.MousePos.x - pos.x;
+	float t = ImClamp(mouse_x_in_widget / size.x, 0.0f, 1.0f);
+	int hovered_frame = (int)(t * max_frames);
+	hovered_frame = ImClamp(hovered_frame, 0, max_frames);
+
+	// [追加] ImGuiのステート領域を使って、現在ドラッグ中のキーフレームのインデックスを記憶する
+	ImGuiStorage* storage = ImGui::GetStateStorage();
+	const ImGuiID drag_id = window->GetID("##kf_dragging_idx");
+	int dragging_kf_idx = storage->GetInt(drag_id, -1);
+
+	const float snap_pixel_radius = 6.0f; // クリック判定の甘さ（ピクセル）
+
+	if (hovered) {
+		// [追加] ツールチップで現在のフレームを表示
+		ImGui::SetTooltip("Frame: %d", hovered_frame);
+
+		// 左クリックされた瞬間に、キーフレーム上かどうかを判定
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+			float min_dist = snap_pixel_radius;
+			int closest_idx = -1;
+			for (size_t i = 0; i < keyframes.size(); ++i) {
+				float kf_x = ((float)keyframes[i] / max_frames) * size.x;
+				float dist = std::abs(kf_x - mouse_x_in_widget);
+				if (dist < min_dist) {
+					min_dist = dist;
+					closest_idx = (int)i;
+				}
+			}
+			if (closest_idx != -1) {
+				// キーフレームを掴んだ
+				dragging_kf_idx = closest_idx;
+				storage->SetInt(drag_id, dragging_kf_idx);
+			}
+		}
+
+		// 右クリックでキーフレームの追加 / 削除
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+			float min_dist = snap_pixel_radius;
+			auto closest_it = keyframes.end();
+
+			for (auto it = keyframes.begin(); it != keyframes.end(); ++it) {
+				float kf_x = ((float)(*it) / max_frames) * size.x;
+				float dist = std::abs(kf_x - mouse_x_in_widget);
+				if (dist < min_dist) {
+					min_dist = dist;
+					closest_it = it;
+				}
+			}
+
+			if (closest_it != keyframes.end()) {
+				keyframes.erase(closest_it);
+			}
+			else {
+				keyframes.push_back(hovered_frame);
+				std::sort(keyframes.begin(), keyframes.end());
+			}
+			value_changed = true;
+		}
+	}
+
+	// --- 左ドラッグによる移動処理 ---
+	int target_frame = hovered_frame;
+
+	// [追加] Shiftキーを押している場合、近くのキーフレームにスナップ（吸着）させる
+	if (io.KeyShift && !keyframes.empty()) {
+		int nearest_kf = keyframes[0];
+		int min_f_dist = std::abs(target_frame - nearest_kf);
+		for (int kf : keyframes) {
+			int d = std::abs(target_frame - kf);
+			if (d < min_f_dist) {
+				min_f_dist = d;
+				nearest_kf = kf;
+			}
+		}
+		// 全体の5%以内の距離ならスナップ
+		if (min_f_dist < max_frames * 0.05f) {
+			target_frame = nearest_kf;
+		}
+	}
+
+	bool is_dragging_kf = (dragging_kf_idx >= 0 && dragging_kf_idx < (int)keyframes.size());
+
+	if (is_dragging_kf) {
+		// キーフレームをドラッグ中
+		if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+			if (keyframes[dragging_kf_idx] != target_frame) {
+				keyframes[dragging_kf_idx] = target_frame;
+				value_changed = true;
+			}
+		}
+		else {
+			// ドロップ（離した）時にソートして状態をリセット
+			std::sort(keyframes.begin(), keyframes.end());
+			storage->SetInt(drag_id, -1);
+		}
+	}
+	else if (held) {
+		// 再生ヘッドをドラッグ中
+		if (*current_frame != target_frame) {
+			*current_frame = target_frame;
+			value_changed = true;
+		}
+	}
+
+	// --- 描画 (DrawList) ---
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	draw_list->PushClipRect(bb.Min, bb.Max, true);
+
+	const ImU32 bg_color = ImGui::GetColorU32(ImGuiCol_FrameBg);
+	const ImU32 border_color = ImGui::GetColorU32(ImGuiCol_Border);
+	draw_list->AddRectFilled(bb.Min, bb.Max, bg_color, g.Style.FrameRounding);
+	draw_list->AddRect(bb.Min, bb.Max, border_color, g.Style.FrameRounding);
+
+	// 目盛り
+	int tick_step = max_frames / 10;
+	if (tick_step < 1) tick_step = 1;
+	for (int i = 0; i <= max_frames; i += tick_step) {
+		float tx = pos.x + ((float)i / max_frames) * size.x;
+		draw_list->AddLine(ImVec2(tx, pos.y + size.y - 8), ImVec2(tx, pos.y + size.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), 1.0f);
+	}
+
+	// キーフレームの描画
+	const ImU32 kf_color = IM_COL32(255, 160, 0, 255);
+	const ImU32 kf_color_hover = IM_COL32(255, 210, 80, 255);
+	const ImU32 kf_color_drag = IM_COL32(255, 255, 255, 255); // ドラッグ中
+
+	for (size_t i = 0; i < keyframes.size(); ++i) {
+		float kf_x = pos.x + ((float)keyframes[i] / max_frames) * size.x;
+
+		bool is_kf_hovered = hovered && std::abs((kf_x - pos.x) - mouse_x_in_widget) < snap_pixel_radius;
+		bool is_this_dragging = (dragging_kf_idx == (int)i);
+
+		ImU32 col = kf_color;
+		if (is_this_dragging) col = kf_color_drag;
+		else if (is_kf_hovered) col = kf_color_hover;
+
+		ImVec2 p1 = ImVec2(kf_x - 3, pos.y + 5);
+		ImVec2 p2 = ImVec2(kf_x + 3, pos.y + size.y - 12);
+
+		draw_list->AddRectFilled(p1, p2, col, 2.0f);
+		draw_list->AddRect(p1, p2, IM_COL32(0, 0, 0, 100), 2.0f);
+	}
+
+	// 再生ヘッドの描画
+	float head_x = pos.x + ((float)(*current_frame) / max_frames) * size.x;
+	draw_list->AddLine(ImVec2(head_x, pos.y), ImVec2(head_x, pos.y + size.y), IM_COL32(255, 50, 50, 255), 2.0f);
+	draw_list->AddTriangleFilled(
+		ImVec2(head_x - 5, pos.y),
+		ImVec2(head_x + 5, pos.y),
+		ImVec2(head_x, pos.y + 6),
+		IM_COL32(255, 50, 50, 255)
+	);
+
+	draw_list->PopClipRect();
+
+	return value_changed;
+}
 // =========================================================================
 // 特殊システム (Toast Notifications)
 // =========================================================================
@@ -774,7 +1220,25 @@ void CustomUI::DrawCustomUIWidgetsTestWindow()
 	{
 		ImGui::Text("This content is inside the gradient header!");
 	}
+	// --- ローディングバーのテストコード ---
+	ImGui::Text("Loading Bar Demo:");
+	static float progress = 0.0f;
 
+	// 時間経過で 0.0 から 1.0 まで自動で進むサンプル
+	progress += deltaTime * 0.2f; // 5秒で満タン
+	if (progress > 1.2f) progress = 0.0f; // 満タン後、少し待ってリセット
+
+	// 手動コントロール用のボタン
+	if (ImGui::Button("Reset progress")) progress = 0.0f;
+	ImGui::SameLine();
+	if (ImGui::Button("Set 100%")) progress = 1.0f;
+
+	// ウィジェットの呼び出し（ラベルあり、標準サイズ）
+	CustomUI::LoadingBar("System Initializing...", progress);
+
+	// ラベルなしで太めのローディングバーを表示したい場合の例
+	ImGui::Spacing();
+	CustomUI::LoadingBar("##silent_bar", progress, ImVec2(0, 12.0f));
 	CustomUI::Separator();
 
 	// =========================================================================
@@ -807,7 +1271,9 @@ void CustomUI::DrawCustomUIWidgetsTestWindow()
 
 	static int test_int = 50;
 	CustomUI::SliderInt("Int Slider", &test_int, 0, 100, "%d%%");
-
+	static float range_min = 20.0f;
+	static float range_max = 80.0f;
+	CustomUI::SliderRangeFloat("Audio Frequency Range", &range_min, &range_max, 0.0f, 100.0f, "%.1f Hz");
 	// =========================================================================
 	// 4. コンボボックスのテスト
 	// =========================================================================
@@ -861,7 +1327,48 @@ void CustomUI::DrawCustomUIWidgetsTestWindow()
 	static ImVec2 cp2(0.58f, 1.0f);
 	CustomUI::CurveEasingEditor("Camera Move Ease Curve", cp1, cp2, ImVec2(120.0f, 120.0f));
 
+	ImGui::Spacing();
+	// =========================================================================
+	CustomUI::SectionLabel("7. Timeline Showcase");
 
+	// 状態保持用のスタティック変数
+	static int current_frame = 0;
+	const int max_frames = 120; // 4秒分（30fps換算）
+
+	// デモ用のキーフレーム位置（std::vectorに変更）
+	static std::vector<int> my_keyframes = { 0, 15, 45, 60, 90, 120 };
+
+	// 再生自動進行用のフラグ
+	static bool is_playing = false;
+	ImGui::Checkbox("Play", &is_playing); // テスト用に再生トグルを追加
+
+	if (is_playing)
+	{
+		static float frame_timer = 0.0f;
+		frame_timer += deltaTime; // ※外側で定義されている deltaTime を使用
+
+		// 30fpsの速度（1フレームあたり約0.033秒）で再生ヘッドを進める
+		if (frame_timer >= 1.0f / 30.0f)
+		{
+			current_frame++;
+			frame_timer = 0.0f;
+			if (current_frame > max_frames)
+			{
+				current_frame = 0; // ループ再生
+			}
+		}
+	}
+
+	// 編集可能なタイムラインのレンダリング
+	// 関数名を EditableTimeline に変更したと仮定しています。
+	// Timeline のまま実装を上書きした場合は CustomUI::Timeline に戻してください。
+	bool changed = CustomUI::EditableTimeline("##MyTimeline", &current_frame, max_frames, my_keyframes, ImVec2(0, 40));
+
+	if (changed)
+	{
+		// キーフレームが追加・削除されたり、シークバーが操作された時にここが呼ばれます
+		// 必要であればログを出力するなどの処理を追加できます
+	}
 	// =========================================================================
 	// 7. トーストシステムのレンダリング
 	// =========================================================================

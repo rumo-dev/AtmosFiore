@@ -39,7 +39,19 @@ void Dashboard::RenderSideBar() {
 		if (ImGui::IsItemClicked()) active_mod_idx = (int)i;
 
 		if (is_selected) {
-			draw_list->AddRectFilled(cursor, ImVec2(cursor.x + 160, cursor.y + 35), IM_COL32(30, 30, 35, 255), 4.0f);
+			// グラデーションの定義 (左側: 少し明るめ, 右側: 少し暗め)
+			ImU32 col_top_left = IM_COL32(40, 40, 45, 255);
+			ImU32 col_top_right = IM_COL32(25, 25, 30, 255);
+			ImU32 col_bot_left = IM_COL32(40, 40, 45, 255);
+			ImU32 col_bot_right = IM_COL32(25, 25, 30, 255);
+
+			draw_list->AddRectFilledMultiColor(
+				cursor,
+				ImVec2(cursor.x + 160, cursor.y + 35),
+				col_top_left, col_top_right, col_bot_right, col_bot_left
+			);
+
+			// 左側のアクセントラインはそのまま、または少し光らせる
 			draw_list->AddRectFilled(cursor, ImVec2(cursor.x + 3, cursor.y + 35), IM_COL32(80, 150, 255, 255), 2.0f);
 		}
 
@@ -59,6 +71,16 @@ void Dashboard::RenderSideBar() {
 void Dashboard::RenderGroupCard(const char* label, ImVec2 size, std::function<void()> content) {
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.13f, 1.0f));
 	ImGui::BeginChild(label, size, false, ImGuiWindowFlags_None);
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	dl->AddRectFilledMultiColor(
+		p,
+		ImVec2(p.x + size.x, p.y + 30),
+		IM_COL32(30, 30, 35, 255),
+		IM_COL32(20, 20, 25, 255),
+		IM_COL32(20, 20, 25, 0),
+		IM_COL32(30, 30, 35, 0)
+	);
 
 	// タイトルと装飾
 	ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", label);
@@ -210,43 +232,62 @@ void Dashboard::SetupStyle() {
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec4* colors = style.Colors;
 
-	// 基本設定
+	// --- 基本レイアウト設定 ---
 	style.WindowRounding = 8.0f;
 	style.FrameRounding = 4.0f;
 	style.GrabRounding = 4.0f;
 	style.ChildRounding = 6.0f;
-	style.WindowBorderSize = 0.0f;
+	style.WindowBorderSize = 1.0f;
 	style.FrameBorderSize = 0.0f;
-	style.PopupBorderSize = 0.0f;
+	style.PopupBorderSize = 1.0f;
 	style.TabRounding = 4.0f;
+	style.ScrollbarSize = 12.0f;
+	style.ScrollbarRounding = 6.0f;
 
-	// カラーパレット：Neverloseのような暗いダークテーマ
-	colors[ImGuiCol_WindowBg] = ImVec4(0.09f, 0.09f, 0.10f, 1.00f);
-	colors[ImGuiCol_ChildBg] = ImVec4(0.12f, 0.12f, 0.13f, 1.00f);
-	colors[ImGuiCol_PopupBg] = ImVec4(0.10f, 0.10f, 0.11f, 1.00f);
+	// --- カラーパレット設定（黄色ベース） ---
+	// メイン背景
+	colors[ImGuiCol_WindowBg] = ImVec4(0.09f, 0.09f, 0.09f, 1.00f);
+	colors[ImGuiCol_ChildBg] = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
+	colors[ImGuiCol_PopupBg] = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+	colors[ImGuiCol_Border] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
 
 	// テキスト
-	colors[ImGuiCol_Text] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+	colors[ImGuiCol_Text] = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
 	colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
 
-	// フレーム・ボタン系（アクセントカラー：薄い青）
-	colors[ImGuiCol_FrameBg] = ImVec4(0.18f, 0.18f, 0.19f, 1.00f);
-	colors[ImGuiCol_FrameBgHovered] = ImVec4(0.22f, 0.22f, 0.24f, 1.00f);
-	colors[ImGuiCol_FrameBgActive] = ImVec4(0.25f, 0.25f, 0.28f, 1.00f);
+	// アクセントカラー（黄色: 0.95, 0.75, 0.10）
+	ImVec4 yellow = ImVec4(0.95f, 0.75f, 0.10f, 1.00f);
+	ImVec4 yellow_hover = ImVec4(0.95f, 0.75f, 0.10f, 0.60f);
+	ImVec4 yellow_active = ImVec4(0.95f, 0.75f, 0.10f, 0.90f);
 
-	colors[ImGuiCol_Button] = ImVec4(0.20f, 0.20f, 0.22f, 1.00f);
-	colors[ImGuiCol_ButtonHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.40f); // 青みのホバー
-	colors[ImGuiCol_ButtonActive] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
+	// フレーム・ボタン系
+	colors[ImGuiCol_FrameBg] = ImVec4(0.18f, 0.18f, 0.18f, 1.00f);
+	colors[ImGuiCol_FrameBgHovered] = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+	colors[ImGuiCol_FrameBgActive] = ImVec4(0.30f, 0.30f, 0.30f, 1.00f);
+
+	colors[ImGuiCol_Button] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+	colors[ImGuiCol_ButtonHovered] = yellow_hover;
+	colors[ImGuiCol_ButtonActive] = yellow;
 
 	// タブ・ヘッダー
-	colors[ImGuiCol_Tab] = ImVec4(0.12f, 0.12f, 0.13f, 1.00f);
-	colors[ImGuiCol_TabHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
-	colors[ImGuiCol_TabActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+	colors[ImGuiCol_Tab] = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
+	colors[ImGuiCol_TabHovered] = yellow_hover;
+	colors[ImGuiCol_TabActive] = yellow;
 
-	// ヘッダー（メニュー項目など）
-	colors[ImGuiCol_Header] = ImVec4(0.20f, 0.20f, 0.22f, 1.00f);
-	colors[ImGuiCol_HeaderHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.45f);
-	colors[ImGuiCol_HeaderActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+	colors[ImGuiCol_Header] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+	colors[ImGuiCol_HeaderHovered] = yellow_hover;
+	colors[ImGuiCol_HeaderActive] = yellow;
 
+	// スライダー・スクロールバー・その他追加
+	colors[ImGuiCol_SliderGrab] = yellow_hover;
+	colors[ImGuiCol_SliderGrabActive] = yellow;
+	colors[ImGuiCol_ScrollbarBg] = ImVec4(0.08f, 0.08f, 0.08f, 1.00f);
+	colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+	colors[ImGuiCol_ScrollbarGrabHovered] = yellow_hover;
+	colors[ImGuiCol_ScrollbarGrabActive] = yellow;
 
+	colors[ImGuiCol_CheckMark] = yellow;
+	colors[ImGuiCol_Separator] = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+	colors[ImGuiCol_TitleBg] = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
+	colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
 }
