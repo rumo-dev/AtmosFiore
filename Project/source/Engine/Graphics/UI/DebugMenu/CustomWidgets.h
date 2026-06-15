@@ -28,6 +28,14 @@ namespace CustomUI
 		float max_duration;
 	};
 	static std::vector<Toast> toasts;
+	struct AdvancedColorState {
+		std::vector<ImVec4> undo_stack;
+		bool is_locked = false;
+		bool is_linear = false;
+		int theme_var_idx = 0;
+		bool dark_bg = true;
+	};
+
 
 	// 1. 基本装飾
 	void SectionLabel(const char* label);
@@ -55,8 +63,11 @@ namespace CustomUI
 	// 5. テキスト / カラー
 	bool InputText(const char* label, char* buf, size_t buf_size, ImGuiInputTextFlags flags = 0, ImGuiInputTextCallback cb = nullptr, void* user_data = nullptr);
 	ImVec4 SimulateColorBlindness(const ImVec4& color, int mode);
+	bool ParseHexColor(const char* text, float col[4]);
+	ImVec4 GetGradientColor(ImVec4 start, ImVec4 end, float t);
 	bool ColorEdit4(const char* label, float col[4], ImGuiColorEditFlags flags = 0);
 	bool ColorEdit3(const char* label, float col[3], ImGuiColorEditFlags flags = 0);
+
 
 	// 6. 空間・データ可視化（新規追加）
 	bool RotationDial(const char* label, float* p_angle_rad, float radius, float min_rad, float max_rad);
@@ -79,5 +90,6 @@ namespace CustomUI
 
 	// 画像ギャラリー
 	bool ImageGallery(const char* label, const std::vector<ImageAsset>& images, int* selected_index, float thumbnail_size);
+
 
 }

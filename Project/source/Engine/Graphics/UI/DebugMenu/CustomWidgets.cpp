@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <cmath>
 #include <algorithm>
+#include <map>
 // =========================================================================
 // Internal helpers
 // =========================================================================
@@ -701,7 +702,25 @@ ImVec4  CustomUI::SimulateColorBlindness(const ImVec4& color, int mode) {
 	out.z = out.z > 1.0f ? 1.0f : (out.z < 0.0f ? 0.0f : out.z);
 	return out;
 }
-
+bool CustomUI::ParseHexColor(const char* text, float col[4]) {
+	if (!text) return false;
+	int r, g, b, a = 255;
+	// #RRGGBBAA または #RRGGBB
+	if (sscanf_s(text, "#%02x%02x%02x%02x", &r, &g, &b, &a) >= 3 ||
+		sscanf_s(text, "%02x%02x%02x%02x", &r, &g, &b, &a) >= 3) {
+		col[0] = r / 255.0f; col[1] = g / 255.0f; col[2] = b / 255.0f; col[3] = a / 255.0f;
+		return true;
+	}
+	return false;
+}
+ImVec4 CustomUI::GetGradientColor(ImVec4 start, ImVec4 end, float t) {
+	return ImVec4(
+		start.x + (end.x - start.x) * t,
+		start.y + (end.y - start.y) * t,
+		start.z + (end.z - start.z) * t,
+		start.w + (end.w - start.w) * t
+	);
+}
 // --- ColorEdit3 (Alphaなし版) ---
 bool  CustomUI::ColorEdit3(const char* label, float col[3], ImGuiColorEditFlags flags) {
 	float col4[4] = { col[0], col[1], col[2], 1.0f };
@@ -717,170 +736,243 @@ bool  CustomUI::ColorEdit3(const char* label, float col[3], ImGuiColorEditFlags 
 // --- ColorEdit4 (フル機能・プロフェッショナル版) ---
 bool  CustomUI::ColorEdit4(const char* label, float col[4], ImGuiColorEditFlags flags) {
 	bool value_changed = false;
-
-	// 【重要】引数の label を使って一意のIDスコープを作成（ID衝突対策）
 	ImGui::PushID(label);
 
-	// --- 状態管理 (静的・永続変数) ---
-	static std::vector<ImVec4> saved_palette;
-	static ImVec4 backup_color;
-	static bool dark_background_preview = true; // チェッカーボード背景のトグル
+	// IDベースで独立した状態を取得 (複数配置対応)
+	ImGuiID id = ImGui::GetID("advanced_state");
+	static std::map<ImGuiID, AdvancedColorState> states;
+	AdvancedColorState& state = states[id];
 
-	// ウィジェット個別の状態（テーマ選択インデックス）をImGuiのストレージから取得
-	ImGuiStorage* storage = ImGui::GetStateStorage();
-	ImGuiID theme_var_id = ImGui::GetID("#theme_var_idx");
-	int* theme_var_idx = storage->GetIntRef(theme_var_id, 0); // デフォルトは 0 (Custom)
-
-	// パレットの初期化（初回のみ16マス分をグレーで確保）
-	if (saved_palette.empty()) {
-		saved_palette.resize(16, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-	}
+	static std::vector<ImVec4> saved_palette; // パレットは全ピッカーで共有
+	if (saved_palette.empty()) saved_palette.resize(16, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 
 	ImVec4 current_color_vec = ImVec4(col[0], col[1], col[2], col[3]);
+	static ImVec4 backup_color;
 
-	// --- スタイルの適用 ---
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(13.0f, 13.0f));
-	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 4.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(8.0f, 12.0f));
-	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGui::GetColorU32(ImGuiCol_FrameBg));
+	// ロック中ならボタンを少し暗くする
+	if (state.is_locked) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
 
-	// --- メインラインUI（カラーボタンとテキストラベル） ---
 	if (ImGui::ColorButton("##ColorBtn", current_color_vec, flags | ImGuiColorEditFlags_NoPicker)) {
-		ImGui::OpenPopup("ProColorPickerPopup");
-		backup_color = current_color_vec; // 開いた瞬間の色を「旧色」として退避
+		if (!state.is_locked) { // ロック解除時のみ開く
+			ImGui::OpenPopup("ProColorPickerPopup");
+			backup_color = current_color_vec;
+			if (state.undo_stack.empty() || state.undo_stack.back().x != col[0]) {
+				state.undo_stack.push_back(current_color_vec); // 初期状態をUndoに積む
+			}
+		}
 	}
+
+	if (state.is_locked) ImGui::PopStyleColor();
+
 	ImGui::SameLine();
 	ImGui::TextUnformatted(label);
+	if (state.is_locked) {
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[Locked]");
+	}
 
-	// --- カスタムポップアップ（左右2カラムレイアウト） ---
-	ImGui::SetNextWindowSize(ImVec2(530, 0), ImGuiCond_Once);
+	ImGui::SetNextWindowSize(ImVec2(540, 0), ImGuiCond_Once);
 	if (ImGui::BeginPopup("ProColorPickerPopup")) {
 
-		// --------------------------------------------------
-		// 左カラム: メインカラーピッカー領域
-		// --------------------------------------------------
+		// ==================================================
+		// [新機能] トップツールバー
+		// ==================================================
+		ImGui::BeginGroup();
+
+		// ロック機能
+		if (ImGui::Button(state.is_locked ? "Unlock" : "Lock")) state.is_locked = !state.is_locked;
+		ImGui::SameLine();
+
+		// クリップボード連携
+		if (ImGui::Button("Copy HEX")) {
+			char hex[32];
+			snprintf(hex, sizeof(hex), "#%02X%02X%02X%02X", (int)(col[0] * 255), (int)(col[1] * 255), (int)(col[2] * 255), (int)(col[3] * 255));
+			ImGui::SetClipboardText(hex);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Paste HEX") && !state.is_locked) {
+			if (ParseHexColor(ImGui::GetClipboardText(), col)) value_changed = true;
+		}
+		ImGui::SameLine();
+
+		// Undo履歴機能
+		ImGui::BeginDisabled(state.undo_stack.size() <= 1 || state.is_locked);
+		if (ImGui::Button("Undo")) {
+			state.undo_stack.pop_back(); // 現在の色を破棄
+			ImVec4 prev = state.undo_stack.back();
+			col[0] = prev.x; col[1] = prev.y; col[2] = prev.z; col[3] = prev.w;
+			value_changed = true;
+		}
+		ImGui::EndDisabled();
+
+		ImGui::EndGroup();
+		ImGui::Separator();
+
+		// ロック中はピッカーの操作を無効化
+		ImGui::BeginDisabled(state.is_locked);
+
+		// ==================================================
+		// 左カラム: メインカラーピッカー & 新機能群
+		// ==================================================
 		ImGui::BeginGroup();
 		{
-			ImGui::PushItemWidth(220.0f); // ピッカーの横幅を固定
+			ImGui::PushItemWidth(220.0f);
 
-			ImGuiColorEditFlags picker_flags = flags |
-				ImGuiColorEditFlags_DisplayHex |
-				ImGuiColorEditFlags_DisplayRGB |
-				ImGuiColorEditFlags_PickerHueWheel;
-
-			// 背景チェッカーボードの切り替えフラグ
-			if (!dark_background_preview) picker_flags |= ImGuiColorEditFlags_AlphaPreview;
+			// --- 1. メインピッカー ---
+			ImGuiColorEditFlags picker_flags = flags | ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_PickerHueWheel;
+			if (!state.dark_bg) picker_flags |= ImGuiColorEditFlags_AlphaPreview;
 			else picker_flags |= ImGuiColorEditFlags_AlphaPreviewHalf;
 
-			value_changed |= ImGui::ColorPicker4("##picker", col, picker_flags);
+			if (ImGui::ColorPicker4("##picker", col, picker_flags)) {
+				value_changed = true;
+			}
 
+			// マウスを離したタイミングでUndoスタックに保存 (履歴がスパムになるのを防ぐ)
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				state.undo_stack.push_back(ImVec4(col[0], col[1], col[2], col[3]));
+			}
+
+
+
+			// --- 3. 色空間 (sRGB / Linear) 切替 ---
 			ImGui::Spacing();
-			ImGui::Checkbox("Dark/Light Checkerboard", &dark_background_preview);
+			if (ImGui::Checkbox("Linear Space (Raw)", &state.is_linear)) {
+				// 切替時にガンマカーブを適用・解除
+				float gamma = state.is_linear ? 2.2f : (1.0f / 2.2f);
+				col[0] = pow(col[0], gamma); col[1] = pow(col[1], gamma); col[2] = pow(col[2], gamma);
+				value_changed = true;
+			}
+			ImGui::Checkbox("Dark/Light Checkerboard", &state.dark_bg);
+
 			ImGui::PopItemWidth();
 		}
 		ImGui::EndGroup();
 
-		ImGui::SameLine(0, 18.0f); // 左右のカラム間の余白
+		ImGui::SameLine(0, 18.0f);
 
-		// --------------------------------------------------
-		// 右カラム: 拡張機能領域（プレビュー、ハーモニー、パレット）
-		// --------------------------------------------------
+		// ==================================================
+		// 右カラム: 拡張機能領域（テーマ、プレビュー、ハーモニー等）
+		// ==================================================
 		ImGui::BeginGroup();
 		{
-			float right_column_width = 250.0f;
-			ImGui::PushItemWidth(right_column_width);
+			float right_width = 250.0f;
+			ImGui::PushItemWidth(right_width);
 
-			// 1. 変数バインディング (Theme Manager Mock)
+			// --- テーマバインディング ---
 			ImGui::TextDisabled("Theme Binding");
 			const char* theme_vars[] = { "Custom (Unbound)", "Primary_Color", "Secondary_Color", "Accent_Color" };
-			if (ImGui::Combo("##theme_bind", theme_var_idx, theme_vars, IM_ARRAYSIZE(theme_vars))) {
-				if (*theme_var_idx != 0) {
-					// モック処理: 選択した変数に応じて既定の色を強制適用
-					if (*theme_var_idx == 1) { col[0] = 0.31f; col[1] = 0.47f; col[2] = 1.00f; col[3] = 1.0f; } // Blue
-					if (*theme_var_idx == 2) { col[0] = 0.92f; col[1] = 0.25f; col[2] = 0.40f; col[3] = 1.0f; } // Pink
-					if (*theme_var_idx == 3) { col[0] = 0.20f; col[1] = 0.85f; col[2] = 0.35f; col[3] = 1.0f; } // Green
-					value_changed = true;
-				}
+			if (ImGui::Combo("##theme_bind", &state.theme_var_idx, theme_vars, IM_ARRAYSIZE(theme_vars))) {
+				if (state.theme_var_idx == 1) { col[0] = 0.31f; col[1] = 0.47f; col[2] = 1.00f; }
+				if (state.theme_var_idx == 2) { col[0] = 0.92f; col[1] = 0.25f; col[2] = 0.40f; }
+				if (state.theme_var_idx == 3) { col[0] = 0.20f; col[1] = 0.85f; col[2] = 0.35f; }
+				value_changed = true;
+				state.undo_stack.push_back(ImVec4(col[0], col[1], col[2], col[3]));
 			}
 			ImGui::Spacing();
 
-			// 2. 旧/新プレビュー ＆ 色覚シミュレーション
+			// --- プレビュー ＆ アクセシビリティ ---
 			ImGui::TextDisabled("Preview & Accessibility");
 			ImDrawList* draw_list = ImGui::GetWindowDrawList();
 			ImVec2 pos = ImGui::GetCursorScreenPos();
-			float preview_height = 20.0f;
 
-			// 通常の「旧色 / 新色」スプリットプレビュー
 			ImU32 col_old = ImGui::ColorConvertFloat4ToU32(backup_color);
 			ImU32 col_new = ImGui::ColorConvertFloat4ToU32(ImVec4(col[0], col[1], col[2], col[3]));
-			draw_list->AddRectFilled(pos, ImVec2(pos.x + right_column_width * 0.5f, pos.y + preview_height), col_old);
-			draw_list->AddRectFilled(ImVec2(pos.x + right_column_width * 0.5f, pos.y), ImVec2(pos.x + right_column_width, pos.y + preview_height), col_new);
-
-			// 透明なボタンを重ねて、クリック時に元の色へ戻すリセット機能を実装
-			if (ImGui::InvisibleButton("##split_preview", ImVec2(right_column_width, preview_height))) {
+			draw_list->AddRectFilled(pos, ImVec2(pos.x + right_width * 0.5f, pos.y + 20.0f), col_old);
+			draw_list->AddRectFilled(ImVec2(pos.x + right_width * 0.5f, pos.y), ImVec2(pos.x + right_width, pos.y + 20.0f), col_new);
+			if (ImGui::InvisibleButton("##split_preview", ImVec2(right_width, 20.0f))) {
 				col[0] = backup_color.x; col[1] = backup_color.y; col[2] = backup_color.z; col[3] = backup_color.w;
 				value_changed = true;
 			}
-			if (ImGui::IsItemHovered()) ImGui::SetTooltip("クリックで元の色にリセット");
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to Reset");
 
-			// 色覚シミュレーション (P型 / D型を左右に並べて描画)
 			pos = ImGui::GetCursorScreenPos();
 			ImVec4 p_color = SimulateColorBlindness(ImVec4(col[0], col[1], col[2], col[3]), 1);
 			ImVec4 d_color = SimulateColorBlindness(ImVec4(col[0], col[1], col[2], col[3]), 2);
-			draw_list->AddRectFilled(pos, ImVec2(pos.x + right_column_width * 0.5f, pos.y + preview_height), ImGui::ColorConvertFloat4ToU32(p_color));
-			draw_list->AddRectFilled(ImVec2(pos.x + right_column_width * 0.5f, pos.y), ImVec2(pos.x + right_column_width, pos.y + preview_height), ImGui::ColorConvertFloat4ToU32(d_color));
-			ImGui::Dummy(ImVec2(right_column_width, preview_height));
-
-			ImGui::TextColored(ImVec4(0.55f, 0.55f, 0.55f, 1.0f), "Left: P型(赤視) | Right: D型(緑視)");
+			draw_list->AddRectFilled(pos, ImVec2(pos.x + right_width * 0.5f, pos.y + 20.0f), ImGui::ColorConvertFloat4ToU32(p_color));
+			draw_list->AddRectFilled(ImVec2(pos.x + right_width * 0.5f, pos.y), ImVec2(pos.x + right_width, pos.y + 20.0f), ImGui::ColorConvertFloat4ToU32(d_color));
+			ImGui::Dummy(ImVec2(right_width, 20.0f));
+			ImGui::TextColored(ImVec4(0.55f, 0.55f, 0.55f, 1.0f), "Left: Protanopia | Right: Deuteranopia");
 			ImGui::Spacing();
 
-			// 3. カラーハーモニー (配色提案)
-			ImGui::TextDisabled("Color Harmony Suggestions");
+			// --- カラーハーモニー ---
+		// --- カラーハーモニー (拡張版) ---
+			ImGui::TextDisabled("Harmony Suggestions");
 			float h, s, v;
 			ImGui::ColorConvertRGBtoHSV(col[0], col[1], col[2], h, s, v);
 
-			// ハーモニー色を計算してボタン化するラムダ式
-			auto DrawHarmonyButton = [&](const char* id, float hue_offset) {
-				float target_h = std::fmod(h + hue_offset, 1.0f);
-				if (target_h < 0.0f) target_h += 1.0f;
+			// HSVを個別に調整できるよう拡張したボタン描画ラムダ式
+			auto DrawHarmonyBtn = [&](const char* id, float h_off, float s_mult = 1.0f, float v_mult = 1.0f) {
+				// 色相(Hue)の計算
+				float th = std::fmod(h + h_off, 1.0f);
+				if (th < 0.0f) th += 1.0f;
+
+				// 彩度(Sat)と明度(Val)の計算（0.0〜1.0にクランプ）
+				float ts = ImClamp(s * s_mult, 0.0f, 1.0f);
+				float tv = ImClamp(v * v_mult, 0.0f, 1.0f);
+
 				float r, g, b;
-				ImGui::ColorConvertHSVtoRGB(target_h, s, v, r, g, b);
+				ImGui::ColorConvertHSVtoRGB(th, ts, tv, r, g, b);
 
 				if (ImGui::ColorButton(id, ImVec4(r, g, b, col[3]), ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoAlpha, ImVec2(24, 24))) {
 					col[0] = r; col[1] = g; col[2] = b;
-					*theme_var_idx = 0; // 色を手動変更したためバインドを解除
 					value_changed = true;
+					state.undo_stack.push_back(ImVec4(r, g, b, col[3]));
 				}
 				};
 
-			ImGui::Text("Comp/Tri: "); ImGui::SameLine();
-			DrawHarmonyButton("##comp", 0.5f); ImGui::SameLine();   // 補色 (180度)
-			DrawHarmonyButton("##tri1", 0.333f); ImGui::SameLine(); // トライアド (+120度)
-			DrawHarmonyButton("##tri2", 0.666f);                    // トライアド (-120度)
+			// ラベルとボタンを綺麗に整列させるためのテーブル
+			if (ImGui::BeginTable("##harmony_table", 2)) {
+				ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthStretch);
 
-			ImGui::Text("Analogous:"); ImGui::SameLine();
-			DrawHarmonyButton("##ana1", 0.083f); ImGui::SameLine(); // 類似色 (+30度)
-			DrawHarmonyButton("##ana2", -0.083f);                   // 類似色 (-30度)
+				auto DrawRow = [&](const char* label, std::vector<float> hues) {
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::AlignTextToFramePadding();
+					ImGui::TextUnformatted(label);
+
+					ImGui::TableSetColumnIndex(1);
+					for (size_t i = 0; i < hues.size(); ++i) {
+						char id[32]; snprintf(id, sizeof(id), "##%s_%d", label, (int)i);
+						DrawHarmonyBtn(id, hues[i]);
+						if (i < hues.size() - 1) ImGui::SameLine();
+					}
+					};
+
+				// 各種カラーハーモニーの生成 (値は360度を1.0とした割合)
+				DrawRow("Complement", { 0.5f });                             // 補色 (180度)
+				DrawRow("Split Comp", { 0.416f, 0.583f });                   // 分裂補色 (150度, 210度)
+				DrawRow("Triadic", { 0.333f, 0.666f });                   // トライアド (120度, 240度)
+				DrawRow("Tetradic", { 0.25f, 0.5f, 0.75f });               // テトラード (90度, 180度, 270度)
+				DrawRow("Analogous", { -0.083f, 0.083f, 0.166f });          // 類似色 (-30度, 30度, 60度)
+
+				// モノクロマティック (色相を変えず、明度・彩度を変化させる階調色)
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::AlignTextToFramePadding();
+				ImGui::TextUnformatted("Monochrome");
+
+				ImGui::TableSetColumnIndex(1);
+				DrawHarmonyBtn("##mono1", 0.0f, 0.4f, 1.0f); ImGui::SameLine(); // 彩度を下げる (パステル調)
+				DrawHarmonyBtn("##mono2", 0.0f, 1.0f, 0.5f); ImGui::SameLine(); // 明度を下げる (ディープ調)
+				DrawHarmonyBtn("##mono3", 0.0f, 0.5f, 0.5f);                    // 両方下げる (シャドウ調)
+
+				ImGui::EndTable();
+			}
 			ImGui::Spacing();
 
-			// 4. スウォッチ (カラーパレットの動的管理)
-			ImGui::TextDisabled("Palette (Right-Click to save)");
+			// --- パレット ---
+			ImGui::TextDisabled("Global Palette (Right-Click)");
 			for (int i = 0; i < saved_palette.size(); ++i) {
 				ImGui::PushID(i);
-				if (i % 8 != 0) ImGui::SameLine(); // 8個ごとに折り返し描画
-
+				if (i % 8 != 0) ImGui::SameLine();
 				if (ImGui::ColorButton("##swatch", saved_palette[i], ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoAlpha, ImVec2(24, 24))) {
 					col[0] = saved_palette[i].x; col[1] = saved_palette[i].y; col[2] = saved_palette[i].z; col[3] = saved_palette[i].w;
-					*theme_var_idx = 0; // バインド解除
 					value_changed = true;
+					state.undo_stack.push_back(saved_palette[i]);
 				}
-
-				// スウォッチ上での右クリックコンテキストメニュー
-				if (ImGui::BeginPopupContextItem("##save_swatch_ctx")) {
-					if (ImGui::Selectable("現在の色をここに保存")) {
-						saved_palette[i] = ImVec4(col[0], col[1], col[2], col[3]);
-					}
+				if (ImGui::BeginPopupContextItem("##save_ctx")) {
+					if (ImGui::Selectable("Save Color Here")) saved_palette[i] = ImVec4(col[0], col[1], col[2], col[3]);
 					ImGui::EndPopup();
 				}
 				ImGui::PopID();
@@ -890,16 +982,13 @@ bool  CustomUI::ColorEdit4(const char* label, float col[4], ImGuiColorEditFlags 
 		}
 		ImGui::EndGroup();
 
+		ImGui::EndDisabled(); // ロック解除
 		ImGui::EndPopup();
 	}
-
-	// --- スタイルの復元 ＆ IDスコープの破棄 ---
-	ImGui::PopStyleVar(4);
-	ImGui::PopStyleColor();
 	ImGui::PopID();
-
 	return value_changed;
 }
+
 // =========================================================================
 // 空間・データ可視化ウィジェット (2D Pad, Graph, Dial, Curve)
 // =========================================================================
@@ -1724,6 +1813,8 @@ void CustomUI::DrawCustomUIWidgetsTestWindow()
 
 	static float color_rgba[4] = { 0.31f, 0.47f, 1.0f,1.0f };
 	CustomUI::ColorEdit4("Accent Color RGBA", color_rgba);
+
+
 
 	// =========================================================================
 	// 6. 空間・データ可視化

@@ -51,6 +51,17 @@ void Frame_Work::render(float elapsed_time) {
 	Render_State::instance().set_sampler_state(Graphics_Core::instance().get_device_context());
 	Scene_Manager::instance().render(elapsed_time);
 
+	// --- キー入力処理 (毎フレームチェック) ---
+	// 0x60 は '~' キー (半角/全角キー) の仮想キーコードです
+	static bool prev_key_state = false;
+	bool current_key_state = (GetAsyncKeyState(VK_OEM_3) & 0x8000) != 0;
+
+	// キーが押された瞬間だけ切り替える (チャタリング防止)
+	if (current_key_state && !prev_key_state) {
+		_hide_imgui = !_hide_imgui;
+	}
+	prev_key_state = current_key_state;
+
 	// --- ImGuiの描画 ---
 #ifdef USE_IMGUI
 	if (!_hide_imgui) {
