@@ -1,75 +1,366 @@
-#include "resource_monitor.h"
-#include <algorithm> // std::copy
-#pragma comment(lib, "Pdh.lib")
 
+#include "resource_monitor.h"
 
 Resource_Monitor::Resource_Monitor()
-	: _cpu_usage(0.0f), _memory_usage(0.0f)
 {
-	PdhOpenQuery(NULL, 0, &_cpu_query);
-	PdhAddCounter(_cpu_query, L"\\Processor(_Total)\\% Processor Time", 0, &_cpu_total);
-	PdhCollectQueryData(_cpu_query);
+	PdhOpenQuery(
+		nullptr,
+		0,
+		&cpu_query
+	);
 
-	_cpu_history.resize(_history_size, 0.0f);
-	_memory_history.resize(_history_size, 0.0f);
+	PdhAddCounter(
+		cpu_query,
+		L"\\Processor(_Total)\\% Processor Time",
+		0,
+		&cpu_counter
+	);
 
-	_last_update_time = std::chrono::steady_clock::now();
+	// 初回サンプル
+	PdhCollectQueryData(
+		cpu_query
+	);
+
+	cpu_hist.resize(
+		HISTORY,
+		0
+	);
+
+	mem_hist.resize(
+		HISTORY,
+		0
+	);
+
+	last =
+		std::chrono::steady_clock::now();
 }
 
 Resource_Monitor::~Resource_Monitor()
 {
-	PdhCloseQuery(_cpu_query);
+	if (cpu_query)
+		PdhCloseQuery(cpu_query);
+
+	if (log.is_open())
+		log.close();
 }
 
 void Resource_Monitor::update()
 {
-	auto now = std::chrono::steady_clock::now();
-	auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - _last_update_time);
+	if (ImGui::GetCurrentContext())
+	{
+		fps =
+			ImGui::GetIO()
+			.Framerate;
 
-	if (elapsed.count() >= 1) { // 1秒ごとに更新
-		update_cpu_usage();
-		update_memory_usage();
+		frame_ms =
+			fps > 0
+			?
+			1000.f / fps
+			:
+			0;
+	}
 
-		if (_cpu_history.size() >= _history_size) _cpu_history.erase(_cpu_history.begin());
-		_cpu_history.push_back(_cpu_usage);
+	auto now =
+		std::chrono::steady_clock::now();
 
-		if (_memory_history.size() >= _history_size) _memory_history.erase(_memory_history.begin());
-		_memory_history.push_back(_memory_usage);
+	auto elapsed =
+		std::chrono::duration_cast<
+		std::chrono::milliseconds
+		>(
+			now - last
+		);
 
-		_last_update_time = now;
+	if (elapsed.count() < 1000)
+		return;
+
+	update_cpu();
+	update_memory();
+	update_process();
+
+	push(
+		cpu_hist,
+		cpu_pos,
+		cpu
+	);
+
+	push(
+		mem_hist,
+		mem_pos,
+		mem
+	);
+
+	peak_cpu =
+		max(
+			peak_cpu,
+			cpu
+		);
+
+	peak_mem =
+		max(
+			peak_mem,
+			mem
+		);
+
+	if (enable_log)
+	{
+		if (!log.is_open())
+		{
+			log.open(
+				"resource_log.csv"
+			);
+
+			log
+				<<
+				"CPU,MEM,FPS\n";
+		}
+
+		log
+			<<
+			cpu
+			<< ","
+			<< mem
+			<< ","
+			<< fps
+			<< "\n";
+	}
+
+	last =
+		now;
+}
+
+void Resource_Monitor::update_cpu()
+{
+	if (!cpu_query)
+		return;
+
+	PDH_FMT_COUNTERVALUE val{};
+
+	PdhCollectQueryData(
+		cpu_query
+	);
+
+	if (
+		PdhGetFormattedCounterValue(
+			cpu_counter,
+			PDH_FMT_DOUBLE,
+			nullptr,
+			&val
+		)
+		==
+		ERROR_SUCCESS
+		)
+	{
+		cpu =
+			(float)
+			val.doubleValue;
 	}
 }
 
-void Resource_Monitor::update_cpu_usage()
+void Resource_Monitor::update_memory()
 {
-	PDH_FMT_COUNTERVALUE counter_val;
-	PdhCollectQueryData(_cpu_query);
-	PdhGetFormattedCounterValue(_cpu_total, PDH_FMT_DOUBLE, NULL, &counter_val);
+	MEMORYSTATUSEX m{};
 
-	_cpu_usage = static_cast<float>(counter_val.doubleValue);
+	m.dwLength =
+		sizeof(m);
+
+	if (
+		GlobalMemoryStatusEx(
+			&m
+		)
+		)
+	{
+		mem =
+			(float)(
+				(
+					m.ullTotalPhys -
+					m.ullAvailPhys
+					)
+				*
+				100.0
+				/
+				m.ullTotalPhys
+				);
+	}
 }
 
-void Resource_Monitor::update_memory_usage()
+void Resource_Monitor::update_process()
 {
-	MEMORYSTATUSEX mem_info = {};
-	mem_info.dwLength = sizeof(MEMORYSTATUSEX);
-	if (GlobalMemoryStatusEx(&mem_info)) {
-		DWORDLONG total = mem_info.ullTotalPhys;
-		DWORDLONG used = total - mem_info.ullAvailPhys;
-		_memory_usage = static_cast<float>(used * 100.0 / total);
+	PROCESS_MEMORY_COUNTERS_EX pm{};
+
+	if (
+		GetProcessMemoryInfo(
+			GetCurrentProcess(),
+			(PROCESS_MEMORY_COUNTERS*)&pm,
+			sizeof(pm)
+		)
+		)
+	{
+		process_mem_mb =
+			pm.WorkingSetSize
+			/
+			1024.f
+			/
+			1024.f;
 	}
+
+	GetProcessHandleCount(
+		GetCurrentProcess(),
+		&handle_count
+	);
+
+	thread_count = 0;
+
+	HANDLE snap =
+		CreateToolhelp32Snapshot(
+			TH32CS_SNAPTHREAD,
+			0
+		);
+
+	if (
+		snap
+		!=
+		INVALID_HANDLE_VALUE
+		)
+	{
+		THREADENTRY32 te{};
+
+		te.dwSize =
+			sizeof(te);
+
+		if (
+			Thread32First(
+				snap,
+				&te
+			)
+			)
+		{
+			do
+			{
+				if (
+					te.th32OwnerProcessID
+					==
+					GetCurrentProcessId()
+					)
+				{
+					thread_count++;
+				}
+
+			} while (
+				Thread32Next(
+					snap,
+					&te
+				)
+				);
+		}
+
+		CloseHandle(
+			snap
+		);
+	}
+}
+
+void Resource_Monitor::push(
+	std::vector<float>& v,
+	int& idx,
+	float value
+)
+{
+	v[idx] =
+		value;
+
+	idx =
+		(idx + 1)
+		%
+		HISTORY;
 }
 
 void Resource_Monitor::render_ui()
 {
+	ImGui::SeparatorText(
+		"Resource Monitor"
+	);
 
-	ImGui::Text("CPU Usage: %.2f %%", _cpu_usage);
-	ImGui::PlotLines("##CPU", _cpu_history.data(), static_cast<int>(_cpu_history.size()), 0, nullptr, 0.0f, 100.0f, ImVec2(0, 60));
+	ImGui::Text(
+		"FPS %.1f (%.2fms)",
+		fps,
+		frame_ms
+	);
 
-	ImGui::Text("Memory Usage: %.2f %%", _memory_usage);
-	ImGui::PlotLines("##Memory", _memory_history.data(), static_cast<int>(_memory_history.size()), 0, nullptr, 0.0f, 100.0f, ImVec2(0, 60));
+	ImGui::Separator();
 
+	ImGui::Text(
+		"CPU %.1f%% Peak %.1f%%",
+		cpu,
+		peak_cpu
+	);
 
+	ImGui::ProgressBar(
+		cpu / 100.f,
+		{ -1,20 }
+	);
 
+	ImGui::PlotLines(
+		"##CPU",
+		cpu_hist.data(),
+		HISTORY,
+		cpu_pos,
+		nullptr,
+		0,
+		100,
+		{ 0,60 }
+	);
 
+	ImGui::Text(
+		"Memory %.1f%% Peak %.1f%%",
+		mem,
+		peak_mem
+	);
+
+	ImGui::ProgressBar(
+		mem / 100.f,
+		{ -1,20 }
+	);
+
+	ImGui::PlotLines(
+		"##MEM",
+		mem_hist.data(),
+		HISTORY,
+		mem_pos,
+		nullptr,
+		0,
+		100,
+		{ 0,60 }
+	);
+
+	ImGui::Separator();
+
+	ImGui::Text(
+		"Process Memory %.1f MB",
+		process_mem_mb
+	);
+
+	ImGui::Text(
+		"Threads %u",
+		thread_count
+	);
+
+	ImGui::Text(
+		"Handles %u",
+		handle_count
+	);
+
+	ImGui::Checkbox(
+		"CSV Log",
+		&enable_log
+	);
+
+	if (
+		ImGui::Button(
+			"Reset Peaks"
+		)
+		)
+	{
+		peak_cpu = 0;
+		peak_mem = 0;
+	}
 }

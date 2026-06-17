@@ -1,36 +1,79 @@
+
 #pragma once
 
-#include <windows.h>
-#include <pdh.h>
+#include <Windows.h>
+#include <Pdh.h>
+#include <Psapi.h>
+#include <TlHelp32.h>   
 #include <vector>
 #include <chrono>
+#include <fstream>
+#include <numeric>
+
+
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 
-class Resource_Monitor {
+#pragma comment(lib,"Pdh.lib")
+#pragma comment(lib,"Psapi.lib")
+
+class Resource_Monitor
+{
 public:
+
 	Resource_Monitor();
 	~Resource_Monitor();
 
-	/// @brief 1秒に1回CPU/メモリ更新
 	void update();
-
-	/// @brief ImGuiでCPU/メモリ使用率を描画
 	void render_ui();
 
 private:
-	void update_cpu_usage();
-	void update_memory_usage();
+
+	void update_cpu();
+	void update_memory();
+	void update_process();
+
+	void push(
+		std::vector<float>& vec,
+		int& idx,
+		float value
+	);
+
+	float avg(
+		const std::vector<float>& vec
+	) const;
+
+	void save_log();
 
 private:
-	float _cpu_usage;
-	float _memory_usage;
 
-	std::vector<float> _cpu_history;
-	std::vector<float> _memory_history;
-	const size_t _history_size = 100;
+	static constexpr int HISTORY = 60;
 
-	PDH_HQUERY _cpu_query;
-	PDH_HCOUNTER _cpu_total;
+	PDH_HQUERY cpu_query{};
+	PDH_HCOUNTER cpu_counter{};
 
-	std::chrono::steady_clock::time_point _last_update_time;
+	float cpu = 0;
+	float mem = 0;
+
+	float peak_cpu = 0;
+	float peak_mem = 0;
+
+	float fps = 0;
+	float frame_ms = 0;
+
+	float process_mem_mb = 0;
+
+	DWORD thread_count = 0;
+	DWORD handle_count = 0;
+
+	bool enable_log = false;
+
+	std::ofstream log;
+
+	std::vector<float> cpu_hist;
+	std::vector<float> mem_hist;
+
+	int cpu_pos = 0;
+	int mem_pos = 0;
+
+	std::chrono::steady_clock::time_point last;
 };

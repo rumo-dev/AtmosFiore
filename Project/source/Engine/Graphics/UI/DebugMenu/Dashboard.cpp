@@ -14,6 +14,7 @@ void Dashboard::Render() {
 		RenderMainContent();
 	}
 	ImGui::End();
+	_monitor.update();
 }
 void Dashboard::RenderSideBar() {
 	ImGui::BeginChild("Sidebar", ImVec2(180, 0), false, ImGuiWindowFlags_NoBackground);
@@ -121,6 +122,7 @@ void Dashboard::RenderGroupCard(const char* label, ImVec2 size, std::function<vo
 }
 
 void Dashboard::RenderMainContent() {
+
 	if (modules.empty()) return;
 
 	auto& current_mod = modules[active_mod_idx];
@@ -215,7 +217,7 @@ void Dashboard::RenderMainContent() {
 void Dashboard::InitializeUI() {
 	auto& dash = Dashboard::Instance();
 
-	_monitor.update();
+
 
 	dash.RegisterModule({ "Dashboard", {
 		{"Monitor", "View system and resource metrics", [&](SharedMetricsData& d) { _monitor.render_ui(); }}
