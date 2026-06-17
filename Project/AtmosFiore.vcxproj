@@ -423,7 +423,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Utilities\math_util.h" />
     <ClInclude Include="source\Game\Effect\adaptation\adaptation.h" />
-    <ClInclude Include="source\Game\Effect\dof\dof.h" />
+    <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />
     <ClInclude Include="source\Game\Effect\fog\fog.h" />
     <ClInclude Include="source\Game\Effect\shadow\shadow.h" />
     <ClInclude Include="source\Game\Effect\Sky\Sky.h">
@@ -555,7 +555,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Game\Effect\adaptation\adaptation.cpp" />
     <ClCompile Include="source\Game\Effect\bloom\Bloom.cpp" />
     <ClCompile Include="source\Engine\System\Manager\PostProcess\post_process_manager.cpp" />
-    <ClCompile Include="source\Game\Effect\dof\dof.cpp" />
+    <ClCompile Include="source\Game\Effect\dof\depth_of_field.cpp" />
     <ClCompile Include="source\Game\Effect\fog\fog.cpp" />
     <ClCompile Include="source\Game\Effect\shadow\shadow.cpp" />
     <ClCompile Include="source\Game\Effect\Sky\Sky.cpp">
@@ -582,6 +582,7 @@ if exist export rmdir /s /q export</Command>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli" />
     <None Include="source\Engine\Graphics\Shader\common.hlsli" />
     <None Include="source\Engine\Graphics\Shader\directional_light.hlsli" />
+    <None Include="source\Engine\Graphics\Shader\dof_common.hlsli" />
     <None Include="source\Engine\Graphics\Shader\fog.hlsli" />
     <None Include="source\Engine\Graphics\Shader\point_light.hlsli" />
     <None Include="source\Engine\Graphics\Shader\shadow_area.hlsli" />
@@ -615,6 +616,18 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\coc_generation_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\composite_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\deferred_lighting_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|Win32'">Pixel</ShaderType>
@@ -639,16 +652,6 @@ if exist export rmdir /s /q export</Command>
       </EnableDebuggingInformation>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="source\Engine\Graphics\Shader\dof_ps.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\error_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
@@ -658,6 +661,30 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_horizontal_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_vertical_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\field_separation_far_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\field_separation_near_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\fog_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

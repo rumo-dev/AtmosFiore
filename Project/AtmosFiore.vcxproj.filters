@@ -89,8 +89,13 @@
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\directional_shadow_vs.hlsl" />
-    <FxCompile Include="source\Engine\Graphics\Shader\dof_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\sky_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\coc_generation_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\composite_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_horizontal_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_vertical_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\field_separation_far_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\field_separation_near_ps.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">
@@ -272,9 +277,9 @@
     </ClCompile>
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.cpp" />
     <ClCompile Include="source\Engine\Extentions\Tracy\TracyClient.cpp" />
-    <ClCompile Include="source\Game\Effect\dof\dof.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.cpp" />
     <ClCompile Include="source\Game\Effect\Sky\Sky.cpp" />
+    <ClCompile Include="source\Game\Effect\dof\depth_of_field.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
@@ -605,10 +610,10 @@
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.h" />
     <ClInclude Include="source\Game\World\camera\null_camera.h" />
-    <ClInclude Include="source\Game\Effect\dof\dof.h" />
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Icons.h" />
     <ClInclude Include="source\Game\Effect\Sky\Sky.h" />
+    <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">
@@ -677,6 +682,7 @@
     <None Include="source\Engine\Graphics\Shader\tonemapping_algorithms.hlsli">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </None>
+    <None Include="source\Engine\Graphics\Shader\dof_common.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="source">

@@ -10,10 +10,31 @@
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\adaptation_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\coc_generation_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\composite_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\deferred_lighting_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\directional_shadow_vs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\error_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_horizontal_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_vertical_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\field_separation_far_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\field_separation_near_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\fog_ps.cso</FullPath>

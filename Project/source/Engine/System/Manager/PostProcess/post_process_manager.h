@@ -9,7 +9,7 @@
 #include "Game/Effect/shadow/shadow.h"
 #include "Game/Effect/adaptation/adaptation.h"
 #include "Game/Effect/tone_mapping/toon_mapping.h"
-#include "Game/Effect/dof/dof.h"
+#include "Game/Effect/dof/depth_of_field.h"
 #include "Game/Effect/Sky/Sky.h"
 
 /**
@@ -138,7 +138,7 @@ public:
 	ToneMapping& GetToneMapping() {
 		return *tone_mapper;
 	};
-	dof& GetDof() {
+	DepthOfField& GetDof() {
 		return *dofer;
 	}
 	void drawDebugView();
@@ -168,7 +168,7 @@ private:
 	static std::unique_ptr<ToneMapping> tone_mapper;
 
 
-	static std::unique_ptr<dof> dofer;
+	static std::unique_ptr<DepthOfField> dofer;
 
 	static std::unique_ptr<Sky> skyer;
 

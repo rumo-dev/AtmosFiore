@@ -13,7 +13,7 @@ struct Camera {
 	float fov{ DirectX::XMConvertToRadians(45.0f) };        // 視野角
 	float aspect_ratio{ 16.0f / 9.0f };                     // アスペクト比
 	float near_z{ 0.1f };                                   // 近クリップ面
-	float far_z{ 10000.f };                                 // 遠クリップ面
+	float far_z{ 1000.f };                                 // 遠クリップ面
 
 	DirectX::XMMATRIX view{ DirectX::XMMatrixIdentity() };       // ビュー行列
 	DirectX::XMMATRIX projection{ DirectX::XMMatrixIdentity() }; // プロジェクション行列
