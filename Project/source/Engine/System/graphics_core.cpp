@@ -289,6 +289,7 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	data.SensorSize = camera.SensorSize;
 	data.FocusDist = camera.FocalLength;
 	data.MaxBlurRadius = camera.MaxBlurRadius;
+	data.isReserved = static_cast<int>(camera.isReversed_Z);
 
 
 	_immediate_context->UpdateSubresource(_constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].Get(), 0, nullptr, &data, 0, 0);

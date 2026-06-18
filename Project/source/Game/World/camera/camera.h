@@ -50,10 +50,18 @@ struct Camera {
 	}
 	void DrawCameraSettingsUI() {
 
-		ImGui::Text("Camera Parameters");
-
-
 		CustomUI::Checkbox("Reversed-Z", &isReversed_Z);
+		ImGui::Text("Clipping Planes");
+
+		// near_z(0.001~100000) はレンジが非常に広いため LogScale を使用
+		// Near < Far は NearFarControl 内部で常に保証される
+		CustomUI::NearFarControl("Clip Planes",
+			&near_z, &far_z,
+			0.001f, 100000.0f,
+			"%.3f",
+			CustomUI::NearFarFlags_ShowDepthViz | CustomUI::NearFarFlags_LogScale);
+
+		ImGui::Text("Camera Parameters");
 		// F値は1.4～22程度が一般的
 		CustomUI::SliderFloat("F-Number (Aperture)", &FNumber, 1.0f, 22.0f, "f/%.1f");
 
@@ -71,8 +79,6 @@ struct Camera {
 
 		// ブラーの強さ
 		CustomUI::SliderFloat("Max Blur Radius", &MaxBlurRadius, 0.0f, 50.0f);
-
-
 	}
 };
 struct alignas(16) Camera_Constants
@@ -98,11 +104,13 @@ struct alignas(16) Camera_Constants
 	float near_z;
 	float far_z;
 	float FNumber;      // 絞り値 (例: 1.4, 2.8)
+
 	float FocalLength;  // 焦点距離 (mm)
 	float SensorSize;   // センサーサイズ (mm)
 	float FocusDist;    // 焦点が合っている距離 (m)
-
 	float MaxBlurRadius;// 最大ボケ半径 (ピクセル単位)
+
+	int isReserved;
 	DirectX::XMFLOAT3 Padding;
 
 

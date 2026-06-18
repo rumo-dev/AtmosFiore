@@ -18,6 +18,10 @@ enum class Depth_State
 	Test_Enable_Write_Disable,    ///< 深度テスト有効 & 書き込み無効
 	Test_Disable_Write_Enable,    ///< 深度テスト無効 & 書き込み有効
 	Test_Disable_Write_Disable,   ///< 深度テスト無効 & 書き込み無効
+	Reversed_Z_Test_Enable_Write_Enable,     ///< 深度テスト有効 & 書き込み有効
+	Reversed_Z_Test_Enable_Write_Disable,    ///< 深度テスト有効 & 書き込み無効
+	Reversed_Z_Test_Disable_Write_Enable,    ///< 深度テスト無効 & 書き込み有効
+	Reversed_Z_Test_Disable_Write_Disable,   ///< 深度テスト無効 & 書き込み無効
 	Num,
 };
 

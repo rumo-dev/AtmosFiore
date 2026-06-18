@@ -545,6 +545,266 @@ bool CustomUI::DragFloat(const char* label, float* v, float v_speed, float v_min
 }
 
 // =========================================================================
+// NearFarControl
+// =========================================================================
+bool CustomUI::NearFarControl(const char* label,
+	float* v_near, float* v_far,
+	float v_min, float v_max,
+	const char* format,
+	NearFarFlags flags)
+{
+	ImGuiWindow* window = ImGui::GetCurrentWindow();
+	if (window->SkipItems) return false;
+
+	ImGuiContext& g = *GImGui;
+	const ImGuiStyle& style = g.Style;
+	ImDrawList* draw = window->DrawList;
+	const float  w = ImGui::GetContentRegionAvail().x;
+
+	// --- 定数 ---
+	const float  label_h = ImGui::CalcTextSize(label, nullptr, true).y;
+	const float  drag_h = 20.0f;
+	const float  viz_h = 10.0f;
+	const float  gap = 4.0f;
+	const float  drag_w = (w - gap) * 0.5f;
+	const bool   show_viz = (flags & NearFarFlags_ShowDepthViz) != 0;
+	const bool   log_scale = (flags & NearFarFlags_LogScale) != 0;
+
+	bool value_changed = false;
+
+	// =========================================================================
+	// 1. ラベル（通常テキストとして描画、ItemSize は取らない）
+	// =========================================================================
+	ImGui::TextUnformatted(label);
+
+	// =========================================================================
+	// 2. Near DragField — ImGui::PushID / SetCursorScreenPos で配置
+	// =========================================================================
+	ImGui::PushID(label);
+
+	// Near フィールドを左半分に配置
+	{
+		ImGui::PushID("##near");
+
+		// カーソル位置を記憶してフィールドを配置
+		ImVec2 cursor = ImGui::GetCursorScreenPos();
+		const ImRect near_bb(cursor.x, cursor.y, cursor.x + drag_w, cursor.y + drag_h);
+		const ImGuiID id_near = window->GetID("##near_drag");
+
+		// ItemSize + ItemAdd で正式に登録 → ヒットテスト・フォーカスが有効になる
+		ImGui::ItemSize(near_bb, style.FramePadding.y);
+		if (ImGui::ItemAdd(near_bb, id_near))
+		{
+			bool hovered_n, held_n;
+			ImGui::ButtonBehavior(near_bb, id_near, &hovered_n, &held_n);
+
+			const bool active_n = (g.ActiveId == id_near);
+
+			float v_speed = log_scale ? (ImMax(*v_near, v_min) * 0.01f + 0.001f)
+				: ((v_max - v_min) * 0.002f);
+			if (ImGui::DragBehavior(id_near, ImGuiDataType_Float, v_near,
+				v_speed, &v_min, v_far, format, ImGuiSliderFlags_None))
+			{
+				*v_near = ImClamp(*v_near, v_min, *v_far - 0.0001f);
+				ImGui::MarkItemEdited(id_near);
+				value_changed = true;
+			}
+
+			// 描画
+			float& anim_n = GetAnim(id_near);
+			anim_n = ImLerp(anim_n, (active_n || hovered_n) ? 1.0f : 0.0f, g.IO.DeltaTime * 12.0f);
+
+			draw->AddRectFilled(near_bb.Min, near_bb.Max,
+				ImGui::GetColorU32(active_n ? ImGuiCol_FrameBgActive
+					: hovered_n ? ImGuiCol_FrameBgHovered
+					: ImGuiCol_FrameBg),
+				style.FrameRounding);
+			// 左端アクセントライン（青）
+			draw->AddRectFilled(near_bb.Min,
+				ImVec2(near_bb.Min.x + 3.0f, near_bb.Max.y),
+				ImGui::ColorConvertFloat4ToU32(ImVec4(0.3f, 0.6f, 1.0f, 0.6f * anim_n)),
+				style.FrameRounding);
+			draw->AddRect(near_bb.Min, near_bb.Max,
+				ImGui::GetColorU32(active_n ? ImGuiCol_SliderGrabActive : ImGuiCol_Border),
+				style.FrameRounding);
+
+			// サブラベル
+			ImVec2 sub_sz = ImGui::CalcTextSize("Near");
+			draw->AddText(ImVec2(near_bb.Min.x + 6.0f, near_bb.Min.y + (drag_h - sub_sz.y) * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_TextDisabled), "Near");
+
+			// 数値（右寄せ）
+			char buf_n[32];
+			ImGui::DataTypeFormatString(buf_n, IM_ARRAYSIZE(buf_n), ImGuiDataType_Float, v_near, format);
+			ImVec2 val_sz = ImGui::CalcTextSize(buf_n);
+			draw->AddText(ImVec2(near_bb.Max.x - val_sz.x - style.FramePadding.x,
+				near_bb.Min.y + (drag_h - val_sz.y) * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_Text), buf_n);
+		}
+
+		ImGui::PopID();
+	}
+
+	// =========================================================================
+	// 3. Far DragField — Near の右隣に SetCursorScreenPos で配置
+	// =========================================================================
+	{
+		ImGui::PushID("##far");
+
+		// Near フィールドの直後 ImGui::SameLine() 相当でカーソルを戻す
+		ImGui::SameLine(0.0f, gap);
+		ImVec2 cursor = ImGui::GetCursorScreenPos();
+		const ImRect far_bb(cursor.x, cursor.y, cursor.x + drag_w, cursor.y + drag_h);
+		const ImGuiID id_far = window->GetID("##far_drag");
+
+		ImGui::ItemSize(far_bb, style.FramePadding.y);
+		if (ImGui::ItemAdd(far_bb, id_far))
+		{
+			bool hovered_f, held_f;
+			ImGui::ButtonBehavior(far_bb, id_far, &hovered_f, &held_f);
+
+			const bool active_f = (g.ActiveId == id_far);
+
+			float v_speed = log_scale ? (ImMax(*v_far, *v_near + 0.001f) * 0.01f + 0.001f)
+				: ((v_max - v_min) * 0.002f);
+			if (ImGui::DragBehavior(id_far, ImGuiDataType_Float, v_far,
+				v_speed, v_near, &v_max, format, ImGuiSliderFlags_None))
+			{
+				*v_far = ImClamp(*v_far, *v_near + 0.0001f, v_max);
+				ImGui::MarkItemEdited(id_far);
+				value_changed = true;
+			}
+
+			float& anim_f = GetAnim(id_far);
+			anim_f = ImLerp(anim_f, (active_f || hovered_f) ? 1.0f : 0.0f, g.IO.DeltaTime * 12.0f);
+
+			draw->AddRectFilled(far_bb.Min, far_bb.Max,
+				ImGui::GetColorU32(active_f ? ImGuiCol_FrameBgActive
+					: hovered_f ? ImGuiCol_FrameBgHovered
+					: ImGuiCol_FrameBg),
+				style.FrameRounding);
+			// 右端アクセントライン（オレンジ）
+			draw->AddRectFilled(ImVec2(far_bb.Max.x - 3.0f, far_bb.Min.y),
+				far_bb.Max,
+				ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.55f, 0.2f, 0.6f * anim_f)),
+				style.FrameRounding);
+			draw->AddRect(far_bb.Min, far_bb.Max,
+				ImGui::GetColorU32(active_f ? ImGuiCol_SliderGrabActive : ImGuiCol_Border),
+				style.FrameRounding);
+
+			ImVec2 sub_sz = ImGui::CalcTextSize("Far");
+			draw->AddText(ImVec2(far_bb.Min.x + 6.0f, far_bb.Min.y + (drag_h - sub_sz.y) * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_TextDisabled), "Far");
+
+			char buf_f[32];
+			ImGui::DataTypeFormatString(buf_f, IM_ARRAYSIZE(buf_f), ImGuiDataType_Float, v_far, format);
+			ImVec2 val_sz = ImGui::CalcTextSize(buf_f);
+			draw->AddText(ImVec2(far_bb.Max.x - val_sz.x - style.FramePadding.x,
+				far_bb.Min.y + (drag_h - val_sz.y) * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_Text), buf_f);
+		}
+
+		ImGui::PopID();
+	}
+
+	ImGui::PopID();
+
+	// =========================================================================
+	// 4. 奥行き可視化バー（オプション）
+	// =========================================================================
+	if (show_viz)
+	{
+		// Spacing を少し詰める
+		ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x,
+			ImGui::GetCursorScreenPos().y - style.FramePadding.y + gap));
+		ImVec2 viz_pos = ImGui::GetCursorScreenPos();
+
+		const ImRect viz_track(viz_pos.x, viz_pos.y, viz_pos.x + w, viz_pos.y + viz_h);
+		const float  rnd = viz_h * 0.5f;
+
+		// アイテムとして登録（高さを消費させる）
+		ImGui::Dummy(ImVec2(w, viz_h));
+
+		// トラック背景
+		draw->AddRectFilled(viz_track.Min, viz_track.Max,
+			ImGui::GetColorU32(ImGuiCol_FrameBg), rnd);
+
+		// Near/Far の正規化位置を計算
+		//   対数スケールの場合は log 変換して線形化
+		float t_near, t_far;
+		if (log_scale && v_max > v_min && v_min > 0.0f)
+		{
+			float log_min = logf(v_min);
+			float log_max = logf(v_max);
+			float log_near = logf(ImMax(*v_near, v_min));
+			float log_far = logf(ImMin(*v_far, v_max));
+			float inv_span = 1.0f / (log_max - log_min);
+			t_near = (log_near - log_min) * inv_span;
+			t_far = (log_far - log_min) * inv_span;
+		}
+		else
+		{
+			float span = v_max - v_min;
+			if (span <= 0.0f) span = 1.0f;
+			t_near = (*v_near - v_min) / span;
+			t_far = (*v_far - v_min) / span;
+		}
+		t_near = ImClamp(t_near, 0.0f, 1.0f);
+		t_far = ImClamp(t_far, 0.0f, 1.0f);
+
+		const float px_near = viz_track.Min.x + t_near * viz_track.GetWidth();
+		const float px_far = viz_track.Min.x + t_far * viz_track.GetWidth();
+
+		// Near〜Far の範囲をグラデーション（青→オレンジ）で塗る
+		draw->AddRectFilledMultiColor(
+			ImVec2(px_near, viz_track.Min.y),
+			ImVec2(px_far, viz_track.Max.y),
+			IM_COL32(80, 150, 255, 200),   // Near側：青
+			IM_COL32(255, 140, 50, 200),   // Far側 ：オレンジ
+			IM_COL32(255, 140, 50, 200),
+			IM_COL32(80, 150, 255, 200));
+
+		// Near〜Far 外の領域をやや暗くオーバーレイ
+		if (px_near > viz_track.Min.x)
+			draw->AddRectFilled(viz_track.Min,
+				ImVec2(px_near, viz_track.Max.y),
+				IM_COL32(0, 0, 0, 80), rnd);
+		if (px_far < viz_track.Max.x)
+			draw->AddRectFilled(ImVec2(px_far, viz_track.Min.y),
+				viz_track.Max,
+				IM_COL32(0, 0, 0, 80), rnd);
+
+		// Near マーカー（縦線 + 三角ノブ）
+		draw->AddLine(ImVec2(px_near, viz_track.Min.y),
+			ImVec2(px_near, viz_track.Max.y),
+			IM_COL32(100, 180, 255, 255), 1.5f);
+		// 上向き三角（Near）
+		const float tri = 4.0f;
+		draw->AddTriangleFilled(
+			ImVec2(px_near - tri, viz_track.Min.y - tri * 0.9f),
+			ImVec2(px_near + tri, viz_track.Min.y - tri * 0.9f),
+			ImVec2(px_near, viz_track.Min.y + 1.0f),
+			IM_COL32(100, 180, 255, 230));
+
+		// Far マーカー
+		draw->AddLine(ImVec2(px_far, viz_track.Min.y),
+			ImVec2(px_far, viz_track.Max.y),
+			IM_COL32(255, 140, 50, 255), 1.5f);
+		draw->AddTriangleFilled(
+			ImVec2(px_far - tri, viz_track.Min.y - tri * 0.9f),
+			ImVec2(px_far + tri, viz_track.Min.y - tri * 0.9f),
+			ImVec2(px_far, viz_track.Min.y + 1.0f),
+			IM_COL32(255, 140, 50, 230));
+
+		// 外枠
+		draw->AddRect(viz_track.Min, viz_track.Max,
+			ImGui::GetColorU32(ImGuiCol_Border), rnd);
+	}
+
+	return value_changed;
+}
+
+// =========================================================================
 // コンボボックス系
 // =========================================================================
 bool CustomUI::BeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags) {
@@ -1817,6 +2077,41 @@ void CustomUI::DrawCustomUIWidgetsTestWindow()
 
 
 	// =========================================================================
+	// =========================================================================
+	// NearFar Controls
+	// =========================================================================
+	CustomUI::SectionLabel("Near / Far Control");
+
+	// カメラクリップ用（線形、狭いレンジ）
+	static float cam_near = 0.1f, cam_far = 1000.0f;
+	CustomUI::NearFarControl("Camera Clip",
+		&cam_near, &cam_far,
+		0.01f, 10000.0f,
+		"%.2f",
+		CustomUI::NearFarFlags_ShowDepthViz);
+
+	ImGui::Spacing();
+
+	// フォグ用（線形、中レンジ）
+	static float fog_near = 10.0f, fog_far = 500.0f;
+	CustomUI::NearFarControl("Fog Distance",
+		&fog_near, &fog_far,
+		0.0f, 2000.0f,
+		"%.1f",
+		CustomUI::NearFarFlags_ShowDepthViz);
+
+	ImGui::Spacing();
+
+	// LOD用（対数スケール、広いレンジ）
+	static float lod_near = 5.0f, lod_far = 8000.0f;
+	CustomUI::NearFarControl("LOD Range (Log)",
+		&lod_near, &lod_far,
+		1.0f, 50000.0f,
+		"%.1f",
+		CustomUI::NearFarFlags_ShowDepthViz | CustomUI::NearFarFlags_LogScale);
+
+	ImGui::Spacing();
+
 	// 6. 空間・データ可視化
 	// =========================================================================
 	CustomUI::SectionLabel("6. Visualization Controls");

@@ -27,13 +27,18 @@ static const int SAMPLE_COUNT = 7; // 水平/垂直パスのサンプル数
 // inv_projection を使って正確に逆変換する
 float LinearizeDepth(float raw_depth)
 {
+    // Reversed-Z の場合は深度を反転
+    float depth = isReversed ? (1.0f - raw_depth) : raw_depth;
+
     // クリップ空間の座標を復元
-    float4 clip = float4(0.0f, 0.0f, raw_depth, 1.0f);
+    float4 clip = float4(0.0f, 0.0f, depth, 1.0f);
 
     // ビュー空間へ逆変換
     float4 view_pos = mul(clip, inv_projection);
+
     return view_pos.z / view_pos.w; // 線形深度（正値）
 }
+
 
 // 薄レンズモデルによる CoC 計算
 // 参考: GDC 2017「Cinematic Depth of Field」- Hillesland & Skelton (AMD)

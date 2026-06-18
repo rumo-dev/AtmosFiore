@@ -230,6 +230,42 @@ bool Render_State::create_depth_stencil_state(ID3D11Device* device)
 	depth_stencil_desc.StencilEnable = FALSE;
 	hr = device->CreateDepthStencilState(&depth_stencil_desc, &_depth_stencil_states[static_cast<int>(Depth_State::Test_Disable_Write_Disable)]);
 
+	depth_stencil_desc.DepthEnable = TRUE;
+	depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	depth_stencil_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+	depth_stencil_desc.StencilEnable = FALSE;
+	hr = device->CreateDepthStencilState(&depth_stencil_desc, &_depth_stencil_states[static_cast<int>(Depth_State::Reversed_Z_Test_Enable_Write_Enable)]);
+	if (FAILED(hr)) {
+		log_printf("デプスステンシルステートオブジェクトの生成(Test_Enable_Write_Enable) >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
+		return false;
+	}
+	log_printf("デプスステンシルステートオブジェクトの生成(Test_Enable_Write_Enable) >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
+	depth_stencil_desc.DepthEnable = TRUE;
+	depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+	depth_stencil_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+	depth_stencil_desc.StencilEnable = FALSE;
+	hr = device->CreateDepthStencilState(&depth_stencil_desc, &_depth_stencil_states[static_cast<int>(Depth_State::Reversed_Z_Test_Enable_Write_Disable)]);
+	if (FAILED(hr)) {
+		log_printf("デプスステンシルステートオブジェクトの生成(Test_Enable_Write_Disable) >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
+		return false;
+	}
+	log_printf("デプスステンシルステートオブジェクトの生成(Test_Enable_Write_Disable) >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
+	depth_stencil_desc.DepthEnable = FALSE;
+	depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	depth_stencil_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+	depth_stencil_desc.StencilEnable = FALSE;
+	hr = device->CreateDepthStencilState(&depth_stencil_desc, &_depth_stencil_states[static_cast<int>(Depth_State::Reversed_Z_Test_Disable_Write_Enable)]);
+	if (FAILED(hr)) {
+		log_printf("デプスステンシルステートオブジェクトの生成(Test_Disable_Write_Enable) >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
+		return false;
+	}
+	log_printf("デプスステンシルステートオブジェクトの生成(Test_Disable_Write_Enable) >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
+	depth_stencil_desc.DepthEnable = FALSE;
+	depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+	depth_stencil_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+	depth_stencil_desc.StencilEnable = FALSE;
+	hr = device->CreateDepthStencilState(&depth_stencil_desc, &_depth_stencil_states[static_cast<int>(Depth_State::Reversed_Z_Test_Disable_Write_Disable)]);
+
 	if (FAILED(hr)) {
 		log_printf("デプスステンシルステートオブジェクトの生成(Test_Disable_Write_Disable) >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
 		return false;
@@ -443,6 +479,8 @@ void Render_State::set_render_states(ID3D11DeviceContext* immediate_context,
 
 void Render_State::set_3d_render_states(ID3D11DeviceContext* immediate_context, Rasterizer_State rs, Depth_State ds)
 {
+
+
 	set_depth_stencil_state(immediate_context, Depth_State::Test_Enable_Write_Enable, Stencil_Ref::Default);
 	set_blend_state(immediate_context, Blend_State::Alpha, Color_Utils::Colors::transparent, 0xFFFFFFFF);
 	set_rasterizer_state(immediate_context, rs);
@@ -457,7 +495,14 @@ void Render_State::set_2d_render_states(ID3D11DeviceContext* immediate_context)
 }
 void Render_State::set_deferred_render_states(ID3D11DeviceContext* immediate_context, Rasterizer_State rs)
 {
-	set_depth_stencil_state(immediate_context, Depth_State::Test_Enable_Write_Enable, Stencil_Ref::Default);
+	if (Camera_Manager::instance().get_active_camera()->get_camera().isReversed_Z) {
+
+		set_depth_stencil_state(immediate_context, Depth_State::Reversed_Z_Test_Enable_Write_Enable, Stencil_Ref::Default);
+	}
+	else {
+
+		set_depth_stencil_state(immediate_context, Depth_State::Test_Enable_Write_Enable, Stencil_Ref::Default);
+	}
 	set_blend_state(immediate_context, Blend_State::Opaque, Color_Utils::Colors::transparent, 0xFFFFFFFF);
 	set_rasterizer_state(immediate_context, rs);
 	set_sampler_state(immediate_context);

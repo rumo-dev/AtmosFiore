@@ -113,6 +113,7 @@ public:
 		}
 	}
 	ID3D11DepthStencilView* GetDepthStencilView() const { return m_depthStencilView; }
+
 	ID3D11ShaderResourceView* GetDepth() const { return m_depthStencilShaderResourceView; }
 private:
 	/// キャッシュするビューポート数

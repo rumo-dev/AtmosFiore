@@ -69,6 +69,22 @@ namespace CustomUI
 	bool ColorEdit3(const char* label, float col[3], ImGuiColorEditFlags flags = 0);
 
 
+	// NearFar フラグ
+	enum NearFarFlags_ {
+		NearFarFlags_None = 0,
+		NearFarFlags_LogScale = 1 << 0,  // 対数スケール（広いレンジ向け）
+		NearFarFlags_ShowDepthViz = 1 << 1, // 奥行きグラデーションバーを表示
+	};
+	typedef int NearFarFlags;
+
+	// Near/Farウィジェット
+	// v_near < v_far を常に保証。near=0.0に近い場合はLogScaleフラグを推奨。
+	bool NearFarControl(const char* label,
+		float* v_near, float* v_far,
+		float v_min, float v_max,
+		const char* format = "%.2f",
+		NearFarFlags flags = NearFarFlags_ShowDepthViz);
+
 	// 6. 空間・データ可視化（新規追加）
 	bool RotationDial(const char* label, float* p_angle_rad, float radius, float min_rad, float max_rad);
 	bool Vec2PositionPad(const char* label, float v[2], float min_val = -1.0f, float max_val = 1.0f, const ImVec2& size_arg = ImVec2(0, 0));

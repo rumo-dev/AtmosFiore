@@ -333,15 +333,31 @@ float3 stars(float3 p)
 
 float4 main(VS_OUT pin) : SV_Target
 {
-// 1. 現在のピクセルの深度値をサンプリング
     float depthVal = depth.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord).r;
-    
-    // 2. 手前にオブジェクトがある場合は、元のシーンの色をそのまま返す（またはフォグを混ぜる）
-    if (depthVal < 0.999f)
+    float4 sceneColor = tex.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
+
+    bool isForeground = false;
+
+    if (isReversed)
     {
-        return tex.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
+        // Reversed-Z: 1.0=Near, 0.0=Far
+        // 0.0 が「完全な背景」。極端に 0 に近い値のみを背景とみなす
+        // 背景が「0.0」なら、それより明らかに大きい値のみを「手前」とする
+        isForeground = (depthVal > 0.000001f);
     }
-    
+    else
+    {
+        // Normal-Z: 0.0=Near, 1.0=Far
+        // 1.0 が「完全な背景」。極端に 1 に近い値のみを背景とみなす
+        // 背景が「1.0」なら、それより明らかに小さい値のみを「手前」とする
+        isForeground = (depthVal < 0.999999f);
+    }
+
+    if (isForeground)
+    {
+        // 背景とみなされた場合の処理（例：そのまま返す、あるいはフォグを混ぜるなど）
+        return sceneColor;
+    }
     // -----------------------------------------------------------
     // 1. カメラレイの方向をビュー・プロジェクション逆行列から取得
     // -----------------------------------------------------------

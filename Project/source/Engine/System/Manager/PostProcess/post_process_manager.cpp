@@ -132,31 +132,126 @@ void SliderFloatWithTooltip(const char* label, float* value, float min, float ma
 }
 
 
+void Post_Process_Manager::drawDebugView() {
+	const float available_w = ImGui::GetContentRegionAvail().x;
+	const float left_w = available_w * 0.4f;   // 左：選択リストとパラメーター 40%
+	const float right_w = available_w * 0.6f;  // 右：テクスチャプレビュー 60%
 
-void Post_Process_Manager::drawDebugView()
-{
+	// 選択状態の保持（ダングリングポインタを防ぐためEnumとIDで管理）
+	enum class DebugTex { None, GBuffer, PointFront, PointBack, DirShadow };
+	static DebugTex selected_type = DebugTex::None;
+	static int selected_gbuffer_idx = 0;
+
+	// ── 左ペイン：リストとパラメーター ──────────────────────────────────
+	ImGui::BeginChild("##debug_left", ImVec2(left_w, 0), false);
 
 	if (ImGui::CollapsingHeader("GBuffer", ImGuiTreeNodeFlags_DefaultOpen)) {
 		ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
 		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
+
 		for (int i = 0; i < GBUFFER_COUNT; ++i) {
 			if (srvs[i]) {
-				ImGui::Text("GBuffer %d", i);
-				ImGui::Image((ImTextureID)srvs[i], ImVec2(256, 256));
+				char label[32];
+				snprintf(label, sizeof(label), "GBuffer %d", i);
+				bool is_selected = (selected_type == DebugTex::GBuffer && selected_gbuffer_idx == i);
+
+				if (ImGui::Selectable(label, is_selected)) {
+					selected_type = DebugTex::GBuffer;
+					selected_gbuffer_idx = i;
+				}
 			}
 		}
 	}
-	if (ImGui::CollapsingHeader("Shadow Maps")) {
-		auto drawShadow = [](const char* label, ID3D11ShaderResourceView* srv) {
-			ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s:", label);
-			srv ? ImGui::Image((ImTextureID)srv, ImVec2(256, 256)) : ImGui::Text("Shadow map not available");
+
+	if (ImGui::CollapsingHeader("Shadow Maps", ImGuiTreeNodeFlags_DefaultOpen)) {
+		// シャドウマップ用のSelectable描画ラムダ式
+		auto drawShadowSelectable = [&](const char* label, DebugTex type, ID3D11ShaderResourceView* srv) {
+			if (!srv) {
+				ImGui::TextDisabled("%s (N/A)", label);
+				return;
+			}
+			bool is_selected = (selected_type == type);
+			if (ImGui::Selectable(label, is_selected)) {
+				selected_type = type;
+			}
 			};
-		drawShadow("point_frontShadow_depth", shadower->get_point_shadow_front_map());
-		drawShadow("point_back_Shadow_depth", shadower->get_point_shadow_back_map());
-		drawShadow("directional_Shadow_depth", shadower->get_directional_shadow_map());
-		shadower->shadow_gui();
+
+		drawShadowSelectable("Point Front Depth", DebugTex::PointFront, shadower->get_point_shadow_front_map());
+		drawShadowSelectable("Point Back Depth", DebugTex::PointBack, shadower->get_point_shadow_back_map());
+		drawShadowSelectable("Directional Depth", DebugTex::DirShadow, shadower->get_directional_shadow_map());
+
+		ImGui::Separator();
+		shadower->shadow_gui(); // シャドウのGUIコントロール
 	}
 
+	ImGui::EndChild();
+
+	// ── 仕切り線 ────────────────────────────────────────────────
+	ImGui::SameLine();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	float h = ImGui::GetContentRegionAvail().y;
+	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
+	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
+
+	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
+	ImGui::BeginChild("##debug_right", ImVec2(right_w - 6.0f, 0), false);
+
+	ID3D11ShaderResourceView* preview_srv = nullptr;
+	const char* preview_name = "None";
+	float aspect_ratio = 16.0f / 9.0f; // デフォルトは画面比率 (16:9)
+
+	// 選択されたタイプに応じてSRVとメタデータを取得
+	switch (selected_type) {
+	case DebugTex::GBuffer: {
+		ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
+		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
+		preview_srv = srvs[selected_gbuffer_idx];
+		preview_name = "GBuffer";
+		break;
+	}
+	case DebugTex::PointFront:
+		preview_srv = shadower->get_point_shadow_front_map();
+		preview_name = "Point Front Depth";
+		aspect_ratio = 1.0f; // シャドウマップは基本的に正方形 (1:1) を想定
+		break;
+	case DebugTex::PointBack:
+		preview_srv = shadower->get_point_shadow_back_map();
+		preview_name = "Point Back Depth";
+		aspect_ratio = 1.0f;
+		break;
+	case DebugTex::DirShadow:
+		preview_srv = shadower->get_directional_shadow_map();
+		preview_name = "Directional Depth";
+		aspect_ratio = 1.0f;
+		break;
+	default:
+		break;
+	}
+
+	if (preview_srv) {
+		ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Preview: %s", preview_name);
+		ImGui::Separator();
+
+		// アスペクト比を維持して最大サイズで描画
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		float tex_w = avail.x;
+		float tex_h = tex_w / aspect_ratio;
+
+		if (tex_h > avail.y) {
+			tex_h = avail.y;
+			tex_w = tex_h * aspect_ratio;
+		}
+		ImGui::Image((ImTextureID)preview_srv, ImVec2(tex_w, tex_h));
+	}
+	else {
+		// 未選択時・無効時のプレースホルダー
+		ImVec2 avail = ImGui::GetContentRegionAvail();
+		ImGui::SetCursorPos(ImVec2(avail.x * 0.25f, avail.y * 0.5f));
+		ImGui::TextDisabled("Select a buffer to preview.");
+	}
+
+	ImGui::EndChild();
 }
 
 void Post_Process_Manager::drawBloomGUI()

@@ -3,6 +3,7 @@
 #include "Engine/Utilities/misc.h"
 
 #include "Engine/System/graphics_core.h"
+#include "Game/World/Camera/camera_manager.h"
 
 GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 {
@@ -114,6 +115,8 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 	hr = device->CreateDepthStencilView(m_depthStencilBuffer, &depth_stencil_view_desc, &m_depthStencilView);
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
+
+
 	D3D11_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc = {};
 	shader_resource_view_desc.Format = DXGI_FORMAT_R32_FLOAT;
 	shader_resource_view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
@@ -135,7 +138,15 @@ void GeometryBuffer::Clear(ID3D11DeviceContext* immediate_context)
 	{
 		immediate_context->ClearRenderTargetView(m_renderTargetViews[render_target_index], color);
 	}
-	immediate_context->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	if (Camera_Manager::instance().get_active_camera()->get_camera().isReversed_Z) {
+
+		immediate_context->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH, 0, 1.0);
+	}
+	else {
+
+		immediate_context->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	}
+
 }
 void GeometryBuffer::Activate(ID3D11DeviceContext* immediate_context)
 {

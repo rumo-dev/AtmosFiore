@@ -69,10 +69,10 @@ float4 linear_to_srgb(float4 c)
 }
 
 // Z buffer to linear 0..1 depth
-float linear_01_depth(float z, float near, float far)
-{
-    return 1.0 / ((1 - far / near) * z + (far / near));
-}
+//float linear_01_depth(float z, float near, float far)
+//{
+//    return 1.0 / ((1 - far / near) * z + (far / near));
+//}
 
 void near_far_from_projection(in float4x4 projection, out float near, out float far)
 {
