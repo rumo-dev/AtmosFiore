@@ -23,6 +23,6 @@ float4 main(VS_OUT pin) : SV_TARGET
 {
     float4 color = color_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
     float near_coc = coc_map.Sample(sampler_states[POINT_CLAMP], pin.texcoord).r;
-    float alpha = (near_coc > 0.0f) ? 1.0f : 0.0f;
-    return float4(color.rgb * near_coc, 1);
+
+    return float4(color.rgb/* * near_coc*/, near_coc);
 }

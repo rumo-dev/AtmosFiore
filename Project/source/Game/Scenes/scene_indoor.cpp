@@ -37,32 +37,32 @@ void Scene_Indoor::initialize()
 	//);
 	//spotLightを1024個Intencity以外ランダムで追加
 
-	//for (int i = 0; i < 100; i++) {
-	//	float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-	//	float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-	//	float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
-	//	float r = Random::Range(5.0f, 15.0f); // 半径をランダム化
-	//	float intensity = Random::Range(5.0f, 15.0f); // 強度をランダム化
-	//	float innerAngle = Random::Range(0.1f, 0.5f); // 内角をランダム化
-	//	float outerAngle = Random::Range(0.4f, 0.8f); // 外角をランダム化
-	//	dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) }; // ランダムな方向（下向きが多め）
-	//	dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るいz色
-	//	Graphics_Core::instance().get_spot_light_manager().add_light({ x, y, z }, direction, r, intensity, innerAngle, outerAngle, diffuseColor);
-	//}
+	for (int i = 0; i < 1; i++) {
+		float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+		float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+		float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
+		float r = Random::Range(5.0f, 15.0f); // 半径をランダム化
+		float intensity = Random::Range(5.0f, 15.0f); // 強度をランダム化
+		float innerAngle = Random::Range(0.1f, 0.5f); // 内角をランダム化
+		float outerAngle = Random::Range(0.4f, 0.8f); // 外角をランダム化
+		dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) }; // ランダムな方向（下向きが多め）
+		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るいz色
+		Graphics_Core::instance().get_spot_light_manager().add_light({ x, y, z }, direction, r, intensity, innerAngle, outerAngle, diffuseColor);
+	}
 
-	//for (int i = 0; i < 100; i++) {
-	//	float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-	//	float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-	//	float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
-	//	float r = 5.0f; // 半径は固定（必要に応じてランダム化も可能）
-	//	float intensity = 10.0f; // 強度は固定（必要に応じてランダム化も可能）
-	//	dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るい色
-	//	Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
-	//}
+	for (int i = 0; i < 1; i++) {
+		float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+		float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
+		float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
+		float r = 5.0f; // 半径は固定（必要に応じてランダム化も可能）
+		float intensity = 10.0f; // 強度は固定（必要に応じてランダム化も可能）
+		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るい色
+		Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
+	}
 	Graphics_Core::instance().get_area_light_manager().add_light();
 
 	ModelInstance s;
-	s.model_key = "Library";
+	s.model_key = "Rain";
 	s.world_transform = make_world_matrix(
 		CoordinateSystem::RH_Y_UP,
 		{ 1,1,1 },
@@ -82,13 +82,6 @@ void Scene_Indoor::initialize()
 	auto& mgr = Resource_Manager::instance().model_manager;
 
 	mgr.add_instance("Library", s);
-	if (mgr.get_model("Library") == nullptr) {
-		// ここが呼ばれるなら、モデルのロード漏れ
-		log_printf("Error: 'Library' model not loaded!\n", LogLevel::Error);
-	}
-	else {
-		log_printf("'Library' model loaded successfully.\n", LogLevel::Success);
-	}
 	ModelInstance c;
 	c.world_transform = make_world_matrix(
 		CoordinateSystem::RH_Y_UP,
@@ -98,13 +91,7 @@ void Scene_Indoor::initialize()
 		1.f);
 	c.model_key = "DamagedHelmet";
 	mgr.add_instance("DamagedHelmet", c);
-	if (mgr.get_model("DamagedHelmet") == nullptr) {
-		// ここが呼ばれるなら、モデルのロード漏れ
-		log_printf("Error: 'DamagedHelmet' model not loaded!\n", LogLevel::Error);
-	}
-	else {
-		log_printf("'DamagedHelmet' model loaded successfully.\n", LogLevel::Success);
-	}
+
 
 	IBL::Initialize(device, L"./data/ibl");
 

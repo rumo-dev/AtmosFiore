@@ -13,7 +13,7 @@ struct Camera {
 	float fov{ DirectX::XMConvertToRadians(45.0f) };        // 視野角
 	float aspect_ratio{ 16.0f / 9.0f };                     // アスペクト比
 	float near_z{ 0.1f };                                   // 近クリップ面
-	float far_z{ 1000.f };                                 // 遠クリップ面
+	float far_z{ 10000.f };                                 // 遠クリップ面
 
 	DirectX::XMMATRIX view{ DirectX::XMMatrixIdentity() };       // ビュー行列
 	DirectX::XMMATRIX projection{ DirectX::XMMatrixIdentity() }; // プロジェクション行列
@@ -27,11 +27,22 @@ struct Camera {
 	float SensorSize = 35.f;   // センサーサイズ (mm)
 	float FocusDist = 5.f;    // 焦点が合っている距離 (m)
 	float MaxBlurRadius = 10.f;// 最大ボケ半径 (ピクセル単位)
+	bool isReversed_Z = false;
+
+
 
 	// 現在のパラメータから行列を再計算するヘルパー関数
 	void identity() {
 		view = DirectX::XMMatrixLookAtLH(position, target, up);
-		projection = DirectX::XMMatrixPerspectiveFovLH(fov, aspect_ratio, near_z, far_z);
+		if (isReversed_Z) {
+
+			projection = DirectX::XMMatrixPerspectiveFovLH(fov, aspect_ratio, far_z, near_z);
+		}
+		else
+		{
+			projection = DirectX::XMMatrixPerspectiveFovLH(fov, aspect_ratio, near_z, far_z);
+
+		}
 		inv_view = DirectX::XMMatrixInverse(nullptr, view);
 		inv_projection = DirectX::XMMatrixInverse(nullptr, projection);
 		view_projection = view * projection;
@@ -42,6 +53,7 @@ struct Camera {
 		ImGui::Text("Camera Parameters");
 
 
+		CustomUI::Checkbox("Reversed-Z", &isReversed_Z);
 		// F値は1.4～22程度が一般的
 		CustomUI::SliderFloat("F-Number (Aperture)", &FNumber, 1.0f, 22.0f, "f/%.1f");
 
@@ -59,6 +71,7 @@ struct Camera {
 
 		// ブラーの強さ
 		CustomUI::SliderFloat("Max Blur Radius", &MaxBlurRadius, 0.0f, 50.0f);
+
 
 	}
 };

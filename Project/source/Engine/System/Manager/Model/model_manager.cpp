@@ -76,7 +76,16 @@ void ModelManager::add_instance(const std::string& key, ModelInstance instance)
 		(instance.anim_mode == Gltf_Model::animation_mode::single) ? "single" : "all");
 	log_printf("  Animation Index: %d\n", LogLevel::Info, instance.animation_index);
 
+	if (get_model(instance.model_key) == nullptr) {
+		// ここが呼ばれるなら、モデルのロード漏れ
+		// c_str() を使わず、std::string 同士として結合してから c_str() を呼ぶ
+		log_printf((instance.model_key + " model not loaded!\n").c_str(), LogLevel::Error);
+		instance.model_key = "Error";
+	}
+	else {
 
+		log_printf((instance.model_key + "  model loaded successfully\n").c_str(), LogLevel::Success);
+	}
 
 	instances_.emplace(key, std::move(instance));
 }

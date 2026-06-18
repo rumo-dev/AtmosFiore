@@ -21,8 +21,5 @@ float4 main(VS_OUT pin) : SV_TARGET
     float4 color = color_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
     float far_coc = coc_map.Sample(sampler_states[POINT_CLAMP], pin.texcoord).g;
 
-    // far_coc が 0 より大きければ 1.0、そうでなければ 0.0
-    float alpha = (far_coc > 0.0f) ? 1.0f : 0.0f;
-
-    return float4(color.rgb, 1);
+    return float4(color.rgb, far_coc);
 }

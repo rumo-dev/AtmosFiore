@@ -101,6 +101,11 @@ void Resource_Manager::load_shaders() {
 
 void Resource_Manager::load_models() {
 	log_printf("モデルの読み込み開始\n", LogLevel::Info);
+	//エラー用ダミー
+	model_manager.load(
+		"Error",
+		"./data/model/Error/Scene.gltf"
+	);
 	model_manager.load(
 		"DamagedHelmet",
 		"./data/model/glTF/DamagedHelmet/DamagedHelmet.gltf"

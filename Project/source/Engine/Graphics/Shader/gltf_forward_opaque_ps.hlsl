@@ -60,7 +60,7 @@ Texture2D<float4> material_textures[5] : register(t1);
 #include "bidirectional_reflectance_distribution_function.hlsli"
 #if 1
 // If you enable earlydepthstencil, 'clip', 'discard' and 'Alpha to coverage' won't work!
-[earlydepthstencil]
+//[earlydepthstencil]
 #endif
 float4 main(VS_OUT pin, bool is_front_face : SV_IsFrontFace) : SV_TARGET
 {

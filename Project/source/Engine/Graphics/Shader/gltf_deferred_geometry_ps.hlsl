@@ -109,7 +109,7 @@ struct PS_OUT_GBUFFER
 
 #if 0
 // If you enable earlydepthstencil, 'clip', 'discard' and 'Alpha to coverage' won't work!
-[earlydepthstencil]
+//[earlydepthstencil]
 #endif
 PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
 {
