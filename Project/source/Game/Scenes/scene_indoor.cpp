@@ -62,10 +62,10 @@ void Scene_Indoor::initialize()
 	Graphics_Core::instance().get_area_light_manager().add_light();
 
 	ModelInstance s;
-	s.model_key = "Rain";
+	s.model_key = "Library";
 	s.world_transform = make_world_matrix(
-		CoordinateSystem::LH_Y_UP,
-		{ 100,100,100 },
+		CoordinateSystem::RH_Y_UP,
+		{ 1,1,1 },
 		{ 0,3.5f,0 },
 		{ 0,0,0 },
 		1.0f);
@@ -220,7 +220,7 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 
 	Graphics_Core::instance().get_geometry_buffer()->Clear(Graphics_Core::instance().get_device_context());
 	Graphics_Core::instance().get_geometry_buffer()->Activate(Graphics_Core::instance().get_device_context());
-	Render_State::instance().set_deferred_render_states(immediate_context, Rasterizer_State::Cull_None_CW);
+	Render_State::instance().set_deferred_render_states(immediate_context, Rasterizer_State::Cull_None_CCW);
 
 	Resource_Manager::instance().model_manager.render_all(pass_mode::deferred_geometry);
 	Graphics_Core::instance().get_geometry_buffer()->Deactivate(Graphics_Core::instance().get_device_context());

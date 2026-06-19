@@ -6,22 +6,22 @@
 // Helper to load CSO file
 static bool load_cso(const char* cso_name, std::unique_ptr<unsigned char[]>& cso_data, size_t& cso_sz)
 {
-    std::string base_path = "./data/shaders/cso/";
-    std::string full_path = base_path + cso_name;
-    FILE* fp{ nullptr };
-    fopen_s(&fp, full_path.c_str(), "rb");
-    _ASSERT_EXPR_A(fp, "CSO File not found");
-    if (!fp) return false;
+	std::string base_path = "./data/shaders/cso/";
+	std::string full_path = base_path + cso_name;
+	FILE* fp{ nullptr };
+	fopen_s(&fp, full_path.c_str(), "rb");
+	_ASSERT_EXPR_A(fp, "CSO File not found");
+	if (!fp) return false;
 
-    fseek(fp, 0, SEEK_END);
-    long sz{ ftell(fp) };
-    fseek(fp, 0, SEEK_SET);
+	fseek(fp, 0, SEEK_END);
+	long sz{ ftell(fp) };
+	fseek(fp, 0, SEEK_SET);
 
-    cso_data = std::make_unique<unsigned char[]>(sz);
-    fread(cso_data.get(), sz, 1, fp);
-    fclose(fp);
-    cso_sz = sz;
-    return true;
+	cso_data = std::make_unique<unsigned char[]>(sz);
+	fread(cso_data.get(), sz, 1, fp);
+	fclose(fp);
+	cso_sz = sz;
+	return true;
 }
 
 // 頂点シェーダーをCSOファイルから生成する関数
@@ -81,6 +81,30 @@ bool create_ps_from_cso(ID3D11Device* device, const char* cso_name, ID3D11PixelS
 		return false;
 	}
 	log_printf("ピクセルシェーダーの生成 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
+
+	return true;
+}
+// コンピュートシェーダーをCSOファイルから生成する関数
+// device: Direct3Dデバイス
+// cso_name: シェーダーバイナリ（CSO）ファイル名
+// compute_shader: 作成されたコンピュートシェーダーの格納先ポインタ
+bool create_cs_from_cso(ID3D11Device* device, const char* cso_name, ID3D11ComputeShader** compute_shader)
+{
+	std::unique_ptr<unsigned char[]> cso_data;
+	size_t cso_sz{};
+	if (!load_cso(cso_name, cso_data, cso_sz))
+		return false;
+
+	HRESULT hr{ S_OK };
+	hr = device->CreateComputeShader(cso_data.get(), static_cast<UINT>(cso_sz), nullptr, compute_shader);
+
+	if (FAILED(hr)) {
+		std::wstringstream wss;
+		wss << L"コンピュートシェーダーの生成 >> 失敗. ファイル名: " << cso_name << L", HRESULT = 0x" << std::hex << hr;
+		log_printf(std::string(wss.str().begin(), wss.str().end()).c_str(), LogLevel::Error);
+		return false;
+	}
+	log_printf("コンピュートシェーダーの生成 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
 
 	return true;
 }

@@ -93,6 +93,30 @@ void Resource_Manager::load_shaders() {
 		"tone_mapping_ps"
 	);
 
+	shader_manager.load<Pixel_Shader>(
+		"DOF_COC",
+		"coc_generation_ps.cso"
+	);
+	shader_manager.load<Pixel_Shader>(
+		"DOF_NEAR_SEPARATE",
+		"field_separation_near_ps.cso"
+	);
+	shader_manager.load<Pixel_Shader>(
+		"DOF_FAR_SEPARATE",
+		"field_separation_far_ps.cso"
+	);
+	shader_manager.load<Pixel_Shader>(
+		"DOF_FFS_HORIZONTAL",
+		"ffs_horizontal_ps.cso"
+	);
+	shader_manager.load<Pixel_Shader>(
+		"DOF_FFS_VERTICAL",
+		"ffs_vertical_ps.cso"
+	);
+	shader_manager.load<Pixel_Shader>(
+		"DOF_COMP",
+		"composite_ps.cso"
+	);
 	log_printf("シェーダーの読み込み終了\n", LogLevel::Info);
 
 
@@ -131,14 +155,14 @@ void Resource_Manager::load_models() {
 	//	"Cafe",
 	//	"./data/model/cafe/scene.gltf"
 	//);
-	model_manager.load(
-		"Cafe_Anime",
-		"./data/model/cafe_anime/scene.gltf"
-	);
-	model_manager.load(
-		"Rain",
-		"./data/model/City/scene.gltf"
-	);
+	//model_manager.load(
+	//	"Cafe_Anime",
+	//	"./data/model/cafe_anime/scene.gltf"
+	//);
+	//model_manager.load(
+	//	"Rain",
+	//	"./data/model/City/scene.gltf"
+	//);
 
 	//model_manager.load(
 	//	"Warehouse_FBX_Model_Free",

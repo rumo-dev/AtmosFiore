@@ -96,6 +96,10 @@
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_vertical_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\field_separation_far_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\field_separation_near_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_prefix_h_cs.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_prefix_v_cs.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_resolve_cs.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_scatter_cs.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">

@@ -26,3 +26,5 @@ bool create_vs_from_cso(ID3D11Device* device, const char* cso_name, ID3D11Vertex
 // 戻り値: HRESULT（Direct3D APIの成否コード）
 // シェーダーのバイナリファイルを読み込み、Direct3Dデバイス上にピクセルシェーダーを作成する
 bool create_ps_from_cso(ID3D11Device* device, const char* cso_name, ID3D11PixelShader** pixel_shader);
+
+bool create_cs_from_cso(ID3D11Device* device, const char* cso_name, ID3D11ComputeShader** compute_shader);

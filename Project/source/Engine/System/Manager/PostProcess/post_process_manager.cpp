@@ -89,11 +89,19 @@ void Post_Process_Manager::end() {
 	fsquad.Deactivate(Graphics_Core::instance().get_device_context());
 }
 void Post_Process_Manager::draw() {
-	dofer->make(Graphics_Core::instance().get_device_context(), fsquad.GetColorMap());
-	skyer->make(Graphics_Core::instance().get_device_context(), dofer->GetColorMap());
-	bloomer->make(Graphics_Core::instance().get_device_context(), skyer->get_color_map());
-	//Graphics_Core::instance().get_device_context()->GenerateMips(bloomer->getColorMap());
+	// 1. まず空を描画（引数にはシーン全体のベースカラーマップを渡す想定）
+	skyer->make(Graphics_Core::instance().get_device_context(), fsquad.GetColorMap());
+
+	// 2. 空も含めた画面全体に対して被写界深度（DoF）を適用
+	dofer->make(Graphics_Core::instance().get_device_context(), skyer->get_color_map());
+
+	// 3. ボカした後の画面からブルーム（溢れ出る光）を抽出・生成
+	bloomer->make(Graphics_Core::instance().get_device_context(), dofer->GetColorMap());
+
+	// 4. ブルーム適用後の画面（またはブルームバッファ）から輝度適応
 	adaptation->make(Graphics_Core::instance().get_device_context(), bloomer->getColorMap());
+
+	// 5. 最終的なトーンマッピング
 	tone_mapper->make(Graphics_Core::instance().get_device_context(), adaptation->get_color_map());
 
 

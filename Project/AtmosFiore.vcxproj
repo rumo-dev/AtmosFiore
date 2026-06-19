@@ -225,21 +225,45 @@
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>rem SolutionDirの1つ上へ移動した場所を保存
-set OUTPUT_DIR=$(SolutionDir)..\LastBuild
+      <Command>@echo off
+setlocal
 
-rem LastBuild作成（なければ）
-if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
+rem --- パスの定義 ---
+set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
+set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
 
-rem data削除 → 再作成
-if exist "%OUTPUT_DIR%\data" rmdir /S /Q "%OUTPUT_DIR%\data"
-mkdir "%OUTPUT_DIR%\data"
+rem --- 1. LastBuildの初期化 ---
+if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
+mkdir "%OUTPUT_DIR%"
 
-rem SolutionDir\data の中身をコピー
+rem --- 2. dataフォルダのコピー ---
+rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
 xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
 
-rem exeを LastBuild 直下へ上書きコピー
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"</Command>
+rem --- 3. シェーダーのコピー ---
+rem Releaseビルドの場合は、この処理をスキップする
+if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
+
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+
+:SKIP_SHADER
+
+rem --- 4. exeのコピー ---
+copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
+
+rem --- 5. Zip圧縮 ---
+rem 既存の古いZipがある場合は強制的に削除する
+if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
+
+rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
+powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
+
+rem --- 6. アクセス権限の修正 ---
+rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
+if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
+
+endlocal</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -270,21 +294,45 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>rem SolutionDirの1つ上へ移動した場所を保存
-set OUTPUT_DIR=$(SolutionDir)..\LastBuild
+      <Command>@echo off
+setlocal
 
-rem LastBuild作成（なければ）
-if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
+rem --- パスの定義 ---
+set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
+set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
 
-rem data削除 → 再作成
-if exist "%OUTPUT_DIR%\data" rmdir /S /Q "%OUTPUT_DIR%\data"
-mkdir "%OUTPUT_DIR%\data"
+rem --- 1. LastBuildの初期化 ---
+if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
+mkdir "%OUTPUT_DIR%"
 
-rem SolutionDir\data の中身をコピー
+rem --- 2. dataフォルダのコピー ---
+rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
 xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
 
-rem exeを LastBuild 直下へ上書きコピー
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"</Command>
+rem --- 3. シェーダーのコピー ---
+rem Releaseビルドの場合は、この処理をスキップする
+if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
+
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+
+:SKIP_SHADER
+
+rem --- 4. exeのコピー ---
+copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
+
+rem --- 5. Zip圧縮 ---
+rem 既存の古いZipがある場合は強制的に削除する
+if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
+
+rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
+powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
+
+rem --- 6. アクセス権限の修正 ---
+rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
+if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
+
+endlocal</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -315,21 +363,45 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>rem SolutionDirの1つ上へ移動した場所を保存
-set OUTPUT_DIR=$(SolutionDir)..\LastBuild
+      <Command>@echo off
+setlocal
 
-rem LastBuild作成（なければ）
-if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
+rem --- パスの定義 ---
+set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
+set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
 
-rem data削除 → 再作成
-if exist "%OUTPUT_DIR%\data" rmdir /S /Q "%OUTPUT_DIR%\data"
-mkdir "%OUTPUT_DIR%\data"
+rem --- 1. LastBuildの初期化 ---
+if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
+mkdir "%OUTPUT_DIR%"
 
-rem SolutionDir\data の中身をコピー
+rem --- 2. dataフォルダのコピー ---
+rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
 xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
 
-rem exeを LastBuild 直下へ上書きコピー
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"</Command>
+rem --- 3. シェーダーのコピー ---
+rem Releaseビルドの場合は、この処理をスキップする
+if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
+
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+
+:SKIP_SHADER
+
+rem --- 4. exeのコピー ---
+copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
+
+rem --- 5. Zip圧縮 ---
+rem 既存の古いZipがある場合は強制的に削除する
+if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
+
+rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
+powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
+
+rem --- 6. アクセス権限の修正 ---
+rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
+if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
+
+endlocal</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -362,21 +434,45 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>rem SolutionDirの1つ上へ移動した場所を保存
-set OUTPUT_DIR=$(SolutionDir)..\LastBuild
+      <Command>@echo off
+setlocal
 
-rem LastBuild作成（なければ）
-if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
+rem --- パスの定義 ---
+set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
+set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
 
-rem data削除 → 再作成
-if exist "%OUTPUT_DIR%\data" rmdir /S /Q "%OUTPUT_DIR%\data"
-mkdir "%OUTPUT_DIR%\data"
+rem --- 1. LastBuildの初期化 ---
+if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
+mkdir "%OUTPUT_DIR%"
 
-rem SolutionDir\data の中身をコピー
+rem --- 2. dataフォルダのコピー ---
+rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
 xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
 
-rem exeを LastBuild 直下へ上書きコピー
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"</Command>
+rem --- 3. シェーダーのコピー ---
+rem Releaseビルドの場合は、この処理をスキップする
+if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
+
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
+
+:SKIP_SHADER
+
+rem --- 4. exeのコピー ---
+copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
+
+rem --- 5. Zip圧縮 ---
+rem 既存の古いZipがある場合は強制的に削除する
+if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
+
+rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
+powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
+
+rem --- 6. アクセス権限の修正 ---
+rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
+if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
+
+endlocal</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -667,6 +763,30 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_prefix_h_cs.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Compute</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_prefix_v_cs.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Compute</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_resolve_cs.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Compute</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ffs_scatter_cs.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Compute</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_vertical_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

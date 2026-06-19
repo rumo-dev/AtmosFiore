@@ -28,6 +28,18 @@
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_horizontal_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_prefix_h_cs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_prefix_v_cs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_resolve_cs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_scatter_cs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ffs_vertical_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>

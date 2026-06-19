@@ -287,7 +287,7 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	data.FNumber = camera.FNumber;
 	data.FocalLength = camera.FocalLength;
 	data.SensorSize = camera.SensorSize;
-	data.FocusDist = camera.FocalLength;
+	data.FocusDist = camera.FocusDist;
 	data.MaxBlurRadius = camera.MaxBlurRadius;
 	data.isReserved = static_cast<int>(camera.isReversed_Z);
 
@@ -296,6 +296,7 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 
 	_immediate_context->VSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
 	_immediate_context->PSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
+	_immediate_context->CSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
 	Light_Constants lights{};
 	lights.ambient_color = ambient_color;
 	lights.directional_light_direction = directional_light_direction;
