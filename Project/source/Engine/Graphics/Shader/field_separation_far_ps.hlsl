@@ -20,8 +20,10 @@ Texture2D coc_map : register(t1); //DXGI_FORMAT_R16G16B16A16_FLOAT
 float4 main(VS_OUT pin) : SV_TARGET
 {
     float4 color = color_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
-    float far_coc = coc_map.Sample(sampler_states[POINT_CLAMP], pin.texcoord).g;
-
-    return float4(color.rgb, far_coc);
+    // LINEAR_CLAMP: フル解像度 coc_map をワーク解像度にダウンサンプルする際に補間する
+    float far_coc = coc_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord).g;
+    // far も premult に変える
+    return float4(color.rgb * far_coc, far_coc);
+    
 }
 

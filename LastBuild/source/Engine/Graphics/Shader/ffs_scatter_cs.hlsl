@@ -33,7 +33,7 @@
 //   t0 = near_field または far_field (RGB = color [near は premult], A = CoC [0,1])
 //
 // 出力:
-//   u0 = delta_buffer  RWBuffer<int> (RGBA を 4 要素として連続格納)
+//   u0 = delta_buffer  RWBuffer<int> (RGBA を 4 要素として連続格納)a
 //        サイズ = (work_width + 2*MAX_RADIUS + 2) * (work_height + 2*MAX_RADIUS + 2) * 4
 //        ※ 境界ガード用にパディングを追加
 //
@@ -141,30 +141,40 @@ void main(uint3 dispatch_id : SV_DispatchThreadID)
     // 境界を (cx ± (R+1)) にすることで 2 回プレフィックスサム後に
     // 幅 2R+1 の Bartlett カーネルが得られる。
 
-    static const int2 bartlett_offsets[9] =
-    {
-        int2(-1, -1), int2(0, -1), int2(1, -1),
-        int2(-1, 0), int2(0, 0), int2(1, 0),
-        int2(-1, 1), int2(0, 1), int2(1, 1)
-    };
-    static const int bartlett_weights[9] =
-    {
-        1, -2, 1,
-        -2, 4, -2,
-         1, -2, 1
-    };
+    // Bartlett デルタ: 4隅のみに書き込む（正しい実装）
+    //
+    // 2D プレフィックスサム（H→V の 2 回）を経ることで
+    // 幅 2R+1 の Bartlett（テント）カーネルが得られる。
+    //
+    // 正しくは 2D の差分演算子として 4 隅のみ:
+    //   +w at (cx-(R+1), cy-(R+1))  TL
+    //   -w at (cx+(R+1), cy-(R+1))  TR
+    //   -w at (cx-(R+1), cy+(R+1))  BL
+    //   +w at (cx+(R+1), cy+(R+1))  BR
+    //
+    // H サムで各行が幅 2R+1 のボックス積分になり、
+    // V サムでさらに積分されて 2D Bartlett（テント）カーネルが完成する。
+    // 9 点パターンに辺中・中心の余分なデルタを加えると
+    // プレフィックスサム後に格子状アーティファクトが生じる（旧バグ）。
 
-    [unroll]
-    for (int i = 0; i < 9; ++i)
-    {
-        int2 off = bartlett_offsets[i];
-        int w = bartlett_weights[i];
+    // inclusive prefix sum の正しいオフセット:
+    //
+    // H 方向: +w at a, -w at b → sum = +w for [a, b-1]
+    // 欲しい範囲 [cx-R, cx+R] → a = cx-R, b = cx+R+1
+    // V 方向も同様: a = cy-R, b = cy+R+1
+    //
+    // よって 4 隅は非対称:
+    //   TL (cx-R,   cy-R  ) +w
+    //   TR (cx+R+1, cy-R  ) -w
+    //   BL (cx-R,   cy+R+1) -w
+    //   BR (cx+R+1, cy+R+1) +w
+    //
+    // (R+1) を両辺に使う対称版は 1px ズレて同心円縞が出る原因になる。
 
-        // オフセットに (R+1) を掛けて Bartlett の台形位置を決定
-        int dx = off.x * (R + 1);
-        int dy = off.y * (R + 1);
+    int4 neg = int4(-intColor.r, -intColor.g, -intColor.b, -intColor.a);
 
-        int4 delta = intColor * w;
-        AddDelta(cx + dx, cy + dy, delta);
-    }
+    AddDelta(cx - R, cy - R, intColor); // TL +w
+    AddDelta(cx + R + 1, cy - R, neg); // TR -w
+    AddDelta(cx - R, cy + R + 1, neg); // BL -w
+    AddDelta(cx + R + 1, cy + R + 1, intColor); // BR +w
 }

@@ -315,7 +315,7 @@ void DepthOfField::make(
 			immediate_context->CSSetUnorderedAccessViews(0, 2, null2, nullptr);
 		}
 
-		Render_State::instance().set_blend_state(immediate_context, Blend_State::Alpha);
+		Render_State::instance().set_blend_state(immediate_context, Blend_State::Replace);
 	}
 
 	// CS をアンセット

@@ -1,43 +1,57 @@
 // =============================================================
 // ffs_resolve_cs.hlsl
-// Pass 3d: Fast Filter Spreading — リゾルブ（固定小数点 → float テクスチャ）
+// Pass 3d: Fast Filter Spreading — リゾルブ
 //
-// 2D プレフィックスサム完了後の delta_buffer から
-// 各ピクセルの最終ブラー値を読み出し、
-// float16 RWTexture2D に書き込む。
+// near と far で正規化方法が異なる:
 //
-// 正規化:
-//   Bartlett フィルタは 2 回積分により面積 = (R+1)^2 * 4
-//   → alpha チャンネルに蓄積した重み合計で除算して正規化。
-//   (GDC スライド "Weights and Normalization" 節参照)
+//   Near (is_near_field=1):
+//     field_separation で rgb *= near_coc（premult済み）、alpha = near_coc。
+//     scatter 後の累積値は:
+//       val.rgb = Σ(color * coc * weight)
+//       val.a   = Σ(coc * weight)
+//     → val.rgb / val.a = 加重平均色（premult解除済み）
+//     → composite では near_blur.rgb をそのまま使い、
+//       blend率として near_blur.a を使う。
 //
-// 出力:
-//   u1 = blurred_tex (RWTexture2D<float4>) — ボケ完成テクスチャ
-//        RGB = ボケカラー（near は premult alpha のまま保持）
-//        A   = 重み付き平均 CoC（composite_ps の blend 比率に使用）
+//   Far (is_near_field=0):
+//     field_separation で alpha = far_coc（非premult）、rgb = color。
+//     scatter 後の累積値は:
+//       val.rgb = Σ(color * weight)
+//       val.a   = Σ(coc * weight)
+//     → val.rgb / val.a = 加重平均色
+//     → composite では far_blur.rgb をそのまま使い、
+//       blend率として far_blur.a を使う。
 //
-// 定数バッファ:
-//   b10: ffs_constants → buf_*, padding_*, work_*
+//   どちらも rgb /= alpha で正規化することは同じだが、
+//   alpha の意味（near=CoC累積, far=CoC累積）は共通。
 // =============================================================
 
 #include "dof_common.hlsli"
 
 cbuffer ffs_constants : register(b10)
 {
-    int   buf_width;
-    int   buf_height;
-    int   padding_x;
-    int   padding_y;
-    int   work_width_cb;
-    int   work_height_cb;
+    int buf_width;
+    int buf_height;
+    int padding_x;
+    int padding_y;
+    int work_width_cb;
+    int work_height_cb;
     float ffs_pad0;
     float ffs_pad1;
 };
 
-// 固定小数点スケール（scatter CS と同値）
+// b9 の is_dof を流用して near/far フラグを取得
+cbuffer dof_local_constants : register(b9)
+{
+    int is_dof; // ここでは is_near_field として使う（C++側で設定）
+    float inv_buffer_width;
+    float inv_buffer_height;
+    float local_padding;
+};
+
 static const float INV_FIXED_SCALE = 1.0f / 65536.0f;
 
-RWBuffer<int> delta_buffer   : register(u0);
+RWBuffer<int> delta_buffer : register(u0);
 RWTexture2D<float4> blurred_tex : register(u1);
 
 int BufferIndex(int x, int y, int ch)
@@ -49,25 +63,29 @@ int BufferIndex(int x, int y, int ch)
 void main(uint3 dispatch_id : SV_DispatchThreadID)
 {
     int2 loc = int2(dispatch_id.xy);
-
     if (loc.x >= work_width_cb || loc.y >= work_height_cb)
         return;
 
-    // パディング込みバッファ上のピクセル位置
     int bx = loc.x + padding_x;
     int by = loc.y + padding_y;
 
-    // 固定小数点値を読み出し → float 変換
     float4 val;
     val.r = (float) delta_buffer[BufferIndex(bx, by, 0)] * INV_FIXED_SCALE;
     val.g = (float) delta_buffer[BufferIndex(bx, by, 1)] * INV_FIXED_SCALE;
     val.b = (float) delta_buffer[BufferIndex(bx, by, 2)] * INV_FIXED_SCALE;
     val.a = (float) delta_buffer[BufferIndex(bx, by, 3)] * INV_FIXED_SCALE;
 
-    // alpha（重み合計）で正規化
-    // near_field は premult alpha なので RGB / alpha は行わない
-    // （composite_ps 側で premult を解除する）
-    // alpha には累積重みが格納されているので [0,1] にクランプ
+    // near / far 共通: rgb が「色 × 重み」の累積、alpha が「重みの累積」
+    // → rgb /= alpha で加重平均色に正規化
+    // near は field_separation で既に premult(rgb*=coc)済みだが、
+    // alpha も coc の累積なので割り算の結果は正しい加重平均色になる
+    if (val.a > 0.0001f)
+    {
+        val.rgb /= val.a;
+    }
+    // alpha は blend 率として [0,1] に正規化
+    // near: CoC の加重平均 → そのまま blend 率として有効
+    // far:  同上
     val.a = saturate(val.a);
 
     blurred_tex[loc] = val;

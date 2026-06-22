@@ -22,7 +22,11 @@ Texture2D coc_map : register(t1);
 float4 main(VS_OUT pin) : SV_TARGET
 {
     float4 color = color_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
-    float near_coc = coc_map.Sample(sampler_states[POINT_CLAMP], pin.texcoord).r;
+    // LINEAR_CLAMP: coc_map はフル解像度、このパスはワーク解像度(half-res)で動くため
+    // POINT_CLAMP だと補間なしでダウンサンプルされ CoC がぱきっと飛ぶ
+    float near_coc = coc_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord).r;
 
-    return float4(color.rgb/* * near_coc*/, near_coc);
+    // Premultiplied Alpha: rgb * near_coc で蓄積し、resolve で alpha(累積CoC合計)で除算
+    // これにより scatter→prefix sum→resolve の後に正しい加重平均色が得られる
+    return float4(color.rgb * near_coc, near_coc);
 }
