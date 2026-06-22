@@ -502,6 +502,8 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes_internal.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot_internal.h" />
     <ClInclude Include="source\Engine\Graphics\UI\sprite\sprite.h" />
     <ClInclude Include="source\Engine\Graphics\UI\sprite\sprite_batch.h" />
     <ClInclude Include="source\Engine\Graphics\UI\text\text.h" />
@@ -617,6 +619,8 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\imnodes.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot_items.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\sprite\sprite.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\sprite\sprite_batch.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\text\text.cpp" />

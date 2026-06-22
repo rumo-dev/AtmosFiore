@@ -284,6 +284,8 @@
     <ClCompile Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.cpp" />
     <ClCompile Include="source\Game\Effect\Sky\Sky.cpp" />
     <ClCompile Include="source\Game\Effect\dof\depth_of_field.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot.cpp" />
+    <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot_items.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
@@ -618,6 +620,8 @@
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Icons.h" />
     <ClInclude Include="source\Game\Effect\Sky\Sky.h" />
     <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot.h" />
+    <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot_internal.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">

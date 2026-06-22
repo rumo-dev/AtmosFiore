@@ -19,7 +19,9 @@
 
 #ifdef USE_IMGUI
 #include "Engine/Graphics/UI/ImGui/imgui.h"
+#include "Engine/Graphics/UI/ImGui/implot.h"
 #include "Engine/Graphics/UI/ImGui/imgui_internal.h"
+#include "Engine/Graphics/UI/ImGui/implot_internal.h"
 #include "Engine/Graphics/UI/ImGui/imgui_impl_dx11.h"
 #include "Engine/Graphics/UI/ImGui/imgui_impl_win32.h"
 
@@ -116,6 +118,7 @@ public:
 #ifdef USE_IMGUI
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
+		ImPlot::CreateContext();
 
 		ImGuiIO& io = ImGui::GetIO();
 

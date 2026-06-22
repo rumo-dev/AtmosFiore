@@ -249,14 +249,7 @@ void Scene_Indoor::render_UI(float elapsedTime) {
 
 	Text::text_data.Color = Color_Utils::hex_to_colorF("#F2D7EE");
 
-	// 【変更】現在アクティブなカメラ名を画面左上に表示してデバッグしやすくする
-	//std::string active_cam_name = Camera_Manager::instance().get_active_camera_name();
-	//std::wstring w_cam_name = std::wstring(active_cam_name.begin(), active_cam_name.end());
-	//std::wstring ui_text = L"現在のカメラ: " + w_cam_name + L" (1?5キーで切替 / Cキーでシネマティック再生)";
-
-	//Text::draw(ui_text.c_str(), DirectX::XMFLOAT2(50, 50), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
-
-	Text::draw(L"objモデル", DirectX::XMFLOAT2(100, 100), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+	Text::draw(L"Indoor", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 }
 
 void Scene_Indoor::render_debug(float elapsedTime) {
