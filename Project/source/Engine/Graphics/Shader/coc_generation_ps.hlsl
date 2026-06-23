@@ -44,32 +44,9 @@ float4 main(VS_OUT pin) : SV_TARGET
    
     float2 coc = ComputeCoC(lin_depth);
 
-    // ========================================================
-    // 🔍 デバッグ表示切り替え（検証したいモードのコメントアウトを解除）
-    // ========================================================
-    
-    // モードA: 画面全体にCoCをそのまま出力 (理想：手前が赤、ピントが黒、奥が緑)
+
     return float4(coc.r, coc.g, 0.0f, 1.0f);
 
-    // モードB: 3分割で「線形深度」「Near CoC」「Far CoC」を同時に確認
-    ///*
-    if (pin.texcoord.x < 1.0f / 3.0f)
-    {
-        // 【左側 1/3】線形深度（50mで白になるようにスケーリング）
-        float v = saturate(lin_depth / 50.0f);
-        return float4(v, v, v, 1.0f);
-    }
-    else if (pin.texcoord.x < 2.0f / 3.0f)
-    {
-        // 【中央 1/3】Near CoC（手前のボケマスク：赤）
-        return float4(coc.r, 0.0f, 0.0f, 1.0f);
-    }
-    else
-    {
-        // 【右側 1/3】Far CoC（奥のボケマスク：緑）
-        return float4(0.0f, coc.g, 0.0f, 1.0f);
-    }
-    //*/
 
     
 }

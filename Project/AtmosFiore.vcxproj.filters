@@ -100,6 +100,7 @@
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_prefix_v_cs.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_resolve_cs.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_scatter_cs.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\exposure_ps.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">
@@ -286,6 +287,7 @@
     <ClCompile Include="source\Game\Effect\dof\depth_of_field.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot_items.cpp" />
+    <ClCompile Include="source\Game\Effect\exposure\Exposure.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
@@ -622,6 +624,7 @@
     <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot_internal.h" />
+    <ClInclude Include="source\Game\Effect\exposure\Exposure.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">

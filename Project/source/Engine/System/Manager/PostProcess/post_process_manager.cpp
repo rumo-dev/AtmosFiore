@@ -1,120 +1,111 @@
 #include "post_process_manager.h"
 #include "Engine/System/graphics_core.h"
 #include "Engine/System/Manager/resource_manager.h"
-
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
-Framebuffer Post_Process_Manager::fsquad;
-//std::unique_ptr<Fullscreen_Quad> Post_Process_Manager::bit_block_transfer = nullptr;
-std::unique_ptr<bloom> Post_Process_Manager::bloomer = nullptr;
-std::unique_ptr<Fog> Post_Process_Manager::fogger = nullptr;
-std::unique_ptr<shadow> Post_Process_Manager::shadower = nullptr;
-std::unique_ptr<Adaptation> Post_Process_Manager::adaptation = nullptr;
+
+// ─── 静的メンバ定義 ───────────────────────────────────────────
+Framebuffer                  Post_Process_Manager::fsquad;
+std::unique_ptr<bloom>       Post_Process_Manager::bloomer = nullptr;
+std::unique_ptr<Fog>         Post_Process_Manager::fogger = nullptr;
+std::unique_ptr<shadow>      Post_Process_Manager::shadower = nullptr;
+std::unique_ptr<Adaptation>  Post_Process_Manager::adaptation = nullptr;
 std::unique_ptr<ToneMapping> Post_Process_Manager::tone_mapper = nullptr;
-std::unique_ptr<DepthOfField> Post_Process_Manager::dofer = nullptr;
-std::unique_ptr<Sky> Post_Process_Manager::skyer = nullptr;
+std::unique_ptr<DepthOfField>Post_Process_Manager::dofer = nullptr;
+std::unique_ptr<Sky>         Post_Process_Manager::skyer = nullptr;
+std::unique_ptr<Exposure>    Post_Process_Manager::exposurer = nullptr;  // ★ 追加
 
+// ─── 初期化 ───────────────────────────────────────────────────
+void Post_Process_Manager::initialize()
+{
+	auto* device = Graphics_Core::instance().get_device();
+	auto  w = static_cast<uint32_t>(Graphics_Core::instance().get_screen_width());
+	auto  h = static_cast<uint32_t>(Graphics_Core::instance().get_screen_height());
 
+	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, false, false);
 
-void Post_Process_Manager::initialize() {
-
-	fsquad = Framebuffer(
-		Graphics_Core::instance().get_device(),
-		Graphics_Core::instance().get_screen_width(),
-		Graphics_Core::instance().get_screen_height(),
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		false, false
-	);
-
-	//bit_block_transfer = std::make_unique<Fullscreen_Quad>(Graphics_Core::instance().get_device());
-	bloomer = std::make_unique<bloom>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-
-	fogger = std::make_unique<Fog>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-	shadower = std::make_unique<shadow>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-	adaptation = std::make_unique<Adaptation>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-	tone_mapper = std::make_unique<ToneMapping>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-	dofer = std::make_unique<DepthOfField>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-	skyer = std::make_unique<Sky>(
-		Graphics_Core::instance().get_device(),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_width()),
-		static_cast<uint32_t>(Graphics_Core::instance().get_screen_height())
-	);
-
+	bloomer = std::make_unique<bloom>(device, w, h);
+	fogger = std::make_unique<Fog>(device, w, h);
+	shadower = std::make_unique<shadow>(device, w, h);
+	adaptation = std::make_unique<Adaptation>(device, w, h);
+	tone_mapper = std::make_unique<ToneMapping>(device, w, h);
+	dofer = std::make_unique<DepthOfField>(device, w, h);
+	skyer = std::make_unique<Sky>(device, w, h);
+	exposurer = std::make_unique<Exposure>(device, w, h);  // ★ 追加
 }
 
-void Post_Process_Manager::update(float elapsedtime) {
+// ─── 更新 ─────────────────────────────────────────────────────
+void Post_Process_Manager::update(float elapsedtime)
+{
 	fogger->fog_constans.Time += elapsedtime;
 	adaptation->delta_time = elapsedtime;
 	skyer->time += elapsedtime;
-
 }
-void Post_Process_Manager::begin() {
-	fsquad.Clear(Graphics_Core::instance().get_device_context(),
-		0.5f, 0.5f, 0.5f, 1.0f);
-	fsquad.Activate(Graphics_Core::instance().get_device_context(), Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
-	Render_State::instance().set_blend_state(Graphics_Core::instance().get_device_context(), Blend_State::Alpha);
+
+// ─── 開始 ─────────────────────────────────────────────────────
+void Post_Process_Manager::begin()
+{
+	auto* ctx = Graphics_Core::instance().get_device_context();
+
+	fsquad.Clear(ctx, 0.5f, 0.5f, 0.5f, 1.0f);
+	fsquad.Activate(ctx, Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
+	Render_State::instance().set_blend_state(ctx, Blend_State::Alpha);
 
 	ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
-
 	Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
 	srvs[GBUFFER_COUNT + 0] = shadower->get_point_shadow_front_map();
 	srvs[GBUFFER_COUNT + 1] = shadower->get_point_shadow_back_map();
 	srvs[GBUFFER_COUNT + 2] = shadower->get_directional_shadow_map();
-	Graphics_Core::instance().get_fullscreen_quad()->Blit(Graphics_Core::instance().get_device_context(), srvs, 0, GBUFFER_COUNT + 3, Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DEFERRED_LIGHTING_PS"));
+
+	Graphics_Core::instance().get_fullscreen_quad()->Blit(
+		ctx, srvs, 0, GBUFFER_COUNT + 3,
+		Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DEFERRED_LIGHTING_PS")
+	);
 }
-void Post_Process_Manager::end() {
+
+// ─── 終了 ─────────────────────────────────────────────────────
+void Post_Process_Manager::end()
+{
 	fsquad.Deactivate(Graphics_Core::instance().get_device_context());
 }
-void Post_Process_Manager::draw() {
-	// 1. まず空を描画（引数にはシーン全体のベースカラーマップを渡す想定）
-	skyer->make(Graphics_Core::instance().get_device_context(), fsquad.GetColorMap());
 
-	// 2. 空も含めた画面全体に対して被写界深度（DoF）を適用
-	dofer->make(Graphics_Core::instance().get_device_context(), skyer->get_color_map());
+// ─── ポストエフェクトパイプライン ────────────────────────────
+void Post_Process_Manager::draw()
+{
+	auto* ctx = Graphics_Core::instance().get_device_context();
 
-	// 3. ボカした後の画面からブルーム（溢れ出る光）を抽出・生成
-	bloomer->make(Graphics_Core::instance().get_device_context(), dofer->GetColorMap());
+	// 1. Sky
+	skyer->make(ctx, fsquad.GetColorMap());
 
-	// 4. ブルーム適用後の画面（またはブルームバッファ）から輝度適応
-	adaptation->make(Graphics_Core::instance().get_device_context(), bloomer->getColorMap());
+	// 2. DoF
+	dofer->make(ctx, skyer->get_color_map());
 
-	// 5. 最終的なトーンマッピング
-	tone_mapper->make(Graphics_Core::instance().get_device_context(), adaptation->get_color_map());
+	// 3. ★ Exposure（T値ベース線形露出）
+	//    DoF後・Bloom前に適用することで Bloom の輝度抽出が
+	//    露出後の正しい輝度値に対して機能する
+	exposurer->make(ctx, dofer->GetColorMap());
 
+	// 4. Bloom
+	bloomer->make(ctx, exposurer->GetColorMap());
 
+	// 5. Adaptation（自動露出）
+	adaptation->make(ctx, bloomer->getColorMap());
 
-
+	// 6. ToneMapping
+	tone_mapper->make(ctx, adaptation->get_color_map());
 }
 
-void Post_Process_Manager::render() {
-	Graphics_Core::instance().get_fullscreen_quad()->Blit(Graphics_Core::instance().get_device_context(),
-		tone_mapper->get_color_map_address(), 0, 1);
-
+// ─── 最終描画 ─────────────────────────────────────────────────
+void Post_Process_Manager::render()
+{
+	Graphics_Core::instance().get_fullscreen_quad()->Blit(
+		Graphics_Core::instance().get_device_context(),
+		tone_mapper->get_color_map_address(), 0, 1
+	);
 }
-bool CheckboxInt(const char* label, int& value, const char* tooltip = nullptr) {
+
+// ─── GUI ─────────────────────────────────────────────────────
+static bool CheckboxInt(const char* label, int& value, const char* tooltip = nullptr)
+{
 #ifdef _DEBUG
 	bool temp = value != 0;
 	if (ImGui::Checkbox(label, &temp)) {
@@ -125,44 +116,55 @@ bool CheckboxInt(const char* label, int& value, const char* tooltip = nullptr) {
 		ImGui::SetTooltip("%s", tooltip);
 #endif
 	return false;
-
 }
 
-// ヘルパー: float Slider with tooltip
-void SliderFloatWithTooltip(const char* label, float* value, float min, float max, const char* tooltip = nullptr) {
+static void SliderFloatWithTooltip(const char* label, float* value, float min, float max,
+	const char* tooltip = nullptr)
+{
 #ifdef _DEBUG
-
-
 	ImGui::SliderFloat(label, value, min, max);
 	if (tooltip && ImGui::IsItemHovered())
 		ImGui::SetTooltip("%s", tooltip);
-#endif // _DEBUG
+#endif
 }
 
+// ★ 追加: 露出 GUI
+void Post_Process_Manager::drawExposureGUI()
+{
+	exposurer->DrawDebugUI();
+	ImGui::EndChild();
 
-void Post_Process_Manager::drawDebugView() {
+	// ── 仕切り線 ────────────────────────────────────────────────
+	ImGui::SameLine();
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	float  h = ImGui::GetContentRegionAvail().y;
+	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
+	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
+
+}
+
+// ─── 既存 GUI（変更なし）────────────────────────────────────
+void Post_Process_Manager::drawDebugView()
+{
 	const float available_w = ImGui::GetContentRegionAvail().x;
-	const float left_w = available_w * 0.4f;   // 左：選択リストとパラメーター 40%
-	const float right_w = available_w * 0.6f;  // 右：テクスチャプレビュー 60%
+	const float left_w = available_w * 0.4f;
+	const float right_w = available_w * 0.6f;
 
-	// 選択状態の保持（ダングリングポインタを防ぐためEnumとIDで管理）
 	enum class DebugTex { None, GBuffer, PointFront, PointBack, DirShadow };
 	static DebugTex selected_type = DebugTex::None;
-	static int selected_gbuffer_idx = 0;
+	static int      selected_gbuffer_idx = 0;
 
-	// ── 左ペイン：リストとパラメーター ──────────────────────────────────
 	ImGui::BeginChild("##debug_left", ImVec2(left_w, 0), false);
 
 	if (ImGui::CollapsingHeader("GBuffer", ImGuiTreeNodeFlags_DefaultOpen)) {
 		ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
 		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
-
 		for (int i = 0; i < GBUFFER_COUNT; ++i) {
 			if (srvs[i]) {
 				char label[32];
 				snprintf(label, sizeof(label), "GBuffer %d", i);
 				bool is_selected = (selected_type == DebugTex::GBuffer && selected_gbuffer_idx == i);
-
 				if (ImGui::Selectable(label, is_selected)) {
 					selected_type = DebugTex::GBuffer;
 					selected_gbuffer_idx = i;
@@ -172,90 +174,52 @@ void Post_Process_Manager::drawDebugView() {
 	}
 
 	if (ImGui::CollapsingHeader("Shadow Maps", ImGuiTreeNodeFlags_DefaultOpen)) {
-		// シャドウマップ用のSelectable描画ラムダ式
 		auto drawShadowSelectable = [&](const char* label, DebugTex type, ID3D11ShaderResourceView* srv) {
-			if (!srv) {
-				ImGui::TextDisabled("%s (N/A)", label);
-				return;
-			}
+			if (!srv) { ImGui::TextDisabled("%s (N/A)", label); return; }
 			bool is_selected = (selected_type == type);
-			if (ImGui::Selectable(label, is_selected)) {
-				selected_type = type;
-			}
+			if (ImGui::Selectable(label, is_selected)) selected_type = type;
 			};
-
 		drawShadowSelectable("Point Front Depth", DebugTex::PointFront, shadower->get_point_shadow_front_map());
 		drawShadowSelectable("Point Back Depth", DebugTex::PointBack, shadower->get_point_shadow_back_map());
 		drawShadowSelectable("Directional Depth", DebugTex::DirShadow, shadower->get_directional_shadow_map());
-
 		ImGui::Separator();
-		shadower->shadow_gui(); // シャドウのGUIコントロール
+		shadower->shadow_gui();
 	}
 
 	ImGui::EndChild();
 
-	// ── 仕切り線 ────────────────────────────────────────────────
 	ImGui::SameLine();
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 	ImVec2 p = ImGui::GetCursorScreenPos();
-	float h = ImGui::GetContentRegionAvail().y;
+	float  h = ImGui::GetContentRegionAvail().y;
 	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
 	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
 
-	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
 	ImGui::BeginChild("##debug_right", ImVec2(right_w - 6.0f, 0), false);
 
 	ID3D11ShaderResourceView* preview_srv = nullptr;
-	const char* preview_name = "None";
-	float aspect_ratio = 16.0f / 9.0f; // デフォルトは画面比率 (16:9)
+	ImVec2 preview_size = ImVec2(1280.0f, 720.0f);
 
-	// 選択されたタイプに応じてSRVとメタデータを取得
-	switch (selected_type) {
-	case DebugTex::GBuffer: {
+	if (selected_type == DebugTex::GBuffer) {
 		ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
 		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
-		preview_srv = srvs[selected_gbuffer_idx];
-		preview_name = "GBuffer";
-		break;
+		if (selected_gbuffer_idx < GBUFFER_COUNT) preview_srv = srvs[selected_gbuffer_idx];
 	}
-	case DebugTex::PointFront:
+	else if (selected_type == DebugTex::PointFront)
 		preview_srv = shadower->get_point_shadow_front_map();
-		preview_name = "Point Front Depth";
-		aspect_ratio = 1.0f; // シャドウマップは基本的に正方形 (1:1) を想定
-		break;
-	case DebugTex::PointBack:
+	else if (selected_type == DebugTex::PointBack)
 		preview_srv = shadower->get_point_shadow_back_map();
-		preview_name = "Point Back Depth";
-		aspect_ratio = 1.0f;
-		break;
-	case DebugTex::DirShadow:
+	else if (selected_type == DebugTex::DirShadow)
 		preview_srv = shadower->get_directional_shadow_map();
-		preview_name = "Directional Depth";
-		aspect_ratio = 1.0f;
-		break;
-	default:
-		break;
-	}
 
 	if (preview_srv) {
-		ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Preview: %s", preview_name);
-		ImGui::Separator();
-
-		// アスペクト比を維持して最大サイズで描画
 		ImVec2 avail = ImGui::GetContentRegionAvail();
 		float tex_w = avail.x;
-		float tex_h = tex_w / aspect_ratio;
-
-		if (tex_h > avail.y) {
-			tex_h = avail.y;
-			tex_w = tex_h * aspect_ratio;
-		}
-		ImGui::Image((ImTextureID)preview_srv, ImVec2(tex_w, tex_h));
+		float tex_h = tex_w * (preview_size.y / preview_size.x);
+		if (tex_h > avail.y) { tex_h = avail.y; tex_w = tex_h * (preview_size.x / preview_size.y); }
+		ImGui::Image(reinterpret_cast<ImTextureID>(preview_srv), ImVec2(tex_w, tex_h));
 	}
 	else {
-		// 未選択時・無効時のプレースホルダー
-		ImVec2 avail = ImGui::GetContentRegionAvail();
-		ImGui::SetCursorPos(ImVec2(avail.x * 0.25f, avail.y * 0.5f));
 		ImGui::TextDisabled("Select a buffer to preview.");
 	}
 
@@ -265,12 +229,10 @@ void Post_Process_Manager::drawDebugView() {
 void Post_Process_Manager::drawBloomGUI()
 {
 	const float available_w = ImGui::GetContentRegionAvail().x;
-	const float left_w = available_w * 0.4f;   // 左：パラメーター 40%
-	const float right_w = available_w * 0.6f;   // 右：テクスチャ   60%
+	const float left_w = available_w * 0.4f;
+	const float right_w = available_w * 0.6f;
 
-	// ── 左ペイン：パラメーター ──────────────────────────────────
 	ImGui::BeginChild("##bloom_left", ImVec2(left_w, 0), false);
-
 	CheckboxInt("Enable Bloom", bloomer->is_bloom, "Enable bloom effect");
 	if (bloomer->is_bloom) {
 		SliderFloatWithTooltip("Threshold", &bloomer->bloom_extraction_threshold,
@@ -278,147 +240,106 @@ void Post_Process_Manager::drawBloomGUI()
 		SliderFloatWithTooltip("Intensity", &bloomer->bloom_intensity,
 			0.0f, 5.0f, "Strength of bloom effect");
 	}
-
 	ImGui::EndChild();
 
-	// ── 仕切り線 ────────────────────────────────────────────────
 	ImGui::SameLine();
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 	ImVec2 p = ImGui::GetCursorScreenPos();
-	float h = ImGui::GetContentRegionAvail().y;
+	float  h = ImGui::GetContentRegionAvail().y;
 	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
-	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));  // 仕切り線分だけ右にずらす
+	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
 
-	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
-	//ImGui::BeginChild("##bloom_right", ImVec2(right_w - 6.0f, 0), false);
-
-	//if (bloomer->is_bloom && bloomer->getColorMap()) {
-	//	ImVec2 avail = ImGui::GetContentRegionAvail();
-	//	// アスペクト比 16:9 を保ってフィット
-	//	float tex_w = avail.x;
-	//	float tex_h = tex_w * (9.0f / 16.0f);
-	//	if (tex_h > avail.y) {
-	//		tex_h = avail.y;
-	//		tex_w = tex_h * (16.0f / 9.0f);
-	//	}
-	//	ImGui::Image((ImTextureID)bloomer->getColorMap(), ImVec2(tex_w, tex_h));
-	//}
-	//else {
-	//	// Bloom オフ時はプレースホルダー
-	//	ImGui::TextDisabled("(Bloom disabled)");
-	//}
-
-	//ImGui::EndChild();
 	ImGui::BeginChild("##bloom_right", ImVec2(right_w - 6.0f, 0), false);
-
 	if (bloomer->is_bloom) {
-		// 1. Bloom用のデバッグアセットリストを取得
 		static int selected_index = 0;
 		auto assets = bloomer->GetDebugAssets();
-
-		// 2. ギャラリー＆プレビューウィジェットの呼び出し
-		// 第4引数のサイズ（64.0f）は必要に応じて調整してください
 		CustomUI::ImageGallery("BloomBufferGallery", assets, &selected_index, 64.0f);
 	}
 	else {
-		// Bloom オフ時は中央にメッセージを表示
 		ImVec2 avail = ImGui::GetContentRegionAvail();
 		ImGui::SetCursorPos(ImVec2(avail.x * 0.3f, avail.y * 0.5f));
 		ImGui::TextDisabled("Bloom effect is disabled.");
 	}
-
 	ImGui::EndChild();
 }
+
 void Post_Process_Manager::drawAdaptationGUI()
 {
 	const float available_w = ImGui::GetContentRegionAvail().x;
 	const float left_w = available_w * 0.4f;
 	const float right_w = available_w * 0.6f;
 
-	// ── 左ペイン：パラメーター ──────────────────────────────────
 	ImGui::BeginChild("##adapt_left", ImVec2(left_w, 0), false);
-
 	SliderFloatWithTooltip("Target Lum", &adaptation->target_lum, 0.0f, 1.0f, "Target luminance for adaptation");
 	SliderFloatWithTooltip("Speed to Light", &adaptation->speed_to_light, 0.0f, 10.0f, "Speed of adaptation to lighter scenes");
 	SliderFloatWithTooltip("Speed to Dark", &adaptation->speed_to_dark, 0.0f, 10.0f, "Speed of adaptation to darker scenes");
-
 	ImGui::EndChild();
 
-	// ── 仕切り線 ────────────────────────────────────────────────
 	ImGui::SameLine();
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 	ImVec2 p = ImGui::GetCursorScreenPos();
-	float h = ImGui::GetContentRegionAvail().y;
+	float  h = ImGui::GetContentRegionAvail().y;
 	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
 	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
 
-	// ── 右ペイン：テクスチャプレビュー ──────────────────────────
 	ImGui::BeginChild("##adapt_right", ImVec2(right_w - 6.0f, 0), false);
-
 	if (adaptation->get_color_map()) {
 		ImVec2 avail = ImGui::GetContentRegionAvail();
 		float tex_w = avail.x;
 		float tex_h = tex_w * (9.0f / 16.0f);
 		if (tex_h > avail.y) { tex_h = avail.y; tex_w = tex_h * (16.0f / 9.0f); }
-		ImGui::Image((ImTextureID)adaptation->get_color_map(), ImVec2(tex_w, tex_h));
+		ImGui::Image(reinterpret_cast<ImTextureID>(adaptation->get_color_map()), ImVec2(tex_w, tex_h));
 	}
 	else {
 		ImGui::TextDisabled("(No texture available)");
 	}
-
 	ImGui::EndChild();
 }
 
 void Post_Process_Manager::drawToneMappingGUI()
 {
 	const float available_w = ImGui::GetContentRegionAvail().x;
-	const float left_w = available_w * 0.55f;  // パラメーター多いので広め
+	const float left_w = available_w * 0.55f;
 	const float right_w = available_w * 0.45f;
 
-	// ── 左ペイン：アルゴリズム選択 + 共通パラメーター ───────────
 	ImGui::BeginChild("##tonemapping_left", ImVec2(left_w, 0), false);
-
 	CheckboxInt("Enable Tone Mapping", tone_mapper->is_enabled, "Enable tone mapping post effect");
 
 	if (tone_mapper->is_enabled) {
 		const char* items[] = {
-			"ACES", "Reinhard", "Unreal", "Neutral", "Linear", "Hable", "AgX", "GT",
-			"Drago", "Exponential", "Logarithmic", "Ward", "Lottes", "Hejl",
-			"RomBinDaHouse", "ReinhardExtended", "FilmicSimple", "ACESApprox",
-			"PBRNeutral", "Sigmoid", "Piecewise", "Cineon", "Exposure", "GammaOnly",
-			"PQApprox", "HLGApprox", "OpenDRTLike", "CameraResponse", "Uchimura",
-			"ClampOnly", "WhitePreservingLuma", "FilmicALU", "AgXPunchy", "CustomCurve"
+			"ACES","Reinhard","Unreal","Neutral","Linear","Hable","AgX","GT",
+			"Drago","Exponential","Logarithmic","Ward","Lottes","Hejl",
+			"RomBinDaHouse","ReinhardExtended","FilmicSimple","ACESApprox",
+			"PBRNeutral","Sigmoid","Piecewise","Cineon","Exposure","GammaOnly",
+			"PQApprox","HLGApprox","OpenDRTLike","CameraResponse","Uchimura",
+			"ClampOnly","WhitePreservingLuma","FilmicALU","AgXPunchy","CustomCurve"
 		};
 		int current = static_cast<int>(tone_mapper->mapping_type);
-		if (ImGui::Combo("Algorithm", &current, items, IM_ARRAYSIZE(items))) {
+		if (ImGui::Combo("Algorithm", &current, items, IM_ARRAYSIZE(items)))
 			tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(current);
-		}
+
 		ImGui::Separator();
 		ImGui::SliderFloat("Exposure", &tone_mapper->exposure, 0.01f, 10.0f);
 		ImGui::SliderFloat("Gamma", &tone_mapper->gamma, 1.0f, 3.0f);
 	}
-
 	ImGui::EndChild();
 
-	// ── 仕切り線 ────────────────────────────────────────────────
 	ImGui::SameLine();
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 	ImVec2 p = ImGui::GetCursorScreenPos();
-	float h = ImGui::GetContentRegionAvail().y;
+	float  h = ImGui::GetContentRegionAvail().y;
 	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
 	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
 
-	// ── 右ペイン：アルゴリズム固有パラメーター ──────────────────
 	ImGui::BeginChild("##tonemapping_right", ImVec2(right_w - 6.0f, 0), false);
-
 	if (tone_mapper->is_enabled) {
 		const char* items[] = {
-			"ACES", "Reinhard", "Unreal", "Neutral", "Linear", "Hable", "AgX", "GT",
-			"Drago", "Exponential", "Logarithmic", "Ward", "Lottes", "Hejl",
-			"RomBinDaHouse", "ReinhardExtended", "FilmicSimple", "ACESApprox",
-			"PBRNeutral", "Sigmoid", "Piecewise", "Cineon", "Exposure", "GammaOnly",
-			"PQApprox", "HLGApprox", "OpenDRTLike", "CameraResponse", "Uchimura",
-			"ClampOnly", "WhitePreservingLuma", "FilmicALU", "AgXPunchy", "CustomCurve"
+			"ACES","Reinhard","Unreal","Neutral","Linear","Hable","AgX","GT",
+			"Drago","Exponential","Logarithmic","Ward","Lottes","Hejl",
+			"RomBinDaHouse","ReinhardExtended","FilmicSimple","ACESApprox",
+			"PBRNeutral","Sigmoid","Piecewise","Cineon","Exposure","GammaOnly",
+			"PQApprox","HLGApprox","OpenDRTLike","CameraResponse","Uchimura",
+			"ClampOnly","WhitePreservingLuma","FilmicALU","AgXPunchy","CustomCurve"
 		};
 		int current = static_cast<int>(tone_mapper->mapping_type);
 
@@ -457,6 +378,5 @@ void Post_Process_Manager::drawToneMappingGUI()
 		ImGui::Spacing();
 		ImGui::TextDisabled("Current: %s", items[current]);
 	}
-
 	ImGui::EndChild();
 }

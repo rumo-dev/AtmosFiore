@@ -5,43 +5,83 @@
  * @brief カメラの純粋なデータ構造体
  */
 struct Camera {
+	// --- 既存のパラメータ ---
+	DirectX::XMVECTOR position{ 0.0f, 5.0f, -10.0f, 1.0f };
+	DirectX::XMVECTOR target{ 0.0f, 0.0f, 0.0f, 1.0f };
+	DirectX::XMVECTOR up{ 0.0f, 1.0f, 0.0f, 0.0f };
 
-	DirectX::XMVECTOR position{ 0.0f, 5.0f, -10.0f, 1.0f }; // 位置
-	DirectX::XMVECTOR target{ 0.0f, 0.0f, 0.0f, 1.0f };     // 注視点
-	DirectX::XMVECTOR up{ 0.0f, 1.0f, 0.0f, 0.0f };         // 上方向ベクトル
+	float fov{ DirectX::XMConvertToRadians(45.0f) };
+	float aspect_ratio{ 16.0f / 9.0f };
+	float near_z{ 0.1f };
+	float far_z{ 10000.f };
 
-	float fov{ DirectX::XMConvertToRadians(45.0f) };        // 視野角
-	float aspect_ratio{ 16.0f / 9.0f };                     // アスペクト比
-	float near_z{ 0.1f };                                   // 近クリップ面
-	float far_z{ 10000.f };                                 // 遠クリップ面
+	DirectX::XMMATRIX view{ DirectX::XMMatrixIdentity() };
+	DirectX::XMMATRIX projection{ DirectX::XMMatrixIdentity() };
+	DirectX::XMMATRIX inv_view{ DirectX::XMMatrixIdentity() };
+	DirectX::XMMATRIX inv_projection{ DirectX::XMMatrixIdentity() };
+	DirectX::XMMATRIX view_projection{ DirectX::XMMatrixIdentity() };
+	DirectX::XMMATRIX inv_view_projection{ DirectX::XMMatrixIdentity() };
 
-	DirectX::XMMATRIX view{ DirectX::XMMatrixIdentity() };       // ビュー行列
-	DirectX::XMMATRIX projection{ DirectX::XMMatrixIdentity() }; // プロジェクション行列
-	DirectX::XMMATRIX inv_view{ DirectX::XMMatrixIdentity() };    // ビュー行列の逆行列	
-	DirectX::XMMATRIX inv_projection{ DirectX::XMMatrixIdentity() }; // プロジェクション行列の逆行列
-	DirectX::XMMATRIX view_projection{ DirectX::XMMatrixIdentity() }; // ビュー・プロジェクション行列
-	DirectX::XMMATRIX inv_view_projection{ DirectX::XMMatrixIdentity() }; // ビュー・プロジェクション行列の逆行列
-
-	float FNumber = 2.8f;      // 絞り値 (例: 1.4, 2.8)
-	float FocalLength = 50.0f;  // 焦点距離 (mm)
-	float SensorSize = 35.f;   // センサーサイズ (mm)
-	float FocusDist = 5.f;    // 焦点が合っている距離 (m)
-	float MaxBlurRadius = 10.f;// 最大ボケ半径 (ピクセル単位)
+	float shutterDenominator = 5.0f;
+	float FNumber = 2.8f;
+	float FocalLength = 50.0f;
+	float SensorSize = 35.f;
+	float FocusDist = 5.f;
+	float MaxBlurRadius = 10.f;
 	bool isReversed_Z = false;
 
+	float TStop = 2.8f;
+	float ShutterSpeed = 1.0f / shutterDenominator;
+	float ISO = 800.0f;
+	float EV_Compensation = 0.0f;
 
+	// --- 手振れ用パラメータ (ランダムウォーク) ---
+	bool enableCameraShake = false;
+	float shakeIntensity = 0.1f; // ブレ幅
+	float shakeFrequency = 0.1f;  // 更新頻度
+	DirectX::XMVECTOR shakeOffset{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-	// 現在のパラメータから行列を再計算するヘルパー関数
+private:
+	DirectX::XMVECTOR currentShakeTarget{ 0.0f, 0.0f, 0.0f, 0.0f };
+	DirectX::XMVECTOR previousShakeTarget{ 0.0f, 0.0f, 0.0f, 0.0f };
+	float shakeTimer = 1.0f;
+	std::mt19937 rng{ std::random_device{}() }; // 高精度な乱数エンジン
+
+public:
+	// ランダムウォークによる揺れの計算
+	void updateShake(float deltaTime) {
+		if (!enableCameraShake) {
+			shakeOffset = DirectX::XMVectorZero();
+			return;
+		}
+
+		shakeTimer += deltaTime * shakeFrequency;
+
+		if (shakeTimer >= 1.0f) {
+			shakeTimer = 0.0f;
+			previousShakeTarget = currentShakeTarget;
+
+			std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+			currentShakeTarget = DirectX::XMVectorSet(dist(rng) * shakeIntensity, dist(rng) * shakeIntensity, 0.0f, 0.0f);
+		}
+
+		// イージング（滑らかな補間）
+		float t = shakeTimer;
+		float smoothT = t * t * (3.0f - 2.0f * t);
+		shakeOffset = DirectX::XMVectorLerp(previousShakeTarget, currentShakeTarget, smoothT);
+	}
+
+	// 行列計算
 	void identity() {
-		view = DirectX::XMMatrixLookAtLH(position, target, up);
-		if (isReversed_Z) {
+		// 注視点を揺らすことで「視線が泳ぐ手持ち感」を演出
+		DirectX::XMVECTOR finalTarget = DirectX::XMVectorAdd(target, shakeOffset);
+		view = DirectX::XMMatrixLookAtLH(position, finalTarget, up);
 
+		if (isReversed_Z) {
 			projection = DirectX::XMMatrixPerspectiveFovLH(fov, aspect_ratio, far_z, near_z);
 		}
-		else
-		{
+		else {
 			projection = DirectX::XMMatrixPerspectiveFovLH(fov, aspect_ratio, near_z, far_z);
-
 		}
 		inv_view = DirectX::XMMatrixInverse(nullptr, view);
 		inv_projection = DirectX::XMMatrixInverse(nullptr, projection);
@@ -79,6 +119,26 @@ struct Camera {
 
 		// ブラーの強さ
 		CustomUI::SliderFloat("Max Blur Radius", &MaxBlurRadius, 0.0f, 50.0f);
+		ImGui::Separator();
+		ImGui::Text("Exposure (T-Stop)");
+		CustomUI::SliderFloat("T-Stop", &TStop, 1.0f, 22.0f, "T%.1f");
+
+
+		if (CustomUI::SliderFloat("Shutter Speed", &shutterDenominator, 1.0f, 8000.0f, "1/%.0f s", ImGuiSliderFlags_Logarithmic)) {
+
+			ShutterSpeed = (1.0f / shutterDenominator);
+		}
+		CustomUI::SliderFloat("ISO", &ISO, 100.0f, 6400.0f, "ISO %.0f",
+			ImGuiSliderFlags_Logarithmic);
+		CustomUI::SliderFloat("EV Compensation", &EV_Compensation, -3.0f, 3.0f, "%.1f EV");
+
+		ImGui::Separator();
+		ImGui::Text("Camera Shake Settings");
+		CustomUI::Checkbox("Enable Camera Shake", &enableCameraShake);
+		if (enableCameraShake) {
+			CustomUI::SliderFloat("Shake Intensity", &shakeIntensity, 0.0f, 1.0f);
+			CustomUI::SliderFloat("Shake Frequency", &shakeFrequency, 0.0f, 30.0f);
+		}
 	}
 };
 struct alignas(16) Camera_Constants
@@ -109,6 +169,11 @@ struct alignas(16) Camera_Constants
 	float SensorSize;   // センサーサイズ (mm)
 	float FocusDist;    // 焦点が合っている距離 (m)
 	float MaxBlurRadius;// 最大ボケ半径 (ピクセル単位)
+
+	float TStop;           // T値
+	float ShutterSpeed;    // シャッタースピード [秒]
+	float ISO;             // ISO感度
+	float EV_Compensation; // 露出補正 [EV]
 
 	int isReserved;
 	DirectX::XMFLOAT3 Padding;

@@ -68,10 +68,11 @@ public:
 	void update(float deltaTime) {
 		if (_active_camera) {
 			_active_camera->update(deltaTime);
+			_active_camera->get_camera().updateShake(deltaTime);
 			_active_camera->get_camera().identity(); // 行列の自動更新
 		}
+
 	}
-	// camera_manager.h への追加・修正
 
 public:
 	/**

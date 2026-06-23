@@ -34,6 +34,11 @@ cbuffer CAMERA_CONSTANT_BUFFER : register(b1)
     float FocusDist; // 焦点が合っている距離 (m)
     float MaxBlurRadius; // 最大ボケ半径 (ピクセル単位)
     
+    float TStop;
+    float ShutterSpeed;
+    float ISO;
+    float EV_Compensation;
+    
     int isReversed;
 
     float3 Padding;
