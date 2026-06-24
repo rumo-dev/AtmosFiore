@@ -58,7 +58,7 @@ public:
 	ID3D11ShaderResourceView* get_color_map() const { return tone_mapping_target->GetColorMap(); }
 	ID3D11ShaderResourceView** get_color_map_address() const { return tone_mapping_target->GetColorMapAddress(); }
 
-	ToneMappingType mapping_type = ToneMappingType::ACES;
+	ToneMappingType mapping_type = ToneMappingType::GT;
 	float exposure = 1.0f;
 	float gamma = 2.2f;
 	float gt_param = 0.22f;

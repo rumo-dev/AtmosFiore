@@ -235,13 +235,15 @@ void Dashboard::InitializeUI() {
 	dash.RegisterModule({ "Rendering", {
 		{"Bloom",       "Adjust bloom settings", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawBloomGUI(); }},
 		{"Adaptation",  "Adjust eye adaptation parameters", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawAdaptationGUI(); }},
-		{"Tone Mapping","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawToneMappingGUI(); }}
+		{"Tone Mapping","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawToneMappingGUI(); }},
+		{"Exposure","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawExposureGUI(); }},
+		{"LensImperfections","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawLensImperfectionsGUI(); }}
 	} });
 
 	dash.RegisterModule({ "Light", {
 		{"Point", "Manage point lights", [](SharedMetricsData& d) { Graphics_Core::instance().get_point_light_manager().draw_imgui(); }},
 		{"Spot",  "Manage spot lights", [](SharedMetricsData& d) { Graphics_Core::instance().get_spot_light_manager().draw_imgui(); }},
-		{"Area",  "Manage area lights", [](SharedMetricsData& d) { Graphics_Core::instance().get_area_light_manager().draw_imgui(); }}
+		{"Area",  "Manage area lights", [](SharedMetricsData& d) { Graphics_Core::instance().get_area_light_manager().draw_imgui(); }},
 	} });
 
 	dash.RegisterModule({ "Resource", {

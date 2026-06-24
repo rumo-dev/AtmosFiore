@@ -11,6 +11,9 @@
 #include "Game/Effect/dof/depth_of_field.h"
 #include "Game/Effect/Sky/Sky.h"
 #include "Game/Effect/exposure/Exposure.h"
+#include "Game/Effect/chromaticAberration/ChromaticAberration.h"
+#include "Game/Effect/lensDistortion/LensDistortion.h"
+#include "Game/Effect/vignetting/Vignetting.h"
 
 /**
  * @brief ポストプロセス管理クラス
@@ -53,12 +56,16 @@ public:
 
 	// ★ 追加
 	Exposure& GetExposure() { return *exposurer; }
+	ChromaticAberration& GetChromaticAberration() { return *ca_effect; }
+	LensDistortion& GetLensDistortion() { return *lens_distortion; }
+	Vignetting& GetVignetting() { return *vignetting; }
 
 	void drawDebugView();
 	void drawBloomGUI();
 	void drawAdaptationGUI();
 	void drawToneMappingGUI();
 	void drawExposureGUI();
+	void drawLensImperfectionsGUI();
 
 private:
 	static Framebuffer fsquad;
@@ -71,6 +78,9 @@ private:
 	static std::unique_ptr<DepthOfField> dofer;
 	static std::unique_ptr<Sky>          skyer;
 	static std::unique_ptr<Exposure>     exposurer;
+	static std::unique_ptr<ChromaticAberration> ca_effect;
+	static std::unique_ptr<LensDistortion>      lens_distortion;
+	static std::unique_ptr<Vignetting>          vignetting;
 
 	float time = 0.0f;
 };

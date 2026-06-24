@@ -101,6 +101,9 @@
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_resolve_cs.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\ffs_scatter_cs.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\exposure_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\chromatic_aberration_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\lens_distortion_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\vignetting_ps.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">
@@ -288,6 +291,9 @@
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot.cpp" />
     <ClCompile Include="source\Engine\Graphics\UI\ImGui\implot_items.cpp" />
     <ClCompile Include="source\Game\Effect\exposure\Exposure.cpp" />
+    <ClCompile Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.cpp" />
+    <ClCompile Include="source\Game\Effect\LensDistortion\LensDistortion.cpp" />
+    <ClCompile Include="source\Game\Effect\Vignetting\Vignetting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
@@ -625,6 +631,9 @@
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\implot_internal.h" />
     <ClInclude Include="source\Game\Effect\exposure\Exposure.h" />
+    <ClInclude Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.h" />
+    <ClInclude Include="source\Game\Effect\LensDistortion\LensDistortion.h" />
+    <ClInclude Include="source\Game\Effect\Vignetting\Vignetting.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">

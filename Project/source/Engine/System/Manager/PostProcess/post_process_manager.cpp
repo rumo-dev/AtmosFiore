@@ -2,6 +2,9 @@
 #include "Engine/System/graphics_core.h"
 #include "Engine/System/Manager/resource_manager.h"
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
+#include "Game/Effect/ChromaticAberration/ChromaticAberration.h"
+#include "Game/Effect/lensDistortion/LensDistortion.h"
+#include "Game/Effect/vignetting/Vignetting.h"
 
 // ─── 静的メンバ定義 ───────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
@@ -13,6 +16,9 @@ std::unique_ptr<ToneMapping> Post_Process_Manager::tone_mapper = nullptr;
 std::unique_ptr<DepthOfField>Post_Process_Manager::dofer = nullptr;
 std::unique_ptr<Sky>         Post_Process_Manager::skyer = nullptr;
 std::unique_ptr<Exposure>    Post_Process_Manager::exposurer = nullptr;  // ★ 追加
+std::unique_ptr<ChromaticAberration> Post_Process_Manager::ca_effect = nullptr;
+std::unique_ptr<LensDistortion>      Post_Process_Manager::lens_distortion = nullptr;
+std::unique_ptr<Vignetting>          Post_Process_Manager::vignetting = nullptr;
 
 // ─── 初期化 ───────────────────────────────────────────────────
 void Post_Process_Manager::initialize()
@@ -31,6 +37,9 @@ void Post_Process_Manager::initialize()
 	dofer = std::make_unique<DepthOfField>(device, w, h);
 	skyer = std::make_unique<Sky>(device, w, h);
 	exposurer = std::make_unique<Exposure>(device, w, h);  // ★ 追加
+	ca_effect = std::make_unique<ChromaticAberration>(device, w, h);
+	lens_distortion = std::make_unique<LensDistortion>(device, w, h);
+	vignetting = std::make_unique<Vignetting>(device, w, h);
 }
 
 // ─── 更新 ─────────────────────────────────────────────────────
@@ -84,8 +93,21 @@ void Post_Process_Manager::draw()
 	//    露出後の正しい輝度値に対して機能する
 	exposurer->make(ctx, dofer->GetColorMap());
 
-	// 4. Bloom
-	bloomer->make(ctx, exposurer->GetColorMap());
+	// 4. ★ ChromaticAberration（色収差）
+	//    Exposure後に適用。HDR 空間で処理することで
+	//    端部の高輝度ハレーションと収差が自然に合成される
+	ca_effect->make(ctx, exposurer->GetColorMap());
+
+	// 5. ★ LensDistortion（レンズ歪曲）
+	//    収差の後に歪みを加えることで、歪み端部の黒帯が収差と干渉しない
+	lens_distortion->make(ctx, ca_effect->GetColorMap());
+
+	// 6. ★ Vignetting（周辺減光）
+	//    Bloom 前に暗くすることで、端部の Bloom が過剰にならない
+	vignetting->make(ctx, lens_distortion->GetColorMap());
+
+	// 7. Bloom
+	bloomer->make(ctx, vignetting->GetColorMap());
 
 	// 5. Adaptation（自動露出）
 	adaptation->make(ctx, bloomer->getColorMap());
@@ -132,16 +154,34 @@ static void SliderFloatWithTooltip(const char* label, float* value, float min, f
 void Post_Process_Manager::drawExposureGUI()
 {
 	exposurer->DrawDebugUI();
-	ImGui::EndChild();
 
-	// ── 仕切り線 ────────────────────────────────────────────────
-	ImGui::SameLine();
-	ImDrawList* dl = ImGui::GetWindowDrawList();
-	ImVec2 p = ImGui::GetCursorScreenPos();
-	float  h = ImGui::GetContentRegionAvail().y;
-	dl->AddLine(p, ImVec2(p.x, p.y + h), IM_COL32(80, 80, 90, 255), 1.0f);
-	ImGui::SetCursorScreenPos(ImVec2(p.x + 6.0f, p.y));
+}
 
+// ★ 追加: レンズ不完全性 GUI（色収差 / 歪曲 / 周辺減光 まとめ）
+void Post_Process_Manager::drawLensImperfectionsGUI()
+{
+	if (ImGui::BeginTabBar("PostProcessingEffectsTabs"))
+	{
+		if (ImGui::BeginTabItem("Chromatic Aberration"))
+		{
+			ca_effect->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Lens Distortion"))
+		{
+			lens_distortion->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Vignetting"))
+		{
+			vignetting->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+	}
 }
 
 // ─── 既存 GUI（変更なし）────────────────────────────────────

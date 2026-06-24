@@ -521,17 +521,20 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Utilities\math_util.h" />
     <ClInclude Include="source\Game\Effect\adaptation\adaptation.h" />
+    <ClInclude Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.h" />
     <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />
     <ClInclude Include="source\Game\Effect\exposure\Exposure.h">
       <SubType>
       </SubType>
     </ClInclude>
     <ClInclude Include="source\Game\Effect\fog\fog.h" />
+    <ClInclude Include="source\Game\Effect\LensDistortion\LensDistortion.h" />
     <ClInclude Include="source\Game\Effect\shadow\shadow.h" />
     <ClInclude Include="source\Game\Effect\Sky\Sky.h">
       <SubType>
       </SubType>
     </ClInclude>
+    <ClInclude Include="source\Game\Effect\Vignetting\Vignetting.h" />
     <ClInclude Include="source\Game\World\camera\camera.h" />
     <ClInclude Include="source\Game\World\camera\camera_base.h" />
     <ClInclude Include="source\Game\World\camera\camera_manager.h" />
@@ -659,17 +662,20 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Game\Effect\adaptation\adaptation.cpp" />
     <ClCompile Include="source\Game\Effect\bloom\Bloom.cpp" />
     <ClCompile Include="source\Engine\System\Manager\PostProcess\post_process_manager.cpp" />
+    <ClCompile Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.cpp" />
     <ClCompile Include="source\Game\Effect\dof\depth_of_field.cpp" />
     <ClCompile Include="source\Game\Effect\exposure\Exposure.cpp">
       <SubType>
       </SubType>
     </ClCompile>
     <ClCompile Include="source\Game\Effect\fog\fog.cpp" />
+    <ClCompile Include="source\Game\Effect\LensDistortion\LensDistortion.cpp" />
     <ClCompile Include="source\Game\Effect\shadow\shadow.cpp" />
     <ClCompile Include="source\Game\Effect\Sky\Sky.cpp">
       <SubType>
       </SubType>
     </ClCompile>
+    <ClCompile Include="source\Game\Effect\Vignetting\Vignetting.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_title.cpp" />
     <ClCompile Include="source\Game\Scenes\loading.cpp" />
@@ -723,6 +729,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\chromatic_aberration_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\coc_generation_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
@@ -863,6 +875,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\lens_distortion_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\shadow_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
@@ -1061,6 +1079,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\vignetting_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
