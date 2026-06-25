@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -577,6 +577,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\Scenes\scene_base.h" />
     <ClInclude Include="source\Game\Scenes\scene_indoor.h" />
     <ClInclude Include="source\Game\Scenes\scene_title.h" />
+    <ClInclude Include="source\Game\Scenes\scene_splash.h" />
     <ClInclude Include="source\Game\Scenes\loading.h" />
     <ClInclude Include="source\Game\Scenes\scene_manager.h" />
     <ClInclude Include="source\Engine\System\framework.h" />
@@ -678,6 +679,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Game\Effect\Vignetting\Vignetting.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_title.cpp" />
+    <ClCompile Include="source\Game\Scenes\scene_splash.cpp" />
     <ClCompile Include="source\Game\Scenes\loading.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_manager.cpp" />
     <ClCompile Include="source\Engine\System\framework.cpp" />
@@ -1079,6 +1081,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\transition_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\vignetting_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

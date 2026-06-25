@@ -20,6 +20,7 @@
 
 #include "scene_manager.h"   ///< シーン管理クラス
 #include "scene_title.h"     ///< タイトル画面
+#include "scene_splash.h"    ///< スプラッシュ画面
 #include "scene_indoor.h"    ///< ゲーム本編（屋内シーン）
 #include "loading.h"         ///< ローディングシーン
 

@@ -1,5 +1,8 @@
 
 #include "Scene_title.h"
+#include "scene_indoor.h"
+#include <windows.h>
+
 // 初期化
 void Scene_Title::initialize()
 {
@@ -48,6 +51,15 @@ void Scene_Title::update(float elapsedTime)
 
 	//Easing_Util::draw_easing_editor(selected3, t3, "test3");
 	_timer += elapsedTime;
+
+	// スプラッシュスキップ時のキー入力引き継ぎ防止のため、遷移後0.5秒間は入力を受け付けない
+	if (_timer > 0.5f)
+	{
+		if ((GetAsyncKeyState(VK_SPACE) & 0x8000) || (GetAsyncKeyState(VK_RETURN) & 0x8000))
+		{
+			Scene_Manager::instance().change_scene(new Scene_Loading(new Scene_Indoor()));
+		}
+	}
 }
 
 // 描画処理
@@ -62,89 +74,7 @@ void Scene_Title::render(float elapsedTime)
 	Text::text->set_font(Text::text_data);
 	//Text::draw("タイトル画面", D2D1::RectF(0, 0, 640, 720), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 	//Text::draw("HOME\t：タイトル\n1キー\t：スプライト\n2キー\t：プリミティブ", D2D1::RectF(0, 300, 640, 720), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
-	Text::draw_type_writer(
-		L"〇〇へ\n"
-		L"最近はどうしてる？\n"
-		L"こっちは毎日慌ただしいけど、なんとか元気に過ごしてるよ。\n"
-		L"昨日は久しぶりに夜更かしして映画を見たんだ。\n"
-		L"昔一緒に観た作品を思い出して、ちょっと懐かしい気持ちになった。\n"
-		L"あの頃は何も考えずに笑っていられたよね。\n"
-		L"今は色々と忙しいけど、あの時間がすごく大切だったんだと改めて思う。\n"
-		L"そういえば最近、新しいカフェを見つけたんだ。\n"
-		L"静かで落ち着いた雰囲気で、読書するのにぴったりだった。\n"
-		L"もし時間が合えば一緒に行けたらいいな。\n"
-		L"君が好きそうなメニューもあったから、きっと気に入ると思う。\n"
-		L"それから、少し前に散歩したときに夕焼けがすごく綺麗でね。\n"
-		L"写真を撮ろうと思ったけど、結局眺めてるだけで満足しちゃった。\n"
-		L"君にも見せたかったなって思ったよ。\n"
-		L"こういう小さな出来事を共有できる相手がいるって幸せだよね。\n"
-		L"最近はお互い忙しいけど、またゆっくり話せる時間を作ろう。\n"
-		L"近況を聞けるだけでも嬉しいし、何気ない会話が一番心地いいんだ。\n"
-		L"寒くなってきたから、体調には気をつけてね。\n"
-		L"風邪をひかないように、ちゃんと温かくして過ごしてほしい。\n"
-		L"また近いうちに会えることを楽しみにしてる。\n"
-		L"〇〇より"
-		,
-		D2D1::RectF(0, 0, 1280, 144),
-		_timer,
-		30.0f,
-		Text::TypeWriterEnding::Chat,
-		true,
-		0.5f,
-		D2D1_DRAW_TEXT_OPTIONS_NONE,
-		true
-	);
-	Text::draw_type_writer(
-
-		L"こっちは毎日慌ただしいけど、なんとか元気に過ごしてるよ。"
-		,
-		D2D1::RectF(0, 144, 1280, 288),
-		_timer,
-		30.0f,
-		Text::TypeWriterEnding::Hold,
-		true,
-		0.5f,
-		D2D1_DRAW_TEXT_OPTIONS_NONE,
-		true
-	);
-	Text::draw_type_writer(
-
-		L"こっちは毎日慌ただしいけど、なんとか元気に過ごしてるよ。"
-		,
-		D2D1::RectF(0, 288, 1280, 432),
-		_timer,
-		30.0f,
-		Text::TypeWriterEnding::Loop,
-		true,
-		0.5f,
-		D2D1_DRAW_TEXT_OPTIONS_NONE,
-		true
-	);
-	Text::draw_type_writer(
-
-		L"こっちは毎日慌ただしいけど、なんとか元気に過ごしてるよ。"
-		,
-		D2D1::RectF(0, 432, 1280, 576),
-		_timer,
-		30.0f,
-		Text::TypeWriterEnding::PingPong,
-		true,
-		0.5f,
-		D2D1_DRAW_TEXT_OPTIONS_NONE,
-		true
-	);
-	Text::draw_type_writer(
-		L"こっちは毎日慌ただしいけど、なんとか元気に過ごしてるよ。"
-		,
-		D2D1::RectF(0, 576, 1280, 720),
-		_timer,
-		30.0f,
-		Text::TypeWriterEnding::StopEmpty,
-		true,
-		0.5f,
-		D2D1_DRAW_TEXT_OPTIONS_NONE,
-		true
-	);
+	Text::draw(L"Title", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 
 }
 

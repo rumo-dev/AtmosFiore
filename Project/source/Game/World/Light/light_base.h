@@ -12,7 +12,7 @@ public:
 
 	// 共通属性
 	dx::XMFLOAT4 ambientColor = { 0.2f, 0.2f, 0.2f, 1.0f };
-	dx::XMFLOAT4 diffuseColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+	dx::XMFLOAT4 diffuseColor = { 1.0f, 0.892f, 0.629f, 1.0f };
 	dx::XMFLOAT4 specularColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	// 共通インターフェース

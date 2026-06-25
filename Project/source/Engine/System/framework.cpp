@@ -16,7 +16,7 @@ bool Frame_Work::initialize()
 	//static ImGui_Util::ThemeType theme = ImGui_Util::ThemeType::seeing;
 	//ImGui_Util::set_theme(theme);
 
-	Scene_Manager::instance().change_scene(new Scene_Loading(new Scene_Indoor()));
+	Scene_Manager::instance().change_scene(new Scene_Splash());
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();
 	return true;
