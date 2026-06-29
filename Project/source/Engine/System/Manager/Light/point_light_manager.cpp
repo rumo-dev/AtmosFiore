@@ -146,7 +146,7 @@ void PointLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 
 	UINT numLights = static_cast<UINT>(gpuLights.size());
 	ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, &numLights, 0, 0);
-	ctx->PSSetShaderResources(7, 1, _sbLightsSRV.GetAddressOf());
+	ctx->PSSetShaderResources(8, 1, _sbLightsSRV.GetAddressOf());
 	ctx->PSSetConstantBuffers(4, 1, _cbLightCount.GetAddressOf());
 }
 

@@ -105,38 +105,12 @@
     <FxCompile Include="source\Engine\Graphics\Shader\lens_distortion_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\vignetting_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\transition_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\distance_fog_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\exponential_fog_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\height_fog_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\volumetric_fog_ps.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Core\AudioEngine.cpp">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Core\VoicePool.cpp">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Graph\AudioGraph.cpp">
-      <Filter>source\Engine\Audio\Graph</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Graph\DSPNodes\LowPass.cpp">
-      <Filter>source\Engine\Audio\Graph\DSPNodes</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Serialization\Serializer.cpp">
-      <Filter>source\Engine\Audio\Serialization</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Spatial\Spatializer.cpp">
-      <Filter>source\Engine\Audio\Spatial</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Streaming\StreamBuffer.cpp">
-      <Filter>source\Engine\Audio\Streaming</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Visual\AudioDebugVisualizer.cpp">
-      <Filter>source\Engine\Audio\Visual</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Audio\Visual\AudioGraphEditor.cpp">
-      <Filter>source\Engine\Audio\Visual</Filter>
-    </ClCompile>
     <ClCompile Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.cpp">
       <Filter>source\Engine\Graphics\geometry_buffer</Filter>
     </ClCompile>
@@ -298,49 +272,19 @@
     <ClCompile Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.cpp" />
     <ClCompile Include="source\Game\Effect\LensDistortion\LensDistortion.cpp" />
     <ClCompile Include="source\Game\Effect\Vignetting\Vignetting.cpp" />
+    <ClCompile Include="source\Engine\Audio\AudioSystem.cpp" />
+    <ClCompile Include="source\Engine\Audio\AudioSystemUsage.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\distance_fog.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\exponential_fog.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\height_fog.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\volumetric_fog.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Core\AudioEngine.h">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Core\IAudioDSPNode.h">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Core\VoicePool.h">
-      <Filter>source\Engine\Audio\Core</Filter>
-    </ClInclude>
     <ClInclude Include="source\Engine\Audio\DSP\DSPNodes.h">
       <Filter>source\Engine\Audio\DSP</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Graph\AudioGraph.h">
-      <Filter>source\Engine\Audio\Graph</Filter>
-    </ClInclude>
     <ClInclude Include="source\Engine\Audio\Graph\AudioNode.h">
       <Filter>source\Engine\Audio\Graph</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Graph\DSPNodes\LowPass.h">
-      <Filter>source\Engine\Audio\Graph\DSPNodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Platform\AudioPlatformStubs.h">
-      <Filter>source\Engine\Audio\Platform</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Serialization\Serializer.h">
-      <Filter>source\Engine\Audio\Serialization</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Spatial\Spatializer.h">
-      <Filter>source\Engine\Audio\Spatial</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Streaming\StreamBuffer.h">
-      <Filter>source\Engine\Audio\Streaming</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Visual\AudioDebugVisualizer.h">
-      <Filter>source\Engine\Audio\Visual</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Audio\Visual\AudioGraphEditor.h">
-      <Filter>source\Engine\Audio\Visual</Filter>
     </ClInclude>
     <ClInclude Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.h">
       <Filter>source\Engine\Graphics\geometry_buffer</Filter>
@@ -641,6 +585,13 @@
     <ClInclude Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.h" />
     <ClInclude Include="source\Game\Effect\LensDistortion\LensDistortion.h" />
     <ClInclude Include="source\Game\Effect\Vignetting\Vignetting.h" />
+    <ClInclude Include="source\Engine\Audio\AudioEffect.h" />
+    <ClInclude Include="source\Engine\Audio\AudioSystem.h" />
+    <ClInclude Include="source\Game\Effect\fog\distance_fog.h" />
+    <ClInclude Include="source\Game\Effect\fog\exponential_fog.h" />
+    <ClInclude Include="source\Game\Effect\fog\fog_base.h" />
+    <ClInclude Include="source\Game\Effect\fog\height_fog.h" />
+    <ClInclude Include="source\Game\Effect\fog\volumetric_fog.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">
@@ -710,6 +661,7 @@
       <Filter>source\Engine\Graphics\Shader</Filter>
     </None>
     <None Include="source\Engine\Graphics\Shader\dof_common.hlsli" />
+    <None Include="source\Engine\Audio\audio_data.json" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="source">

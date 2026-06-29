@@ -70,6 +70,7 @@ public:
 			_active_camera->update(deltaTime);
 			_active_camera->get_camera().updateShake(deltaTime);
 			_active_camera->get_camera().identity(); // 行列の自動更新
+			_active_camera->get_camera().UpdateAudioListener(deltaTime);
 		}
 
 	}

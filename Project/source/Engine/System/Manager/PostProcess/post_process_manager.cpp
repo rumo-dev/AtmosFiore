@@ -6,7 +6,7 @@
 #include "Game/Effect/lensDistortion/LensDistortion.h"
 #include "Game/Effect/vignetting/Vignetting.h"
 
-// ─── 静的メンバ定義 ───────────────────────────────────────────
+// ─── 静的メンバ定義 ───────────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
 std::unique_ptr<bloom>       Post_Process_Manager::bloomer = nullptr;
 std::unique_ptr<Fog>         Post_Process_Manager::fogger = nullptr;
@@ -15,12 +15,18 @@ std::unique_ptr<Adaptation>  Post_Process_Manager::adaptation = nullptr;
 std::unique_ptr<ToneMapping> Post_Process_Manager::tone_mapper = nullptr;
 std::unique_ptr<DepthOfField>Post_Process_Manager::dofer = nullptr;
 std::unique_ptr<Sky>         Post_Process_Manager::skyer = nullptr;
-std::unique_ptr<Exposure>    Post_Process_Manager::exposurer = nullptr;  // ★ 追加
+std::unique_ptr<Exposure>    Post_Process_Manager::exposurer = nullptr;
 std::unique_ptr<ChromaticAberration> Post_Process_Manager::ca_effect = nullptr;
 std::unique_ptr<LensDistortion>      Post_Process_Manager::lens_distortion = nullptr;
 std::unique_ptr<Vignetting>          Post_Process_Manager::vignetting = nullptr;
 
-// ─── 初期化 ───────────────────────────────────────────────────
+// ★ 新フォグ
+std::unique_ptr<VolumetricFog>       Post_Process_Manager::vol_fog = nullptr;
+std::unique_ptr<HeightFog>           Post_Process_Manager::hgt_fog = nullptr;
+std::unique_ptr<DistanceFog>         Post_Process_Manager::dst_fog = nullptr;
+std::unique_ptr<ExponentialFog>      Post_Process_Manager::exp_fog = nullptr;
+
+// ─── 初期化 ───────────────────────────────────────────────────────
 void Post_Process_Manager::initialize()
 {
 	auto* device = Graphics_Core::instance().get_device();
@@ -36,21 +42,30 @@ void Post_Process_Manager::initialize()
 	tone_mapper = std::make_unique<ToneMapping>(device, w, h);
 	dofer = std::make_unique<DepthOfField>(device, w, h);
 	skyer = std::make_unique<Sky>(device, w, h);
-	exposurer = std::make_unique<Exposure>(device, w, h);  // ★ 追加
+	exposurer = std::make_unique<Exposure>(device, w, h);
 	ca_effect = std::make_unique<ChromaticAberration>(device, w, h);
 	lens_distortion = std::make_unique<LensDistortion>(device, w, h);
 	vignetting = std::make_unique<Vignetting>(device, w, h);
+
+	// ★ 新フォグ初期化
+	vol_fog = std::make_unique<VolumetricFog>(device, w, h);
+	hgt_fog = std::make_unique<HeightFog>(device, w, h);
+	dst_fog = std::make_unique<DistanceFog>(device, w, h);
+	exp_fog = std::make_unique<ExponentialFog>(device, w, h);
 }
 
-// ─── 更新 ─────────────────────────────────────────────────────
+// ─── 更新 ─────────────────────────────────────────────────────────
 void Post_Process_Manager::update(float elapsedtime)
 {
 	fogger->fog_constans.Time += elapsedtime;
 	adaptation->delta_time = elapsedtime;
 	skyer->time += elapsedtime;
+	hgt_fog->config.time += elapsedtime;
+
+
 }
 
-// ─── 開始 ─────────────────────────────────────────────────────
+// ─── 開始 ─────────────────────────────────────────────────────────
 void Post_Process_Manager::begin()
 {
 	auto* ctx = Graphics_Core::instance().get_device_context();
@@ -71,61 +86,89 @@ void Post_Process_Manager::begin()
 	);
 }
 
-// ─── 終了 ─────────────────────────────────────────────────────
+// ─── 終了 ─────────────────────────────────────────────────────────
 void Post_Process_Manager::end()
 {
 	fsquad.Deactivate(Graphics_Core::instance().get_device_context());
 }
 
-// ─── ポストエフェクトパイプライン ────────────────────────────
+// ─── ポストエフェクトパイプライン ────────────────────────────────
+//
+//  Sky
+//  → VolumetricFog   (3D レイマーチング散乱)
+//  → HeightFog        (高さ指数フォグ)
+//  → DistanceFog      (距離リニアフォグ)
+//  → ExponentialFog   (距離指数フォグ)
+//  → DoF
+//  → Exposure
+//  → ChromaticAberration
+//  → LensDistortion
+//  → Vignetting
+//  → Bloom
+//  → Adaptation
+//  → ToneMapping
+//
 void Post_Process_Manager::draw()
 {
 	auto* ctx = Graphics_Core::instance().get_device_context();
 
 	// 1. Sky
-	skyer->make(ctx, fsquad.GetColorMap());
+	//skyer->make(ctx, fsquad.GetColorMap());
 
-	// 2. DoF
-	dofer->make(ctx, skyer->get_color_map());
+	// ★ 2. VolumetricFog（Sky 直後 ＝ HDR 生輝度に対してフォグを乗せる）
+	//       シェーダー側で GBuffer2(position) を t1 として読む。
+	//       事前にバインドしておく必要がある場合はここで行うこと。
+	//vol_fog->make(ctx, skyer->get_color_map());
 
-	// 3. ★ Exposure（T値ベース線形露出）
-	//    DoF後・Bloom前に適用することで Bloom の輝度抽出が
-	//    露出後の正しい輝度値に対して機能する
-	exposurer->make(ctx, dofer->GetColorMap());
+	// ★ 3. HeightFog
+	//hgt_fog->make(ctx, vol_fog->get_color_map());
 
-	// 4. ★ ChromaticAberration（色収差）
-	//    Exposure後に適用。HDR 空間で処理することで
-	//    端部の高輝度ハレーションと収差が自然に合成される
-	ca_effect->make(ctx, exposurer->GetColorMap());
+	// ★ 4. DistanceFog
+	//dst_fog->make(ctx, hgt_fog->get_color_map());
 
-	// 5. ★ LensDistortion（レンズ歪曲）
-	//    収差の後に歪みを加えることで、歪み端部の黒帯が収差と干渉しない
-	lens_distortion->make(ctx, ca_effect->GetColorMap());
+	// ★ 5. ExponentialFog
+	//exp_fog->make(ctx, dst_fog->get_color_map());
 
-	// 6. ★ Vignetting（周辺減光）
-	//    Bloom 前に暗くすることで、端部の Bloom が過剰にならない
-	vignetting->make(ctx, lens_distortion->GetColorMap());
+	// 6. DoF（フォグ後に被写界深度を適用することでボケ端にフォグが馴染む）
+	//dofer->make(ctx, exp_fog->get_color_map());
 
-	// 7. Bloom
-	bloomer->make(ctx, vignetting->GetColorMap());
+	// 7. Exposure
+	//exposurer->make(ctx, dofer->GetColorMap());
+	//exposurer->make(ctx, exp_fog->get_color_map());
 
-	// 5. Adaptation（自動露出）
-	adaptation->make(ctx, bloomer->getColorMap());
+	// 8. ChromaticAberration
+	//ca_effect->make(ctx, exposurer->GetColorMap());
 
-	// 6. ToneMapping
-	tone_mapper->make(ctx, adaptation->get_color_map());
+	// 9. LensDistortion
+	//lens_distortion->make(ctx, ca_effect->GetColorMap());
+
+	// 10. Vignetting
+	//vignetting->make(ctx, lens_distortion->GetColorMap());
+
+	// 11. Bloom
+	//bloomer->make(ctx, vignetting->GetColorMap());
+
+	// 12. Adaptation（自動露出）
+	//adaptation->make(ctx, bloomer->getColorMap());
+
+	// 13. ToneMapping
+	//tone_mapper->make(ctx, adaptation->get_color_map());
 }
 
-// ─── 最終描画 ─────────────────────────────────────────────────
+// ─── 最終描画 ─────────────────────────────────────────────────────
 void Post_Process_Manager::render()
 {
+	//Graphics_Core::instance().get_fullscreen_quad()->Blit(
+	//	Graphics_Core::instance().get_device_context(),
+	//	tone_mapper->get_color_map_address(), 0, 1
+	//);
 	Graphics_Core::instance().get_fullscreen_quad()->Blit(
 		Graphics_Core::instance().get_device_context(),
-		tone_mapper->get_color_map_address(), 0, 1
+		fsquad.GetColorMapAddress(), 0, 1
 	);
 }
 
-// ─── GUI ─────────────────────────────────────────────────────
+// ─── GUI ─────────────────────────────────────────────────────────
 static bool CheckboxInt(const char* label, int& value, const char* tooltip = nullptr)
 {
 #ifdef _DEBUG
@@ -150,41 +193,74 @@ static void SliderFloatWithTooltip(const char* label, float* value, float min, f
 #endif
 }
 
-// ★ 追加: 露出 GUI
+// ── Exposure GUI ─────────────────────────────────────────────────
 void Post_Process_Manager::drawExposureGUI()
 {
 	exposurer->DrawDebugUI();
-
 }
 
-// ★ 追加: レンズ不完全性 GUI（色収差 / 歪曲 / 周辺減光 まとめ）
+// ── Lens Imperfections GUI ────────────────────────────────────────
 void Post_Process_Manager::drawLensImperfectionsGUI()
 {
-	if (ImGui::BeginTabBar("PostProcessingEffectsTabs"))
+	if (ImGui::BeginTabBar("LensImperfectionsTabs"))
 	{
 		if (ImGui::BeginTabItem("Chromatic Aberration"))
 		{
 			ca_effect->DrawDebugUI();
 			ImGui::EndTabItem();
 		}
-
 		if (ImGui::BeginTabItem("Lens Distortion"))
 		{
 			lens_distortion->DrawDebugUI();
 			ImGui::EndTabItem();
 		}
-
 		if (ImGui::BeginTabItem("Vignetting"))
 		{
 			vignetting->DrawDebugUI();
 			ImGui::EndTabItem();
 		}
-
 		ImGui::EndTabBar();
 	}
 }
 
-// ─── 既存 GUI（変更なし）────────────────────────────────────
+// ★ ── Fog GUI（全フォグ種をタブで統合） ─────────────────────────
+void Post_Process_Manager::drawFogGUI()
+{
+	if (ImGui::BeginTabBar("FogTypeTabs"))
+	{
+		if (ImGui::BeginTabItem("Volumetric"))
+		{
+			ImGui::TextDisabled("Ray-marching + FBM noise + light scattering");
+			ImGui::Separator();
+			vol_fog->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("Height"))
+		{
+			ImGui::TextDisabled("Exponential density based on world Y");
+			ImGui::Separator();
+			hgt_fog->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("Distance"))
+		{
+			ImGui::TextDisabled("Linear fog between Start / End distance");
+			ImGui::Separator();
+			dst_fog->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("Exponential"))
+		{
+			ImGui::TextDisabled("exp / exp2 fog by camera distance");
+			ImGui::Separator();
+			exp_fog->DrawDebugUI();
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
+}
+
+// ─── 既存 GUI（変更なし）────────────────────────────────────────
 void Post_Process_Manager::drawDebugView()
 {
 	const float available_w = ImGui::GetContentRegionAvail().x;
@@ -213,7 +289,7 @@ void Post_Process_Manager::drawDebugView()
 		}
 	}
 
-	if (ImGui::CollapsingHeader("Shadow Maps", ImGuiTreeNodeFlags_DefaultOpen)) {
+	if (ImGui::CollapsingHeader("Shadow Maps")) {
 		auto drawShadowSelectable = [&](const char* label, DebugTex type, ID3D11ShaderResourceView* srv) {
 			if (!srv) { ImGui::TextDisabled("%s (N/A)", label); return; }
 			bool is_selected = (selected_type == type);
@@ -254,8 +330,8 @@ void Post_Process_Manager::drawDebugView()
 
 	if (preview_srv) {
 		ImVec2 avail = ImGui::GetContentRegionAvail();
-		float tex_w = avail.x;
-		float tex_h = tex_w * (preview_size.y / preview_size.x);
+		float  tex_w = avail.x;
+		float  tex_h = tex_w * (preview_size.y / preview_size.x);
 		if (tex_h > avail.y) { tex_h = avail.y; tex_w = tex_h * (preview_size.x / preview_size.y); }
 		ImGui::Image(reinterpret_cast<ImTextureID>(preview_srv), ImVec2(tex_w, tex_h));
 	}
@@ -325,8 +401,8 @@ void Post_Process_Manager::drawAdaptationGUI()
 	ImGui::BeginChild("##adapt_right", ImVec2(right_w - 6.0f, 0), false);
 	if (adaptation->get_color_map()) {
 		ImVec2 avail = ImGui::GetContentRegionAvail();
-		float tex_w = avail.x;
-		float tex_h = tex_w * (9.0f / 16.0f);
+		float  tex_w = avail.x;
+		float  tex_h = tex_w * (9.0f / 16.0f);
 		if (tex_h > avail.y) { tex_h = avail.y; tex_w = tex_h * (16.0f / 9.0f); }
 		ImGui::Image(reinterpret_cast<ImTextureID>(adaptation->get_color_map()), ImVec2(tex_w, tex_h));
 	}

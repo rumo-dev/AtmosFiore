@@ -205,7 +205,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;_DEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -225,45 +225,8 @@
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>@echo off
-setlocal
-
-rem --- パスの定義 ---
-set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
-set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
-
-rem --- 1. LastBuildの初期化 ---
-if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
-mkdir "%OUTPUT_DIR%"
-
-rem --- 2. dataフォルダのコピー ---
-rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
-xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
-
-rem --- 3. シェーダーのコピー ---
-rem Releaseビルドの場合は、この処理をスキップする
-if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
-
-xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
-xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
-
-:SKIP_SHADER
-
-rem --- 4. exeのコピー ---
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
-
-rem --- 5. Zip圧縮 ---
-rem 既存の古いZipがある場合は強制的に削除する
-if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
-
-rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
-powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
-
-rem --- 6. アクセス権限の修正 ---
-rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
-if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
-
-endlocal</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -274,7 +237,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;USE_IMGUI;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;_DEBUG;_CONSOLE;USE_IMGUI;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -294,45 +257,8 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>@echo off
-setlocal
-
-rem --- パスの定義 ---
-set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
-set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
-
-rem --- 1. LastBuildの初期化 ---
-if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
-mkdir "%OUTPUT_DIR%"
-
-rem --- 2. dataフォルダのコピー ---
-rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
-xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
-
-rem --- 3. シェーダーのコピー ---
-rem Releaseビルドの場合は、この処理をスキップする
-if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
-
-xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
-xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
-
-:SKIP_SHADER
-
-rem --- 4. exeのコピー ---
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
-
-rem --- 5. Zip圧縮 ---
-rem 既存の古いZipがある場合は強制的に削除する
-if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
-
-rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
-powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
-
-rem --- 6. アクセス権限の修正 ---
-rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
-if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
-
-endlocal</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -343,7 +269,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;USE_IMGUI;DISABLE_DWRITE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;_DEBUG;_CONSOLE;USE_IMGUI;DISABLE_DWRITE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -363,45 +289,8 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>@echo off
-setlocal
-
-rem --- パスの定義 ---
-set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
-set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
-
-rem --- 1. LastBuildの初期化 ---
-if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
-mkdir "%OUTPUT_DIR%"
-
-rem --- 2. dataフォルダのコピー ---
-rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
-xcopy "$(SolutionDir)data\*" "%OUTPUT_DIR%\data\" /E /I /Y
-
-rem --- 3. シェーダーのコピー ---
-rem Releaseビルドの場合は、この処理をスキップする
-if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
-
-xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
-xcopy "$(SolutionDir)source\Engine\Graphics\Shader\*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader\" /S /I /Y
-
-:SKIP_SHADER
-
-rem --- 4. exeのコピー ---
-copy /Y "$(TargetPath)" "%OUTPUT_DIR%\"
-
-rem --- 5. Zip圧縮 ---
-rem 既存の古いZipがある場合は強制的に削除する
-if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
-
-rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
-powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
-
-rem --- 6. アクセス権限の修正 ---
-rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
-if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
-
-endlocal</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -414,7 +303,7 @@ if exist export rmdir /s /q export</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;NDEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -465,9 +354,20 @@ rem --- 5. Zip圧縮 ---
 rem 既存の古いZipがある場合は強制的に削除する
 if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
 
-rem PowerShellをプロファイルなしで軽量に起動し、Zip化を実行
-powershell -NoProfile -Command "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
-
+echo [INFO] 圧縮処理を開始します...
+rem .NETの機能を使って、ファイルを1つずつ追加しながらログに出力
+powershell -NoProfile -Command ^
+    "[System.Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem') | Out-Null;" ^
+    "$files = Get-ChildItem -Path '%OUTPUT_DIR%' -Recurse;" ^
+    "$total = $files.Count;" ^
+    "$i = 0;" ^
+    "foreach ($file in $files) {" ^
+        "if (-not $file.PSIsContainer) {" ^
+            "$i++;" ^
+            "Write-Host ('[{0}/{1}] 圧縮中: {2}' -f $i, $total, $file.FullName);" ^
+        "}" ^
+    "}" ^
+    "Compress-Archive -Path '%OUTPUT_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
 rem --- 6. アクセス権限の修正 ---
 rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
 if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q
@@ -480,20 +380,10 @@ if exist export rmdir /s /q export</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Engine\Audio\Core\AudioCommand.h" />
-    <ClInclude Include="Source\Engine\Audio\Core\AudioEngine.h" />
-    <ClInclude Include="Source\Engine\Audio\Core\IAudioDSPNode.h" />
-    <ClInclude Include="Source\Engine\Audio\Core\VoicePool.h" />
+    <ClInclude Include="source\Engine\Audio\AudioEffect.h" />
+    <ClInclude Include="source\Engine\Audio\AudioSystem.h" />
     <ClInclude Include="source\Engine\Audio\DSP\DSPNodes.h" />
-    <ClInclude Include="Source\Engine\Audio\Graph\AudioGraph.h" />
     <ClInclude Include="source\Engine\Audio\Graph\AudioNode.h" />
-    <ClInclude Include="Source\Engine\Audio\Graph\DSPNodes\LowPass.h" />
-    <ClInclude Include="Source\Engine\Audio\Platform\AudioPlatformStubs.h" />
-    <ClInclude Include="Source\Engine\Audio\Serialization\Serializer.h" />
-    <ClInclude Include="Source\Engine\Audio\Spatial\Spatializer.h" />
-    <ClInclude Include="Source\Engine\Audio\Streaming\StreamBuffer.h" />
-    <ClInclude Include="Source\Engine\Audio\Visual\AudioDebugVisualizer.h" />
-    <ClInclude Include="Source\Engine\Audio\Visual\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.h" />
     <ClInclude Include="source\Engine\Graphics\Shadow\shadow_map.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
@@ -527,7 +417,12 @@ if exist export rmdir /s /q export</Command>
       <SubType>
       </SubType>
     </ClInclude>
+    <ClInclude Include="source\Game\Effect\fog\distance_fog.h" />
+    <ClInclude Include="source\Game\Effect\fog\exponential_fog.h" />
     <ClInclude Include="source\Game\Effect\fog\fog.h" />
+    <ClInclude Include="source\Game\Effect\fog\fog_base.h" />
+    <ClInclude Include="source\Game\Effect\fog\height_fog.h" />
+    <ClInclude Include="source\Game\Effect\fog\volumetric_fog.h" />
     <ClInclude Include="source\Game\Effect\LensDistortion\LensDistortion.h" />
     <ClInclude Include="source\Game\Effect\shadow\shadow.h" />
     <ClInclude Include="source\Game\Effect\Sky\Sky.h">
@@ -611,16 +506,8 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\World\Light\spot_light.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Engine\Audio\Core\AudioCommand.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Core\AudioEngine.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Core\VoicePool.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Graph\AudioGraph.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Graph\DSPNodes\LowPass.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Serialization\Serializer.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Spatial\Spatializer.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Streaming\StreamBuffer.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Visual\AudioDebugVisualizer.cpp" />
-    <ClCompile Include="Source\Engine\Audio\Visual\AudioGraphEditor.cpp" />
+    <ClCompile Include="source\Engine\Audio\AudioSystem.cpp" />
+    <ClCompile Include="source\Engine\Audio\AudioSystemUsage.cpp" />
     <ClCompile Include="source\Engine\Extentions\Tracy\TracyClient.cpp" />
     <ClCompile Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.cpp" />
     <ClCompile Include="source\Engine\Graphics\Shadow\shadow_map.cpp" />
@@ -669,7 +556,11 @@ if exist export rmdir /s /q export</Command>
       <SubType>
       </SubType>
     </ClCompile>
+    <ClCompile Include="source\Game\Effect\fog\distance_fog.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\exponential_fog.cpp" />
     <ClCompile Include="source\Game\Effect\fog\fog.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\height_fog.cpp" />
+    <ClCompile Include="source\Game\Effect\fog\volumetric_fog.cpp" />
     <ClCompile Include="source\Game\Effect\LensDistortion\LensDistortion.cpp" />
     <ClCompile Include="source\Game\Effect\shadow\shadow.cpp" />
     <ClCompile Include="source\Game\Effect\Sky\Sky.cpp">
@@ -695,6 +586,7 @@ if exist export rmdir /s /q export</Command>
     <Text Include="note\cbuffer.txt" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="source\Engine\Audio\audio_data.json" />
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli" />
     <None Include="source\Engine\Graphics\Shader\common.hlsli" />
     <None Include="source\Engine\Graphics\Shader\directional_light.hlsli" />
@@ -774,6 +666,12 @@ if exist export rmdir /s /q export</Command>
       </EnableDebuggingInformation>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Vertex</ShaderType>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\distance_fog_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\error_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
@@ -783,6 +681,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\exponential_fog_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\exposure_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
@@ -877,6 +781,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\height_fog_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\lens_distortion_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
@@ -1089,6 +999,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\vignetting_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\volumetric_fog_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>

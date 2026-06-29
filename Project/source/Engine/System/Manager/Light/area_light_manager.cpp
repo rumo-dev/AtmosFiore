@@ -156,7 +156,7 @@ void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 
 	UINT numLights = static_cast<UINT>(gpuLights.size());
 	ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, &numLights, 0, 0);
-	ctx->PSSetShaderResources(9, 1, _sbLightsSRV.GetAddressOf());
+	ctx->PSSetShaderResources(10, 1, _sbLightsSRV.GetAddressOf());
 	ctx->PSSetConstantBuffers(7, 1, _cbLightCount.GetAddressOf());
 }
 
@@ -191,15 +191,15 @@ void AreaLightManager::debug_render()
 		dx::XMVECTOR dir = dx::XMLoadFloat3(&l.direction);
 		dir = dx::XMVector3Normalize(dir);
 		dx::XMVECTOR normal = dx::XMVectorNegate(dir); // 面法線（照射方向）
-		
+
 		dx::XMVECTOR right = dx::XMLoadFloat3(&l.right);
 		right = dx::XMVector3Normalize(right);
-		
+
 		// rightを面へ射影（シェーダーと同じ）
 		dx::XMVECTOR dot = dx::XMVector3Dot(right, normal);
 		dx::XMVECTOR rightProjected = dx::XMVectorSubtract(right, dx::XMVectorMultiply(normal, dot));
 		rightProjected = dx::XMVector3Normalize(rightProjected);
-		
+
 		dx::XMVECTOR up = dx::XMVector3Cross(rightProjected, normal);
 
 		// スケール行列

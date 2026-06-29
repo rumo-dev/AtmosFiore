@@ -147,6 +147,11 @@ void Resource_Manager::load_models() {
 		//"./data/model/Library/library.gltf"
 		"./data/model/Library/library_OneMesh.gltf"
 	);
+	model_manager.load(
+		"Temple",
+		//"./data/model/Library/library.gltf"
+		"./data/model/temple/raytracing_temple.gltf"
+	);
 	//model_manager.load(
 	//	"Scene",
 	//	"./data/model/Scene/Scene.gltf"

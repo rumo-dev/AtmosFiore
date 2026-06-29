@@ -14,6 +14,8 @@
 #include "Engine/utilities/resource_monitor.h"
 #include "Engine/Graphics/UI/text/text.h"
 
+#include "Engine/Audio/AudioSystem.h"
+
 #include "Game/Scenes/scene.h"
 #include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 
@@ -154,6 +156,17 @@ public:
 
 		ImGui::StyleColorsDark();
 		Dashboard::Instance().SetupStyle();
+		//----------------------
+// imnodes のサイズ調整
+//----------------------
+		ImNodesStyle& ns = ImNodes::GetStyle();
+
+		//ns.NodePadding = ImVec4(4, 4, 4, 4);
+		ns.NodeBorderThickness = 1.0f;
+		ns.PinCircleRadius = 3.0f;
+		ns.PinQuadSideLength = 6.0f;
+		ns.LinkThickness = 2.0f;
+		ns.GridSpacing = 20.0f;
 #endif
 
 		while (WM_QUIT != msg.message)

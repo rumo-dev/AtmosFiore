@@ -29,7 +29,7 @@ struct AreaLight_GPU
 #define AREA_LIGHT_SHAPE_DISK 1
 #define AREA_LIGHT_SHAPE_SPHERE 2
 
-StructuredBuffer<AreaLight_GPU> areaLights : register(t9);
+StructuredBuffer<AreaLight_GPU> areaLights : register(t10);
 
 cbuffer CB_AreaLightCount : register(b7)
 {

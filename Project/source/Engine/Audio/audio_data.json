@@ -1,0 +1,219 @@
+{
+  "baseDir": "Assets/Audio/",
+
+  "clips": {
+    "bgm_title": {
+      "key":           "bgm_title",
+      "relativePath":  "BGM/title.wav",
+      "isStreaming":   false,
+      "defaultVolume": 0.75,
+      "defaultPitch":  1.0,
+      "effectChain":   "reverb_hall"
+    },
+    "bgm_field": {
+      "key":           "bgm_field",
+      "relativePath":  "BGM/field.wav",
+      "isStreaming":   false,
+      "defaultVolume": 0.8,
+      "defaultPitch":  1.0,
+      "effectChain":   "reverb_room"
+    },
+    "bgm_battle": {
+      "key":           "bgm_battle",
+      "relativePath":  "BGM/battle.wav",
+      "isStreaming":   false,
+      "defaultVolume": 1.0,
+      "defaultPitch":  1.0,
+      "effectChain":   "eq_boost_high"
+    },
+    "se_explosion": {
+      "key":           "se_explosion",
+      "relativePath":  "SE/explosion.wav",
+      "isStreaming":   false,
+      "defaultVolume": 1.0,
+      "defaultPitch":  1.0,
+      "effectChain":   "reverb_large"
+    },
+    "se_jump": {
+      "key":           "se_jump",
+      "relativePath":  "SE/jump.wav",
+      "isStreaming":   false,
+      "defaultVolume": 0.9,
+      "defaultPitch":  1.0,
+      "effectChain":   ""
+    },
+    "se_footstep": {
+      "key":           "se_footstep",
+      "relativePath":  "SE/footstep.wav",
+      "isStreaming":   false,
+      "defaultVolume": 0.6,
+      "defaultPitch":  1.0,
+      "effectChain":   "lpf_muffled"
+    },
+    "se_coin": {
+      "key":           "se_coin",
+      "relativePath":  "SE/coin.wav",
+      "isStreaming":   false,
+      "defaultVolume": 1.0,
+      "defaultPitch":  1.0,
+      "effectChain":   "echo_light"
+    },
+    "se_sword": {
+      "key":           "se_sword",
+      "relativePath":  "SE/sword.wav",
+      "isStreaming":   false,
+      "defaultVolume": 1.0,
+      "defaultPitch":  1.0,
+      "effectChain":   "reverb_small"
+    }
+  },
+
+  "effectChains": {
+    "reverb_hall": {
+      "name": "reverb_hall",
+      "nodes": [
+        {
+          "nodeId":  1,
+          "type":    "Volume",
+          "enabled": true,
+          "param":   { "volume": 0.9 }
+        },
+        {
+          "nodeId":  2,
+          "type":    "Reverb",
+          "enabled": true,
+          "param": {
+            "wetDryMix":  70.0,
+            "roomSize":   0.9,
+            "decayTime":  3.0,
+            "earlyDelay": 10.0,
+            "lateDelay":  50.0,
+            "density":    100.0,
+            "lowEQGain":  8.0,
+            "highEQGain": 6.0
+          }
+        }
+      ],
+      "links": [
+        { "linkId": 1, "fromNode": 1, "toNode": 2 }
+      ]
+    },
+
+    "reverb_room": {
+      "name": "reverb_room",
+      "nodes": [
+        {
+          "nodeId":  10,
+          "type":    "Reverb",
+          "enabled": true,
+          "param": {
+            "wetDryMix":  40.0,
+            "roomSize":   0.5,
+            "decayTime":  1.2,
+            "earlyDelay": 20.0,
+            "lateDelay":  30.0,
+            "density":    80.0,
+            "lowEQGain":  8.0,
+            "highEQGain": 8.0
+          }
+        }
+      ],
+      "links": []
+    },
+
+    "reverb_large": {
+      "name": "reverb_large",
+      "nodes": [
+        {
+          "nodeId":  20,
+          "type":    "Reverb",
+          "enabled": true,
+          "param": {
+            "wetDryMix":  80.0,
+            "roomSize":   1.0,
+            "decayTime":  5.0,
+            "earlyDelay": 5.0,
+            "lateDelay":  80.0,
+            "density":    100.0,
+            "lowEQGain":  10.0,
+            "highEQGain": 4.0
+          }
+        }
+      ],
+      "links": []
+    },
+
+    "reverb_small": {
+      "name": "reverb_small",
+      "nodes": [
+        {
+          "nodeId":  30,
+          "type":    "Reverb",
+          "enabled": true,
+          "param": {
+            "wetDryMix":  25.0,
+            "roomSize":   0.3,
+            "decayTime":  0.5,
+            "earlyDelay": 8.0,
+            "lateDelay":  12.0,
+            "density":    60.0,
+            "lowEQGain":  8.0,
+            "highEQGain": 8.0
+          }
+        }
+      ],
+      "links": []
+    },
+
+    "echo_light": {
+      "name": "echo_light",
+      "nodes": [
+        {
+          "nodeId":  40,
+          "type":    "Echo",
+          "enabled": true,
+          "param": {
+            "wetDryMix": 30.0,
+            "feedback":  0.3,
+            "delay":     200.0
+          }
+        }
+      ],
+      "links": []
+    },
+
+    "lpf_muffled": {
+      "name": "lpf_muffled",
+      "nodes": [
+        {
+          "nodeId":  50,
+          "type":    "LowPassFilter",
+          "enabled": true,
+          "param": {
+            "frequency": 1500.0,
+            "oneOverQ":  1.0
+          }
+        }
+      ],
+      "links": []
+    },
+
+    "eq_boost_high": {
+      "name": "eq_boost_high",
+      "nodes": [
+        {
+          "nodeId":  60,
+          "type":    "Equalizer",
+          "enabled": true,
+          "param": {
+            "gain0": 1.0,  "freq0": 80.0,    "bw0": 1.0,
+            "gain1": 1.2,  "freq1": 500.0,   "bw1": 1.0,
+            "gain2": 1.5,  "freq2": 3000.0,  "bw2": 1.0,
+            "gain3": 2.0,  "freq3": 10000.0, "bw3": 1.0
+          }
+        }
+      ],
+      "links": []
+    }
+  }
+}

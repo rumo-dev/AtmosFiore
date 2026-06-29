@@ -16,7 +16,7 @@ struct SpotLight_GPU
     float padding[3];
 };
 
-StructuredBuffer<SpotLight_GPU> spotLights : register(t8);
+StructuredBuffer<SpotLight_GPU> spotLights : register(t9);
 cbuffer CB_SpotLightCount : register(b6)
 {
     uint numSpotLights;

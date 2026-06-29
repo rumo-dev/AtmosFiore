@@ -10,6 +10,11 @@
 #include "Game/World/camera/quarter_view_camera.h"
 #include "Game/World/camera/cinematic_camera.h"
 
+
+
+#include "Engine/Audio/AudioSystem.h"
+
+
 #include "Game/World/camera/camera_manager.h"
 #include <string>
 #include "Engine/Utilities/color_Util.h"
@@ -236,7 +241,7 @@ void Scene_Indoor::render_forward(float elapsedTime) {
 	Graphics_Core::instance().post_procss.begin();
 	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 
-	//Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
+	Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
 }
 
 void Scene_Indoor::render_UI(float elapsedTime) {

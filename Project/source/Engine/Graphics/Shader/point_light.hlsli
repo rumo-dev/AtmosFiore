@@ -7,7 +7,7 @@ struct PointLight_GPU
     float intensity;
 };
 
-StructuredBuffer<PointLight_GPU> pointLights : register(t7);
+StructuredBuffer<PointLight_GPU> pointLights : register(t8);
 cbuffer CB_PointLightCount : register(b4)
 {
     uint numPointLights;

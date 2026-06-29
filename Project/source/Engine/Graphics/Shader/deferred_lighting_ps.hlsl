@@ -18,191 +18,191 @@ Texture2D<float> point_shadow_front_map : register(t4);
 Texture2D<float> point_shadow_back_map : register(t5);
 Texture2D<float> directional_shadow_map : register(t6);
 
-// ==========================================
-// 3Dノイズ生成関数 (Value Noise & FBM)
-// ==========================================
-float hash(float3 p)
-{
-    p = frac(p * 0.3183099 + 0.1);
-    p *= 17.0;
-    return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-
-float noise3D(float3 x)
-{
-    float3 i = floor(x);
-    float3 f = frac(x);
-    f = f * f * (3.0 - 2.0 * f); // スムーズな補間
-
-    float v000 = hash(i + float3(0, 0, 0));
-    float v100 = hash(i + float3(1, 0, 0));
-    float v010 = hash(i + float3(0, 1, 0));
-    float v110 = hash(i + float3(1, 1, 0));
-    float v001 = hash(i + float3(0, 0, 1));
-    float v101 = hash(i + float3(1, 0, 1));
-    float v011 = hash(i + float3(0, 1, 1));
-    float v111 = hash(i + float3(1, 1, 1));
-
-    return lerp(
-        lerp(lerp(v000, v100, f.x), lerp(v010, v110, f.x), f.y),
-        lerp(lerp(v001, v101, f.x), lerp(v011, v111, f.x), f.y), f.z);
-}
-
-// FBM (フラクタルブラウン運動) を使って雲のようなディテールを作る
-float fbm(float3 p)
-{
-    float f = 0.0;
-    float amplitude = 0.5;
-    for (int i = 0; i < 3; i++)
-    {
-        f += amplitude * noise3D(p);
-        p *= 2.02;
-        amplitude *= 0.5;
-    }
-    return f;
-}
-// ==========================================
-// ボリュームフォグ計算関連
-// ==========================================
-
-// Henyey-Greenstein 位相関数
-float HGPhase(float cosTheta, float g)
-{
-    float g2 = g * g;
-    float denom = 1.0 + g2 - 2.0 * g * cosTheta;
-    return (1.0 - g2) / (4.0 * 3.14159 * pow(max(denom, 0.0001), 1.5));
-}
-float4 ComputeVolumetricFog(float2 screenPos, float3 rayStart, float3 rayEnd, float3 dirLightDir, float3 dirLightColor)
-{
-    const int STEP_COUNT = 16;
-    float3 rayVector = rayEnd - rayStart;
-    float rayLength = length(rayVector);
-    if (rayLength < 0.0001f)
-        return float4(0, 0, 0, 1);
-
-    float3 rayDir = rayVector / rayLength;
-    float stepSize = rayLength / STEP_COUNT;
-    float3 step = rayDir * stepSize;
-
-    // ディザー (Interleaved Gradient Noise)
-    float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
-    float dither = frac(magic.z * frac(dot(screenPos, magic.xy)));
-    float3 currentPos = rayStart + step * dither;
-
-    // 室内向け調整パラメータ
-    const float fogDensityBase = 0.02f;
-    const float fogScattering = 0.8f;
-    const float fogAbsorption = 0.002f;
-    const float anisotropy = 0.65f;
-
-    float3 scatteredLight = 0.0f;
-    float transmittance = 1.0f;
-
-    for (int i = 0; i < STEP_COUNT; i++)
-    {
-        // ノイズ密度と高さフォグ
-        float noiseVal = saturate(lerp(0.4f, 1.6f, fbm(currentPos * 0.5f)));
-        float heightFog = exp(-max(currentPos.y, 0.0f) * 0.15f);
-        float density = fogDensityBase * noiseVal * heightFog;
-
-        float extinction = density * (fogScattering + fogAbsorption);
-        float stepTrans = exp(-extinction * stepSize);
-
-        float3 totalLight = 0;
-
-        // 1. Directional
-        {
-            float cosTheta = dot(rayDir, -dirLightDir);
-            float phase = HGPhase(cosTheta, anisotropy);
-            float shadow = SampleDirectionalShadow(directional_shadow_map, currentPos, dirLightDir, dirLightDir);
-            totalLight += dirLightColor * phase * shadow;
-        }
-
-        // 2. Point Lights
-        for (int p = 0; p < numPointLights; ++p)
-        {
-            if (pointLights[p].intensity <= 0 || pointLights[p].radius <= 0)
-                continue;
-            float3 lightVec = pointLights[p].position - currentPos;
-            float dist = length(lightVec);
-            if (dist >= pointLights[p].radius)
-                continue;
-
-            float3 L = lightVec / max(dist, 0.0001f);
-            float attenuation = pow(saturate(1.0f - dist / pointLights[p].radius), 2.0f);
-            
-            // ライトシャフト強調用ブースト
-            float intensityBoost = min(1.0f / (dist + 0.1f), 5.0f);
-            float phase = HGPhase(dot(-rayDir, L), anisotropy);
-            float shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, currentPos, L, L, p);
-
-            totalLight += pointLights[p].color * pointLights[p].intensity * (attenuation * intensityBoost) * phase * shadow;
-        }
-
-        // 3. Spot Lights
-        for (int s = 0; s < numSpotLights; ++s)
-        {
-            if (spotLights[s].intensity <= 0 || spotLights[s].radius <= 0)
-                continue;
-            float3 lightVec = spotLights[s].position - currentPos;
-            float dist = length(lightVec);
-            if (dist >= spotLights[s].radius)
-                continue;
-
-            float3 L = lightVec / max(dist, 0.0001f);
-            float cosAngle = dot(-L, normalize(spotLights[s].direction));
-            float spot = smoothstep(cos(spotLights[s].outerAngle), cos(spotLights[s].innerAngle), cosAngle);
-            if (spot <= 0)
-                continue;
-
-            float distanceAtt = pow(saturate(1.0f - dist / spotLights[s].radius), 2.0f);
-            float phase = HGPhase(dot(-rayDir, L), anisotropy);
-            
-            totalLight += spotLights[s].color * spotLights[s].intensity * (spot * distanceAtt * 2.0f) * phase;
-        }
-        
-        for (uint a = 0; a < numAreaLights; ++a)
-        {
-            AreaLight_GPU light = areaLights[a];
-            if (light.intensity <= 0.0f)
-                continue;
-
-        // 1. LTC評価用の基底と逆行列
-        // フォグ内では明確な法線がないため、ライトの中心を向くベクトルを法線とする
-            float3 N_approx = normalize(light.position - currentPos);
-            float3 V = -rayDir; // レイの進行方向の逆
-        
-        // フォグは拡散体なので roughness は大きめに設定（散乱の広がり）
-            float roughness = 0.8f;
-            float NoV = saturate(dot(N_approx, V));
-            float3x3 Minv = LTC_MatrixInv(roughness, NoV);
-
-        // 2. 形状を考慮した正確な積分 (LTC_Evaluate)
-        // ここで提示いただいたコードのLTCロジックをフル実行します
-            float integral = LTC_Evaluate(N_approx, V, currentPos, light, Minv);
-
-        // 3. 散乱位相関数 (HG) の適用
-        // ライトの向きと視線方向の位相差を計算
-            float3 L_dir = normalize(light.position - currentPos);
-            float phase = HGPhase(dot(-rayDir, L_dir), anisotropy);
-
-        // 4. 加算
-        // integralには面光源の形状を考慮した輝度が格納されている
-            totalLight += light.color * light.intensity * integral * phase;
-        }
-        // 積分
-        float3 scattering = totalLight * density * fogScattering;
-        float integralWeight = (extinction > 0.0001f) ? (1.0f - stepTrans) / extinction : stepSize;
-        scatteredLight += scattering * transmittance * integralWeight;
-        transmittance *= stepTrans;
-
-        if (transmittance < 0.01f)
-            break;
-        currentPos += step;
-    }
-
-    return float4(scatteredLight, transmittance);
-}
+//// ==========================================
+//// 3Dノイズ生成関数 (Value Noise & FBM)
+//// ==========================================
+//float hash(float3 p)
+//{
+//    p = frac(p * 0.3183099 + 0.1);
+//    p *= 17.0;
+//    return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
+//}
+//
+//float noise3D(float3 x)
+//{
+//    float3 i = floor(x);
+//    float3 f = frac(x);
+//    f = f * f * (3.0 - 2.0 * f); // スムーズな補間
+//
+//    float v000 = hash(i + float3(0, 0, 0));
+//    float v100 = hash(i + float3(1, 0, 0));
+//    float v010 = hash(i + float3(0, 1, 0));
+//    float v110 = hash(i + float3(1, 1, 0));
+//    float v001 = hash(i + float3(0, 0, 1));
+//    float v101 = hash(i + float3(1, 0, 1));
+//    float v011 = hash(i + float3(0, 1, 1));
+//    float v111 = hash(i + float3(1, 1, 1));
+//
+//    return lerp(
+//        lerp(lerp(v000, v100, f.x), lerp(v010, v110, f.x), f.y),
+//        lerp(lerp(v001, v101, f.x), lerp(v011, v111, f.x), f.y), f.z);
+//}
+//
+//// FBM (フラクタルブラウン運動) を使って雲のようなディテールを作る
+//float fbm(float3 p)
+//{
+//    float f = 0.0;
+//    float amplitude = 0.5;
+//    for (int i = 0; i < 3; i++)
+//    {
+//        f += amplitude * noise3D(p);
+//        p *= 2.02;
+//        amplitude *= 0.5;
+//    }
+//    return f;
+//}
+//// ==========================================
+//// ボリュームフォグ計算関連
+//// ==========================================
+//
+//// Henyey-Greenstein 位相関数
+//float HGPhase(float cosTheta, float g)
+//{
+//    float g2 = g * g;
+//    float denom = 1.0 + g2 - 2.0 * g * cosTheta;
+//    return (1.0 - g2) / (4.0 * 3.14159 * pow(max(denom, 0.0001), 1.5));
+//}
+//float4 ComputeVolumetricFog(float2 screenPos, float3 rayStart, float3 rayEnd, float3 dirLightDir, float3 dirLightColor)
+//{
+//    const int STEP_COUNT = 16;
+//    float3 rayVector = rayEnd - rayStart;
+//    float rayLength = length(rayVector);
+//    if (rayLength < 0.0001f)
+//        return float4(0, 0, 0, 1);
+//
+//    float3 rayDir = rayVector / rayLength;
+//    float stepSize = rayLength / STEP_COUNT;
+//    float3 step = rayDir * stepSize;
+//
+//    // ディザー (Interleaved Gradient Noise)
+//    float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
+//    float dither = frac(magic.z * frac(dot(screenPos, magic.xy)));
+//    float3 currentPos = rayStart + step * dither;
+//
+//    // 室内向け調整パラメータ
+//    const float fogDensityBase = 0.02f;
+//    const float fogScattering = 0.8f;
+//    const float fogAbsorption = 0.002f;
+//    const float anisotropy = 0.65f;
+//
+//    float3 scatteredLight = 0.0f;
+//    float transmittance = 1.0f;
+//
+//    for (int i = 0; i < STEP_COUNT; i++)
+//    {
+//        // ノイズ密度と高さフォグ
+//        float noiseVal = saturate(lerp(0.4f, 1.6f, fbm(currentPos * 0.5f)));
+//        float heightFog = exp(-max(currentPos.y, 0.0f) * 0.15f);
+//        float density = fogDensityBase * noiseVal * heightFog;
+//
+//        float extinction = density * (fogScattering + fogAbsorption);
+//        float stepTrans = exp(-extinction * stepSize);
+//
+//        float3 totalLight = 0;
+//
+//        // 1. Directional
+//        {
+//            float cosTheta = dot(rayDir, -dirLightDir);
+//            float phase = HGPhase(cosTheta, anisotropy);
+//            float shadow = SampleDirectionalShadow(directional_shadow_map, currentPos, dirLightDir, dirLightDir);
+//            totalLight += dirLightColor * phase * shadow;
+//        }
+//
+//        // 2. Point Lights
+//        for (int p = 0; p < numPointLights; ++p)
+//        {
+//            if (pointLights[p].intensity <= 0 || pointLights[p].radius <= 0)
+//                continue;
+//            float3 lightVec = pointLights[p].position - currentPos;
+//            float dist = length(lightVec);
+//            if (dist >= pointLights[p].radius)
+//                continue;
+//
+//            float3 L = lightVec / max(dist, 0.0001f);
+//            float attenuation = pow(saturate(1.0f - dist / pointLights[p].radius), 2.0f);
+//            
+//            // ライトシャフト強調用ブースト
+//            float intensityBoost = min(1.0f / (dist + 0.1f), 5.0f);
+//            float phase = HGPhase(dot(-rayDir, L), anisotropy);
+//            float shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, currentPos, L, L, p);
+//
+//            totalLight += pointLights[p].color * pointLights[p].intensity * (attenuation * intensityBoost) * phase * shadow;
+//        }
+//
+//        // 3. Spot Lights
+//        for (int s = 0; s < numSpotLights; ++s)
+//        {
+//            if (spotLights[s].intensity <= 0 || spotLights[s].radius <= 0)
+//                continue;
+//            float3 lightVec = spotLights[s].position - currentPos;
+//            float dist = length(lightVec);
+//            if (dist >= spotLights[s].radius)
+//                continue;
+//
+//            float3 L = lightVec / max(dist, 0.0001f);
+//            float cosAngle = dot(-L, normalize(spotLights[s].direction));
+//            float spot = smoothstep(cos(spotLights[s].outerAngle), cos(spotLights[s].innerAngle), cosAngle);
+//            if (spot <= 0)
+//                continue;
+//
+//            float distanceAtt = pow(saturate(1.0f - dist / spotLights[s].radius), 2.0f);
+//            float phase = HGPhase(dot(-rayDir, L), anisotropy);
+//            
+//            totalLight += spotLights[s].color * spotLights[s].intensity * (spot * distanceAtt * 2.0f) * phase;
+//        }
+//        
+//        for (uint a = 0; a < numAreaLights; ++a)
+//        {
+//            AreaLight_GPU light = areaLights[a];
+//            if (light.intensity <= 0.0f)
+//                continue;
+//
+//        // 1. LTC評価用の基底と逆行列
+//        // フォグ内では明確な法線がないため、ライトの中心を向くベクトルを法線とする
+//            float3 N_approx = normalize(light.position - currentPos);
+//            float3 V = -rayDir; // レイの進行方向の逆
+//        
+//        // フォグは拡散体なので roughness は大きめに設定（散乱の広がり）
+//            float roughness = 0.8f;
+//            float NoV = saturate(dot(N_approx, V));
+//            float3x3 Minv = LTC_MatrixInv(roughness, NoV);
+//
+//        // 2. 形状を考慮した正確な積分 (LTC_Evaluate)
+//        // ここで提示いただいたコードのLTCロジックをフル実行します
+//            float integral = LTC_Evaluate(N_approx, V, currentPos, light, Minv);
+//
+//        // 3. 散乱位相関数 (HG) の適用
+//        // ライトの向きと視線方向の位相差を計算
+//            float3 L_dir = normalize(light.position - currentPos);
+//            float phase = HGPhase(dot(-rayDir, L_dir), anisotropy);
+//
+//        // 4. 加算
+//        // integralには面光源の形状を考慮した輝度が格納されている
+//            totalLight += light.color * light.intensity * integral * phase;
+//        }
+//        // 積分
+//        float3 scattering = totalLight * density * fogScattering;
+//        float integralWeight = (extinction > 0.0001f) ? (1.0f - stepTrans) / extinction : stepSize;
+//        scatteredLight += scattering * transmittance * integralWeight;
+//        transmittance *= stepTrans;
+//
+//        if (transmittance < 0.01f)
+//            break;
+//        currentPos += step;
+//    }
+//
+//    return float4(scatteredLight, transmittance);
+//}
 
 float4 main(VS_OUT pin) : SV_TARGET
 {
@@ -371,11 +371,11 @@ float4 main(VS_OUT pin) : SV_TARGET
     specular *= occlusion;
 
     float3 Lo = diffuse + specular + emissive;
-    float4 fog = ComputeVolumetricFog(pin.position.xy, camera_position.xyz, position, L, Li);
-
-    float fogIntensityMultiplier = 1;
-    
-    // 元のピクセルカラーに透過率を掛け、フォグを加算
-    Lo = Lo * fog.a + (fog.rgb * fogIntensityMultiplier);
+   //float4 fog = ComputeVolumetricFog(pin.position.xy, camera_position.xyz, position, L, Li);
+   //
+   //float fogIntensityMultiplier = 1;
+   //
+   //// 元のピクセルカラーに透過率を掛け、フォグを加算
+   //Lo = Lo * fog.a + (fog.rgb * fogIntensityMultiplier);
     return float4(Lo, 1.0f);
 }

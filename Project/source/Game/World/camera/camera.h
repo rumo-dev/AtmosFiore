@@ -1,6 +1,10 @@
 #pragma once
 #include <directxmath.h>
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
+
+
+#include "Engine/Audio/AudioSystem.h"
+
 /**
  * @brief カメラの純粋なデータ構造体
  */
@@ -21,6 +25,7 @@ struct Camera {
 	DirectX::XMMATRIX inv_projection{ DirectX::XMMatrixIdentity() };
 	DirectX::XMMATRIX view_projection{ DirectX::XMMatrixIdentity() };
 	DirectX::XMMATRIX inv_view_projection{ DirectX::XMMatrixIdentity() };
+	DirectX::XMVECTOR prevPosition{ 0.0f, 5.0f, -10.0f, 1.0f };
 
 	float shutterDenominator = 5.0f;
 	float FNumber = 2.8f;
@@ -70,7 +75,36 @@ public:
 		float smoothT = t * t * (3.0f - 2.0f * t);
 		shakeOffset = DirectX::XMVectorLerp(previousShakeTarget, currentShakeTarget, smoothT);
 	}
+	void UpdateAudioListener(float deltaTime) {
+		// 1. 現在の位置と前フレームの位置を格納
+		DirectX::XMFLOAT4 curPosF, prevPosF;
+		DirectX::XMStoreFloat4(&curPosF, position);
+		DirectX::XMStoreFloat4(&prevPosF, prevPosition);
 
+		// 2. 速度の計算（ドップラー効果用）
+		float vx = 0.0f, vy = 0.0f, vz = 0.0f;
+		if (deltaTime > 0.0f) {
+			vx = (curPosF.x - prevPosF.x) / deltaTime;
+			vy = (curPosF.y - prevPosF.y) / deltaTime;
+			vz = (curPosF.z - prevPosF.z) / deltaTime;
+		}
+		AudioSystem::instance().SetListenerVelocity(vx, vy, vz);
+
+		// 3. 位置の更新
+		AudioSystem::instance().SetListenerPosition(curPosF.x, curPosF.y, curPosF.z);
+
+		// 4. カメラの逆行列から「前方向」と「上方向」を抽出して設定
+		DirectX::XMFLOAT4X4 invViewF;
+		DirectX::XMStoreFloat4x4(&invViewF, inv_view);
+
+		AudioSystem::instance().SetListenerOrientation(
+			invViewF._31, invViewF._32, invViewF._33,  // 前方向 (OrientFront)
+			invViewF._21, invViewF._22, invViewF._23   // 上方向 (OrientTop)
+		);
+
+		// 5. 次フレームの速度計算のために現在の位置を保存
+		prevPosition = position;
+	}
 	// 行列計算
 	void identity() {
 		// 注視点を揺らすことで「視線が泳ぐ手持ち感」を演出

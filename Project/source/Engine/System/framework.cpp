@@ -19,6 +19,14 @@ bool Frame_Work::initialize()
 	Scene_Manager::instance().change_scene(new Scene_Splash());
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();
+	AudioSystem::instance().Initialize(
+		"data/Audio/audio_data.json",   // JSON ファイルパス
+		"data/Audio/",            // 音声ファイルのベースディレクトリ
+		64                          // 最大同時再生ボイス数
+	);
+	AudioSystem::instance().SetListenerPosition(0.0f, 0.0f, 0.0f);
+	AudioSystem::instance().SetListenerOrientation(0.0f, 0.0f, 1.0f,   // front
+		0.0f, 1.0f, 0.0f);  // up
 	return true;
 }
 
@@ -34,6 +42,8 @@ void Frame_Work::update(float elapsed_time/*Elapsed seconds from last frame*/)
 
 	Graphics_Core::instance().post_procss.update(elapsed_time);
 	Scene_Manager::instance().update(elapsed_time);
+	AudioSystem::instance().Update();
+	//AudioSystem::instance().UpdateInput();
 
 #ifdef USE_IMGUI
 
@@ -50,6 +60,7 @@ void Frame_Work::render(float elapsed_time) {
 	Graphics_Core::instance().set_render_targets();
 	Render_State::instance().set_sampler_state(Graphics_Core::instance().get_device_context());
 	Scene_Manager::instance().render(elapsed_time);
+
 
 	// --- キー入力処理 (毎フレームチェック) ---
 	// 0x60 は '~' キー (半角/全角キー) の仮想キーコードです
@@ -91,7 +102,7 @@ void Frame_Work::render(float elapsed_time) {
 
 bool Frame_Work::uninitialize()
 {
-
+	AudioSystem::instance().Shutdown();
 
 
 

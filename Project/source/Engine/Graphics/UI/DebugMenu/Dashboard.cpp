@@ -7,6 +7,9 @@
 #include "Engine/utilities/resource_monitor.h"
 #include "Game/Scenes/scene.h"
 
+
+#include "Engine/Audio/AudioSystem.h"
+
 void Dashboard::Render() {
 	if (ImGui::Begin("Dashboard", nullptr, ImGuiWindowFlags_NoTitleBar)) {
 		RenderSideBar();
@@ -223,6 +226,10 @@ void Dashboard::InitializeUI() {
 		{"Monitor", "View system and resource metrics", [&](SharedMetricsData& d) { _monitor.render_ui(); }}
 	} });
 
+	dash.RegisterModule({ "Audio", {
+		{"Editor", "View system and resource metrics", [&](SharedMetricsData& d) { AudioSystem::instance().DrawEffectGraphEditor(); }}
+	} });
+
 	dash.RegisterModule({ "Scene", {
 		{"Manager", "Manage scene hierarchy and entities", [](SharedMetricsData& d) { Scene_Manager::instance().draw_gui(); }},
 	} });
@@ -237,7 +244,9 @@ void Dashboard::InitializeUI() {
 		{"Adaptation",  "Adjust eye adaptation parameters", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawAdaptationGUI(); }},
 		{"Tone Mapping","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawToneMappingGUI(); }},
 		{"Exposure","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawExposureGUI(); }},
-		{"LensImperfections","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawLensImperfectionsGUI(); }}
+		{"LensImperfections","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawLensImperfectionsGUI(); }},
+		{"Fog","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawFogGUI(); }}
+
 	} });
 
 	dash.RegisterModule({ "Light", {

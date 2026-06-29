@@ -15,10 +15,14 @@
 #include "Game/Effect/lensDistortion/LensDistortion.h"
 #include "Game/Effect/vignetting/Vignetting.h"
 
+// ★ 新規フォグシステム
+#include "Game/Effect/fog/volumetric_fog.h"
+#include "Game/Effect/fog/height_fog.h"
+#include "Game/Effect/fog/distance_fog.h"
+#include "Game/Effect/fog/exponential_fog.h"
+
 /**
  * @brief ポストプロセス管理クラス
- *
- * レンダリング結果に対して各種ポストエフェクトを適用する。
  *
  * 処理フロー：
  * @code
@@ -28,15 +32,23 @@
  *   ↓
  * end()
  *   ↓
- * draw()   // Sky → DoF → Exposure → Bloom → Adaptation → ToneMapping
+ * draw()
+ *   Sky
+ *   → VolumetricFog   (レイマーチング散乱フォグ)
+ *   → HeightFog        (高さベースフォグ)
+ *   → DistanceFog      (距離ベースフォグ)
+ *   → ExponentialFog   (指数フォグ)
+ *   → DoF → Exposure → ChromaticAberration
+ *   → LensDistortion → Vignetting → Bloom
+ *   → Adaptation → ToneMapping
  *   ↓
- * render() // 最終出力
+ * render()
  * @endcode
  */
 class Post_Process_Manager {
 public:
-	Post_Process_Manager() {};
-	~Post_Process_Manager() {};
+	Post_Process_Manager() = default;
+	~Post_Process_Manager() = default;
 
 	static void initialize();
 	static void update(float elapsedtime);
@@ -47,40 +59,52 @@ public:
 	static void renderGUI();
 
 public:
+	// ── 既存アクセサ ─────────────────────────────────────────────
 	bloom& GetBloom() { return *bloomer; }
 	Fog& GetFog() { return *fogger; }
 	shadow& GetShadow() { return *shadower; }
 	Adaptation& GetAdaptation() { return *adaptation; }
 	ToneMapping& GetToneMapping() { return *tone_mapper; }
 	DepthOfField& GetDof() { return *dofer; }
-
-	// ★ 追加
 	Exposure& GetExposure() { return *exposurer; }
 	ChromaticAberration& GetChromaticAberration() { return *ca_effect; }
 	LensDistortion& GetLensDistortion() { return *lens_distortion; }
 	Vignetting& GetVignetting() { return *vignetting; }
 
+	// ★ 新フォグアクセサ
+	VolumetricFog& GetVolumetricFog() { return *vol_fog; }
+	HeightFog& GetHeightFog() { return *hgt_fog; }
+	DistanceFog& GetDistanceFog() { return *dst_fog; }
+	ExponentialFog& GetExponentialFog() { return *exp_fog; }
+
+	// ── GUI ──────────────────────────────────────────────────────
 	void drawDebugView();
 	void drawBloomGUI();
 	void drawAdaptationGUI();
 	void drawToneMappingGUI();
 	void drawExposureGUI();
 	void drawLensImperfectionsGUI();
+	void drawFogGUI();
 
 private:
 	static Framebuffer fsquad;
 
-	static std::unique_ptr<bloom>        bloomer;
-	static std::unique_ptr<Fog>          fogger;
-	static std::unique_ptr<shadow>       shadower;
-	static std::unique_ptr<Adaptation>   adaptation;
-	static std::unique_ptr<ToneMapping>  tone_mapper;
-	static std::unique_ptr<DepthOfField> dofer;
-	static std::unique_ptr<Sky>          skyer;
-	static std::unique_ptr<Exposure>     exposurer;
+	// ── 既存エフェクト ────────────────────────────────────────────
+	static std::unique_ptr<bloom>               bloomer;
+	static std::unique_ptr<Fog>                 fogger;
+	static std::unique_ptr<shadow>              shadower;
+	static std::unique_ptr<Adaptation>          adaptation;
+	static std::unique_ptr<ToneMapping>         tone_mapper;
+	static std::unique_ptr<DepthOfField>        dofer;
+	static std::unique_ptr<Sky>                 skyer;
+	static std::unique_ptr<Exposure>            exposurer;
 	static std::unique_ptr<ChromaticAberration> ca_effect;
 	static std::unique_ptr<LensDistortion>      lens_distortion;
 	static std::unique_ptr<Vignetting>          vignetting;
+	static std::unique_ptr<VolumetricFog>       vol_fog;
+	static std::unique_ptr<HeightFog>           hgt_fog;
+	static std::unique_ptr<DistanceFog>         dst_fog;
+	static std::unique_ptr<ExponentialFog>      exp_fog;
 
 	float time = 0.0f;
 };
