@@ -13,6 +13,7 @@
 
 #include "Engine/utilities/color_util.h"
 #include "Engine/Graphics/IBL/ibl.h"
+#include "Game/World/Player/player.h"
 
 // ゲームシーン
 class Scene_Indoor :public Scene_Base
@@ -55,6 +56,12 @@ private:
 	};
 	std::unique_ptr<Gltf_Model>_gltf_model;
 	Directional_Light _directional_light;
+
+	/// プレイヤー
+	Player _player;
+
+	/// プレイヤー用スポットライトの配列インデックス
+	int _player_spotlight_index = -1;
 
 
 };

@@ -64,7 +64,7 @@ public:
 				float offsetY = static_cast<float>(_last_mouse_pos.y - current_mouse_pos.y);
 				_last_mouse_pos = current_mouse_pos;
 
-				_yaw += offsetX * _mouse_sensitivity;
+				_yaw -= offsetX * _mouse_sensitivity;
 				_pitch += offsetY * _mouse_sensitivity;
 
 				// 真上・真下を向いた際の首の反転を防止

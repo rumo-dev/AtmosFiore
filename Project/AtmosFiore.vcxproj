@@ -504,6 +504,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\World\Light\point_light.h" />
     <ClInclude Include="source\Game\Effect\tone_mapping\toon_mapping.h" />
     <ClInclude Include="source\Game\World\Light\spot_light.h" />
+    <ClInclude Include="source\Game\World\Player\player.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Engine\Audio\AudioSystem.cpp" />

@@ -135,6 +135,29 @@ void Scene_Indoor::initialize()
 	// デフォルトカメラをスペクテイターに設定
 	camera_mgr.switch_camera("Spectator");
 	float elapsedTime = 0.0f; // 初期化時のダミー値
+
+	// -----------------------------------------------------------------
+	// プレイヤー初期化
+	// -----------------------------------------------------------------
+	// プレイヤー前方を照らすスポットライトを事前に登録し、インデックスを記憶する
+	auto& spot_mgr = Graphics_Core::instance().get_spot_light_manager();
+	_player_spotlight_index = static_cast<int>(spot_mgr.get_lights().size());
+	spot_mgr.add_light(
+		{ 0.0f, 1.5f, 0.0f },   // 初期位置（後で毎フレーム上書き）
+		{ 0.0f, 0.0f, 1.0f },   // 初期方向（後で毎フレーム上書き）
+		15.0f,                   // 半径
+		8.0f,                    // 強度
+		0.15f,                   // 内角
+		0.40f,                   // 外角
+		{ 1.0f, 0.95f, 0.85f, 1.0f } // 暖色系白
+	);
+
+	_player.initialize(
+		hwnd,
+		dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
+		_player_spotlight_index
+	);
+
 	log_printf("objモデルシーン初期化終了\n", LogLevel::Info);
 }
 
@@ -152,30 +175,64 @@ void Scene_Indoor::update(float elapsedTime)
 	auto& camera_mgr = Camera_Manager::instance();
 
 
-	// -------------------------------------------------------------
-	// ?? 特殊な引数を必要とするカメラ用の更新ロジック
-	// -------------------------------------------------------------
-	std::string active_name = camera_mgr.get_active_camera_name(); // マネージャー側に名前取得用メソッドがあると便利です
+	// -----------------------------------------------------------------
+	// カメラ更新
+	// -----------------------------------------------------------------
+	// アクティブカメラの向き（Yaw）をビュー行列から逆算してプレイヤーに渡す
+	auto& active_cam = camera_mgr.get_active_camera()->get_camera();
 
-	// 本来はプレイヤーキャラの座標を渡しますが、今回はテスト用にStage(Library)の座標を使用
-	dx::XMVECTOR mock_player_pos = dx::XMVectorSet(0.0f, 3.5f, 0.0f, 1.0f);
+	// カメラ前方ベクトル（target - position）からYaw・Pitchを計算
+	dx::XMFLOAT3 cam_pos_f, cam_tar_f;
+	dx::XMStoreFloat3(&cam_pos_f, active_cam.position);
+	dx::XMStoreFloat3(&cam_tar_f, active_cam.target);
+
+	float fwd_x = cam_tar_f.x - cam_pos_f.x;
+	float fwd_y = cam_tar_f.y - cam_pos_f.y;
+	float fwd_z = cam_tar_f.z - cam_pos_f.z;
+
+	float cam_yaw_deg   = dx::XMConvertToDegrees(atan2f(fwd_x, fwd_z));
+	float cam_pitch_deg = dx::XMConvertToDegrees(atan2f(fwd_y, sqrtf(fwd_x * fwd_x + fwd_z * fwd_z)));
+
+	// プレイヤー更新
+	_player.update(elapsedTime, cam_yaw_deg, cam_pitch_deg);
+
+	// プレイヤーの実座標
+	dx::XMVECTOR player_pos = _player.get_position();
+
+	std::string active_name = camera_mgr.get_active_camera_name();
 
 	if (active_name == "ThirdPerson") {
 		auto tp_cam = std::dynamic_pointer_cast<Third_Person_Camera>(camera_mgr.get_active_camera());
-		if (tp_cam) tp_cam->set_target_position(mock_player_pos);
+		if (tp_cam) tp_cam->set_target_position(player_pos);
+		camera_mgr.update(elapsedTime);
 	}
 	else if (active_name == "FirstPerson") {
 		auto fp_cam = std::dynamic_pointer_cast<First_Person_Camera>(camera_mgr.get_active_camera());
 		if (fp_cam) {
-			dx::XMVECTOR dummy_forward;
-			// 目の高さに合わせるため少しYを上げる
-			dx::XMVECTOR head_pos = dx::XMVectorAdd(mock_player_pos, dx::XMVectorSet(0.0f, 1.8f, 0.0f, 0.0f));
-			fp_cam->set_character_head_position(head_pos);
+			fp_cam->set_character_head_position(_player.get_head_position());
 		}
+		camera_mgr.update(elapsedTime);
 	}
 	else {
 		// 引数の要らない通常カメラ（Spectator, Orbit, QuarterView, Cinematic）は一括更新
 		camera_mgr.update(elapsedTime);
+	}
+
+	// -----------------------------------------------------------------
+	// プレイヤー前方スポットライトを毎フレーム更新
+	// -----------------------------------------------------------------
+	auto& spot_lights = Graphics_Core::instance().get_spot_light_manager().get_lights();
+	if (_player_spotlight_index >= 0 &&
+		_player_spotlight_index < static_cast<int>(spot_lights.size()))
+	{
+		auto& pl = spot_lights[_player_spotlight_index];
+		pl.position     = _player.get_light_position();
+		pl.direction    = _player.get_light_direction();
+		pl.radius       = _player.get_light_radius();
+		pl.intensity    = _player.get_light_intensity();
+		pl.innerAngle   = _player.get_light_inner_angle();
+		pl.outerAngle   = _player.get_light_outer_angle();
+		pl.diffuseColor = _player.get_light_color();
 	}
 
 	// _directional_light.set_camera(Camera_Manager::instance().get_active_camera()->get_camera());
@@ -266,4 +323,10 @@ void Scene_Indoor::render_debug(float elapsedTime) {
 // GUI描画
 void Scene_Indoor::draw_gui() {
 	_directional_light.draw_imgui("Directional Light");
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	_player.draw_imgui();
 }

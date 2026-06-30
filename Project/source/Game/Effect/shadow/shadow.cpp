@@ -103,28 +103,56 @@ void shadow::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVi
 
 
 }
-
-void shadow::make_directional_shadow_begin() {
+void shadow::make_directional_shadow_begin()
+{
 	using namespace DirectX;
 
-
 	XMFLOAT4X4 VP;
-	const float aspect_ratio = directional_shadow_map->viewport.Width / directional_shadow_map->viewport.Height;
-	XMVECTOR F{ XMLoadFloat4(&light_view_focus) };
-	DirectX::XMFLOAT4 directional_light_direction = Graphics_Core::instance().get_directional_light_direction();
-	XMVECTOR E{ F - XMVector3Normalize(XMLoadFloat4(&directional_light_direction)) * light_view_distance };
-	XMVECTOR U{ XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f) };
-	XMMATRIX V{ XMMatrixLookAtLH(E, F, U) };
-	XMMATRIX P{ XMMatrixOrthographicLH(light_view_size * aspect_ratio, light_view_size, light_view_near_z, light_view_far_z) };
 
-	DirectX::XMStoreFloat4x4(&VP, V * P);
-	// store for culling usage
+	Camera cam =
+		Camera_Manager::instance().get_active_camera()->get_camera();
+
+	const float aspect_ratio =
+		directional_shadow_map->viewport.Width /
+		directional_shadow_map->viewport.Height;
+
+	// カメラの位置だけを使用（向きは無視）
+	XMVECTOR F = cam.position;
+
+	XMFLOAT4 directional_light_direction =
+		Graphics_Core::instance().get_directional_light_direction();
+
+	XMVECTOR lightDir =
+		XMVector3Normalize(XMLoadFloat4(&directional_light_direction));
+
+	// ライト方向に離れた位置からカメラ位置を見る
+	XMVECTOR E = F - lightDir * light_view_distance;
+
+	XMMATRIX V = XMMatrixLookAtLH(
+		E,
+		F,
+		XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
+	);
+
+	XMMATRIX P = XMMatrixOrthographicLH(
+		light_view_size * aspect_ratio,
+		light_view_size,
+		light_view_near_z,
+		light_view_far_z
+	);
+
+	XMStoreFloat4x4(&VP, V * P);
+
+	// カリング用に保存
 	last_light_view_projection = VP;
 	light_view_projection = VP;
 
 	active_shadow_map = directional_shadow_map.get();
-	active_shadow_map->clear(Graphics_Core::instance().get_device_context(), 1.0f);
-	active_shadow_map->activate(Graphics_Core::instance().get_device_context());
+
+	auto* dc = Graphics_Core::instance().get_device_context();
+
+	active_shadow_map->clear(dc, 1.0f);
+	active_shadow_map->activate(dc);
 }
 void shadow::make_shadow_begin(PointShadowFace face) {
 	using namespace DirectX;

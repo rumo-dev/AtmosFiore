@@ -158,7 +158,7 @@ float4 main(VS_OUT pin) : SV_TARGET
             float att = pow(saturate(1.0 - dist / pointLights[p].radius), 2.0);
             float boost = min(1.0 / (dist + 0.1), 5.0);
             
-            float cos_theta = dot(ray_dir, -L);
+            float cos_theta = dot(ray_dir, L);
             float phase = HGPhase(cos_theta, anisotropy);
             
             float shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, cur_pos, float3(0, 0, 0), L, p);
@@ -184,7 +184,7 @@ float4 main(VS_OUT pin) : SV_TARGET
 
             float dist_att = pow(saturate(1.0 - dist / spotLights[s].radius), 2.0);
             
-            float cos_theta = dot(ray_dir, -L);
+            float cos_theta = dot(ray_dir, L);
             float phase = HGPhase(cos_theta, anisotropy);
             
             total_light += spotLights[s].color * spotLights[s].intensity * (spot * dist_att * 2.0) * phase;

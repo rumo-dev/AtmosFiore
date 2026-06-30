@@ -113,58 +113,54 @@ void Post_Process_Manager::draw()
 	auto* ctx = Graphics_Core::instance().get_device_context();
 
 	// 1. Sky
-	//skyer->make(ctx, fsquad.GetColorMap());
+	skyer->make(ctx, fsquad.GetColorMap());
 
 	// ★ 2. VolumetricFog（Sky 直後 ＝ HDR 生輝度に対してフォグを乗せる）
 	//       シェーダー側で GBuffer2(position) を t1 として読む。
 	//       事前にバインドしておく必要がある場合はここで行うこと。
-	//vol_fog->make(ctx, skyer->get_color_map());
+	vol_fog->make(ctx, skyer->get_color_map());
 
 	// ★ 3. HeightFog
-	//hgt_fog->make(ctx, vol_fog->get_color_map());
+	hgt_fog->make(ctx, vol_fog->get_color_map());
 
 	// ★ 4. DistanceFog
-	//dst_fog->make(ctx, hgt_fog->get_color_map());
+	dst_fog->make(ctx, hgt_fog->get_color_map());
 
 	// ★ 5. ExponentialFog
-	//exp_fog->make(ctx, dst_fog->get_color_map());
+	exp_fog->make(ctx, dst_fog->get_color_map());
 
 	// 6. DoF（フォグ後に被写界深度を適用することでボケ端にフォグが馴染む）
-	//dofer->make(ctx, exp_fog->get_color_map());
+	dofer->make(ctx, exp_fog->get_color_map());
 
 	// 7. Exposure
-	//exposurer->make(ctx, dofer->GetColorMap());
+	exposurer->make(ctx, dofer->GetColorMap());
 	//exposurer->make(ctx, exp_fog->get_color_map());
 
 	// 8. ChromaticAberration
-	//ca_effect->make(ctx, exposurer->GetColorMap());
+	ca_effect->make(ctx, exposurer->GetColorMap());
 
 	// 9. LensDistortion
-	//lens_distortion->make(ctx, ca_effect->GetColorMap());
+	lens_distortion->make(ctx, ca_effect->GetColorMap());
 
 	// 10. Vignetting
-	//vignetting->make(ctx, lens_distortion->GetColorMap());
+	vignetting->make(ctx, lens_distortion->GetColorMap());
 
 	// 11. Bloom
-	//bloomer->make(ctx, vignetting->GetColorMap());
+	bloomer->make(ctx, vignetting->GetColorMap());
 
 	// 12. Adaptation（自動露出）
-	//adaptation->make(ctx, bloomer->getColorMap());
+	adaptation->make(ctx, bloomer->getColorMap());
 
 	// 13. ToneMapping
-	//tone_mapper->make(ctx, adaptation->get_color_map());
+	tone_mapper->make(ctx, adaptation->get_color_map());
 }
 
 // ─── 最終描画 ─────────────────────────────────────────────────────
 void Post_Process_Manager::render()
 {
-	//Graphics_Core::instance().get_fullscreen_quad()->Blit(
-	//	Graphics_Core::instance().get_device_context(),
-	//	tone_mapper->get_color_map_address(), 0, 1
-	//);
 	Graphics_Core::instance().get_fullscreen_quad()->Blit(
 		Graphics_Core::instance().get_device_context(),
-		fsquad.GetColorMapAddress(), 0, 1
+		tone_mapper->get_color_map_address(), 0, 1
 	);
 }
 

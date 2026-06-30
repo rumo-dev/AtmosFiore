@@ -592,6 +592,7 @@
     <ClInclude Include="source\Game\Effect\fog\fog_base.h" />
     <ClInclude Include="source\Game\Effect\fog\height_fog.h" />
     <ClInclude Include="source\Game\Effect\fog\volumetric_fog.h" />
+    <ClInclude Include="source\Game\World\Player\player.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">
