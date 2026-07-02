@@ -408,6 +408,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\System\Manager\Light\spot_light_manager.h" />
     <ClInclude Include="source\Engine\System\Manager\Shader\InputLayout\input_layout_parser.h" />
     <ClInclude Include="source\Engine\System\samplers.h" />
+    <ClInclude Include="source\Engine\Utilities\collision_util.h" />
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Utilities\math_util.h" />
     <ClInclude Include="source\Game\Effect\adaptation\adaptation.h" />

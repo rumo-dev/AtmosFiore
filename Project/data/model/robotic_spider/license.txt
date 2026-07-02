@@ -1,0 +1,11 @@
+Model Information:
+* title:	Robotic Spider
+* source:	https://sketchfab.com/3d-models/robotic-spider-ee587d7dabed49e1906ac5035b502899
+* author:	kishan037 (https://sketchfab.com/kishan037)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Robotic Spider" (https://sketchfab.com/3d-models/robotic-spider-ee587d7dabed49e1906ac5035b502899) by kishan037 (https://sketchfab.com/kishan037) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

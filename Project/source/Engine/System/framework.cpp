@@ -43,7 +43,7 @@ void Frame_Work::update(float elapsed_time/*Elapsed seconds from last frame*/)
 	Graphics_Core::instance().post_procss.update(elapsed_time);
 	Scene_Manager::instance().update(elapsed_time);
 	AudioSystem::instance().Update();
-	//AudioSystem::instance().UpdateInput();
+	AudioSystem::instance().UpdateInput();
 
 #ifdef USE_IMGUI
 

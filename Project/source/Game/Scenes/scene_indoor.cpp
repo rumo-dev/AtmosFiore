@@ -1,6 +1,7 @@
 #include "Scene_indoor.h"
 #include "Engine/system/manager/resource_manager.h"
 #include "Engine/Utilities/math_util.h"
+#include "Engine/Utilities/collision_util.h"
 
 // 【追加】すべてのカメラクラスのヘッダーをインクルード
 #include "Game/World/camera/spectator_camera.h"
@@ -18,6 +19,54 @@
 #include "Game/World/camera/camera_manager.h"
 #include <string>
 #include "Engine/Utilities/color_Util.h"
+
+// -----------------------------------------------------------------------
+// コリジョン対象インスタンス登録／解除／グリッド構築
+// -----------------------------------------------------------------------
+
+bool Scene_Indoor::register_collision_instance(const std::string& instance_name,
+	const DirectX::XMFLOAT4X4& world_transform)
+{
+	auto& mgr = Resource_Manager::instance().model_manager;
+	Gltf_Model* model = mgr.get_model(instance_name);
+	if (!model)
+	{
+		log_printf("Collision instance not found: %s\n", LogLevel::Warning, instance_name.c_str());
+		return false;
+	}
+
+	// 重複登録防止
+	for (const auto& src : _collision_sources)
+	{
+		if (src.instance_name == instance_name)
+		{
+			log_printf("Collision instance already registered: %s\n", LogLevel::Warning, instance_name.c_str());
+			return false;
+		}
+	}
+
+	std::vector<DirectX::XMFLOAT3> tris;
+	model->extract_collision_triangles(world_transform, tris);
+
+	_collision_sources.push_back({ instance_name, world_transform });
+	_collision_triangles.insert(_collision_triangles.end(), tris.begin(), tris.end());
+
+	log_printf("Collision instance registered: '%s' (%zu triangles, total %zu)\n",
+		LogLevel::Info, instance_name.c_str(), tris.size() / 3, _collision_triangles.size() / 3);
+
+	return true;
+}
+
+void Scene_Indoor::clear_collision_instances()
+{
+	_collision_sources.clear();
+	_collision_triangles.clear();
+}
+
+void Scene_Indoor::rebuild_collision_grid()
+{
+	_collision_grid.build(_collision_triangles);
+}
 
 // 初期化
 void Scene_Indoor::initialize()
@@ -87,15 +136,35 @@ void Scene_Indoor::initialize()
 	auto& mgr = Resource_Manager::instance().model_manager;
 
 	mgr.add_instance("Library", s);
-	ModelInstance c;
-	c.world_transform = make_world_matrix(
-		CoordinateSystem::RH_Y_UP,
-		{ 1,1,1 },
-		{ 0,3.5f,0 },
-		{ 0,3,0 },
-		1.f);
-	c.model_key = "DamagedHelmet";
-	mgr.add_instance("DamagedHelmet", c);
+
+	// -----------------------------------------------------------------------
+	// 当たり判定対象インスタンスの登録
+	// -----------------------------------------------------------------------
+	// "Library" インスタンスだけを明示的に当たり判定対象として登録する。
+	// model_manager に他のインスタンスを追加しても、ここで register_collision_instance()
+	// を呼ばない限り _collision_triangles には混入しない。
+	clear_collision_instances();
+	register_collision_instance("Library", s.world_transform);
+	// 複数インスタンスを当たり判定に含めたい場合はここに追加で呼ぶ
+	// register_collision_instance("Terrain", terrain_instance.world_transform);
+
+	rebuild_collision_grid();
+
+	//ModelInstance c;
+	//c.world_transform = make_world_matrix(
+	//	CoordinateSystem::RH_Y_UP,
+	//	{ 10,10,10 },
+	//	{ 0,3.5f,0 },
+	//	{ 0,3,0 },
+	//	1.f);
+	//c.model_key = "Spider";
+	//c.is_animation = true;
+	//c.animation_index = 0;
+	//c.animation_time = 0.f;
+	//c.loop_animation = true;
+	//c.animation_speed = 0.001f;
+	//c.anim_mode = Gltf_Model::animation_mode::single;
+	//mgr.add_instance("DamagedHelmet", c);
 
 
 	IBL::Initialize(device, L"./data/ibl");
@@ -166,6 +235,7 @@ void Scene_Indoor::finalize() {
 	//sprite_object[static_cast<int>(Sprite_Type::None)] & delete;
 	Graphics_Core::instance().get_point_light_manager().clear_light();
 	Graphics_Core::instance().get_spot_light_manager().clear_light();
+	clear_collision_instances();
 	log_printf("objモデルシーン終了\n", LogLevel::Info);
 }
 
@@ -190,11 +260,22 @@ void Scene_Indoor::update(float elapsedTime)
 	float fwd_y = cam_tar_f.y - cam_pos_f.y;
 	float fwd_z = cam_tar_f.z - cam_pos_f.z;
 
-	float cam_yaw_deg   = dx::XMConvertToDegrees(atan2f(fwd_x, fwd_z));
+	float cam_yaw_deg = dx::XMConvertToDegrees(atan2f(fwd_x, fwd_z));
 	float cam_pitch_deg = dx::XMConvertToDegrees(atan2f(fwd_y, sqrtf(fwd_x * fwd_x + fwd_z * fwd_z)));
 
-	// プレイヤー更新
-	_player.update(elapsedTime, cam_yaw_deg, cam_pitch_deg);
+	// -----------------------------------------------------------------
+	// コリジョン三角形をプレイヤー周辺だけに絞り込む
+	// -----------------------------------------------------------------
+	// 空間グリッドから、プレイヤー座標を中心に COLLISION_QUERY_RADIUS 以内の
+	// 三角形だけを抽出する。これにより、シーン全体の三角形を毎フレーム
+	// 総当たりする必要がなくなり、移動中の負荷が大幅に下がる。
+	dx::XMFLOAT3 player_pos_f;
+	dx::XMStoreFloat3(&player_pos_f, _player.get_position());
+	_collision_grid.query(player_pos_f, COLLISION_QUERY_RADIUS, _nearby_collision_triangles);
+
+	// プレイヤー更新（絞り込み済みコリジョン三角形リストを渡す）
+	_player.update(elapsedTime, cam_yaw_deg, cam_pitch_deg,
+		_nearby_collision_triangles.empty() ? nullptr : &_nearby_collision_triangles);
 
 	// プレイヤーの実座標
 	dx::XMVECTOR player_pos = _player.get_position();
@@ -226,12 +307,12 @@ void Scene_Indoor::update(float elapsedTime)
 		_player_spotlight_index < static_cast<int>(spot_lights.size()))
 	{
 		auto& pl = spot_lights[_player_spotlight_index];
-		pl.position     = _player.get_light_position();
-		pl.direction    = _player.get_light_direction();
-		pl.radius       = _player.get_light_radius();
-		pl.intensity    = _player.get_light_intensity();
-		pl.innerAngle   = _player.get_light_inner_angle();
-		pl.outerAngle   = _player.get_light_outer_angle();
+		pl.position = _player.get_light_position();
+		pl.direction = _player.get_light_direction();
+		pl.radius = _player.get_light_radius();
+		pl.intensity = _player.get_light_intensity();
+		pl.innerAngle = _player.get_light_inner_angle();
+		pl.outerAngle = _player.get_light_outer_angle();
 		pl.diffuseColor = _player.get_light_color();
 	}
 

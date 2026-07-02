@@ -129,6 +129,8 @@ private:
 			buffer_view index_buffer_view;
 			// CPU-side copy of POSITION attribute for dynamic bbox calculation
 			std::vector<DirectX::XMFLOAT3> cpu_positions;
+			// CPU-side copy of indices (uint32_t) for collision triangle extraction
+			std::vector<uint32_t> cpu_indices;
 		};
 		std::vector<primitive> primitives;
 	};
@@ -311,6 +313,20 @@ public:
 		int animation_index,
 		DirectX::XMFLOAT3& out_min,
 		DirectX::XMFLOAT3& out_max
+	) const;
+
+	/**
+	 * @brief コリジョン用三角形データを取得
+	 *
+	 * モデルの全メッシュからワールド変換済みの三角形頂点リストを抽出する。
+	 * 静的コリジョンメッシュの構築に使用する。
+	 *
+	 * @param world_matrix インスタンスのワールド変換行列
+	 * @param out_vertices 出力：三角形頂点リスト（3頂点で1三角形）
+	 */
+	void extract_collision_triangles(
+		const DirectX::XMFLOAT4X4& world_matrix,
+		std::vector<DirectX::XMFLOAT3>& out_vertices
 	) const;
 private:
 	//util

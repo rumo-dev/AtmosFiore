@@ -322,6 +322,25 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				primitive.index_buffer_view.buffer.ReleaseAndGetAddressOf());
 			_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
+			// CPU-side copy of indices for collision triangle extraction
+			{
+				const void* raw = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()
+					+ gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
+				primitive.cpu_indices.resize(gltf_accessor.count);
+				if (gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+				{
+					const uint16_t* src = reinterpret_cast<const uint16_t*>(raw);
+					for (size_t i = 0; i < gltf_accessor.count; ++i)
+						primitive.cpu_indices[i] = static_cast<uint32_t>(src[i]);
+				}
+				else if (gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+				{
+					const uint32_t* src = reinterpret_cast<const uint32_t*>(raw);
+					for (size_t i = 0; i < gltf_accessor.count; ++i)
+						primitive.cpu_indices[i] = src[i];
+				}
+			}
+
 			// Create vertex buffers
 			for (std::map<std::string, int>::const_reference gltf_attribute : gltf_primitive.attributes)
 			{
@@ -980,4 +999,56 @@ void Gltf_Model::animate_all(float time, std::vector<node>& animated_nodes)
 	}
 
 	cumulate_transforms(animated_nodes);
+}
+
+void Gltf_Model::extract_collision_triangles(
+	const DirectX::XMFLOAT4X4& world_matrix,
+	std::vector<DirectX::XMFLOAT3>& out_vertices) const
+{
+	using namespace DirectX;
+	XMMATRIX world = XMLoadFloat4x4(&world_matrix);
+
+	// ノードインデックス → グローバル変換のマップを構築
+	// nodes[i].global_transform はすでに cumulate_transforms で計算済み
+	for (size_t node_idx = 0; node_idx < nodes.size(); ++node_idx)
+	{
+		const auto& nd = nodes[node_idx];
+		if (nd.mesh < 0 || nd.mesh >= static_cast<int>(meshes.size()))
+			continue;
+
+		// ノードローカル→ワールド変換
+		XMMATRIX node_world = XMLoadFloat4x4(&nd.global_transform) * world;
+
+		const auto& msh = meshes[nd.mesh];
+		for (const auto& prim : msh.primitives)
+		{
+			const auto& pos = prim.cpu_positions;
+			const auto& idx = prim.cpu_indices;
+			if (pos.empty() || idx.size() < 3) continue;
+
+			// 3インデックスで1三角形
+			for (size_t i = 0; i + 2 < idx.size(); i += 3)
+			{
+				uint32_t i0 = idx[i + 0];
+				uint32_t i1 = idx[i + 1];
+				uint32_t i2 = idx[i + 2];
+				if (i0 >= pos.size() || i1 >= pos.size() || i2 >= pos.size())
+					continue;
+
+				// モデルローカル座標をワールドへ変換
+				XMVECTOR v0 = XMVector3TransformCoord(XMLoadFloat3(&pos[i0]), node_world);
+				XMVECTOR v1 = XMVector3TransformCoord(XMLoadFloat3(&pos[i1]), node_world);
+				XMVECTOR v2 = XMVector3TransformCoord(XMLoadFloat3(&pos[i2]), node_world);
+
+				XMFLOAT3 w0, w1, w2;
+				XMStoreFloat3(&w0, v0);
+				XMStoreFloat3(&w1, v1);
+				XMStoreFloat3(&w2, v2);
+
+				out_vertices.push_back(w0);
+				out_vertices.push_back(w1);
+				out_vertices.push_back(w2);
+			}
+		}
+	}
 }

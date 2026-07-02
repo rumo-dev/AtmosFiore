@@ -56,7 +56,7 @@ void Graphics_Core::set_render_targets() {
 void Graphics_Core::present(UINT sync_interval) {
 	//log_printf("画面の表示開始\n", LogLevel::Info);
 	//HRESULT hr = _swapchain.Get()->Present(sync_interval, static_cast<UINT>(graphics_constants::PresentFlags::None));
-	HRESULT hr = _swapchain.Get()->Present(0, 0);
+	HRESULT hr = _swapchain.Get()->Present(sync_interval, 0);
 	if (FAILED(hr)) {
 		//log_printf("画面の表示 >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
 	}
