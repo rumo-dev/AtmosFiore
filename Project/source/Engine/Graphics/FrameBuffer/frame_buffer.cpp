@@ -10,23 +10,20 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	D3D11_TEXTURE2D_DESC texture2d_desc{};
 	texture2d_desc.Width = width;
 	texture2d_desc.Height = height;
-	texture2d_desc.MipLevels = mip_levels;
+	texture2d_desc.MipLevels = 1;
 	texture2d_desc.ArraySize = 1;
 	texture2d_desc.Format = format;
 	texture2d_desc.SampleDesc.Count = 1;
 	texture2d_desc.SampleDesc.Quality = 0;
 	texture2d_desc.Usage = D3D11_USAGE_DEFAULT;
-	texture2d_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+	texture2d_desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 	texture2d_desc.CPUAccessFlags = 0;
-	texture2d_desc.MiscFlags = (mip_levels != 1) ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+	texture2d_desc.MiscFlags = mip_levels > 1 ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
 	hr = device->CreateTexture2D(&texture2d_desc, 0, render_target_buffer.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 	// レンダーターゲットビューの作成
 	D3D11_RENDER_TARGET_VIEW_DESC render_target_view_desc{};
 	render_target_view_desc.Format = texture2d_desc.Format;
-	// ★注意：ミップマップを持つテクスチャに対しては、一番親（MipLevel 0）に描画するように明示する
-	render_target_view_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-	render_target_view_desc.Texture2D.MipSlice = 0;
 	render_target_view_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
 	hr = device->CreateRenderTargetView(render_target_buffer.Get(), &render_target_view_desc, m_renderTargetView.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
@@ -34,8 +31,7 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	D3D11_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc{};
 	shader_resource_view_desc.Format = texture2d_desc.Format;
 	shader_resource_view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	shader_resource_view_desc.Texture2D.MostDetailedMip = 0;
-	shader_resource_view_desc.Texture2D.MipLevels = (mip_levels == 0) ? -1 : mip_levels;
+	shader_resource_view_desc.Texture2D.MipLevels = 1;
 	hr = device->CreateShaderResourceView(render_target_buffer.Get(), &shader_resource_view_desc, m_colorMap.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 	// 深度ステンシルバッファの作成

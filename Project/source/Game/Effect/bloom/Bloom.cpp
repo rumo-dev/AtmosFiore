@@ -163,7 +163,6 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 
 
 	bloom_final->Deactivate(immediate_context);
-	immediate_context->GenerateMips(bloom_final->GetColorMap());
 	// Restore states
 	immediate_context->PSSetConstantBuffers(8, 1, cached_constant_buffer.GetAddressOf());
 

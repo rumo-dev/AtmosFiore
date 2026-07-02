@@ -271,6 +271,65 @@ inline void CapsuleCastTriangles(
 	float move_len = dx::XMVectorGetX(dx::XMVector3Length(out_corrected));
 	if (move_len < 1e-6f) return;
 
+	// カプセルの現在の位置と移動後の位置を包む最大AABBを計算する
+	dx::XMFLOAT3 cb, ct;
+	dx::XMStoreFloat3(&cb, capsule.base);
+	dx::XMStoreFloat3(&ct, capsule.tip);
+
+	float r = capsule.radius;
+	float cap_min_x = (std::min)(cb.x, ct.x) - r;
+	float cap_max_x = (std::max)(cb.x, ct.x) + r;
+	float cap_min_y = (std::min)(cb.y, ct.y) - r;
+	float cap_max_y = (std::max)(cb.y, ct.y) + r;
+	float cap_min_z = (std::min)(cb.z, ct.z) - r;
+	float cap_max_z = (std::max)(cb.z, ct.z) + r;
+
+	dx::XMFLOAT3 d;
+	dx::XMStoreFloat3(&d, move_delta);
+
+	float sweep_min_x = (std::min)(cap_min_x, cap_min_x + d.x);
+	float sweep_max_x = (std::max)(cap_max_x, cap_max_x + d.x);
+	float sweep_min_y = (std::min)(cap_min_y, cap_min_y + d.y);
+	float sweep_max_y = (std::max)(cap_max_y, cap_max_y + d.y);
+	float sweep_min_z = (std::min)(cap_min_z, cap_min_z + d.z);
+	float sweep_max_z = (std::max)(cap_max_z, cap_max_z + d.z);
+
+	// 最大AABBと交差する三角形だけをローカルバッファに抽出する
+	// アロケーションを避けるため thread_local vector を再利用
+	thread_local std::vector<CollisionTriangle> culled_triangles;
+	culled_triangles.clear();
+
+	size_t tri_count = triangles.size() / 3;
+	for (size_t ti = 0; ti < tri_count; ++ti)
+	{
+		const dx::XMFLOAT3& p0 = triangles[ti * 3 + 0];
+		const dx::XMFLOAT3& p1 = triangles[ti * 3 + 1];
+		const dx::XMFLOAT3& p2 = triangles[ti * 3 + 2];
+
+		float tri_min_x = (std::min)({ p0.x, p1.x, p2.x });
+		float tri_max_x = (std::max)({ p0.x, p1.x, p2.x });
+		float tri_min_y = (std::min)({ p0.y, p1.y, p2.y });
+		float tri_max_y = (std::max)({ p0.y, p1.y, p2.y });
+		float tri_min_z = (std::min)({ p0.z, p1.z, p2.z });
+		float tri_max_z = (std::max)({ p0.z, p1.z, p2.z });
+
+		// AABB交差判定
+		if (tri_max_x < sweep_min_x || tri_min_x > sweep_max_x ||
+			tri_max_y < sweep_min_y || tri_min_y > sweep_max_y ||
+			tri_max_z < sweep_min_z || tri_min_z > sweep_max_z)
+		{
+			continue;
+		}
+
+		culled_triangles.push_back({
+			dx::XMLoadFloat3(&p0),
+			dx::XMLoadFloat3(&p1),
+			dx::XMLoadFloat3(&p2)
+		});
+	}
+
+	if (culled_triangles.empty()) return;
+
 	for (int iter = 0; iter < max_iterations; ++iter)
 	{
 		float iter_len = dx::XMVectorGetX(dx::XMVector3Length(out_corrected));
@@ -286,15 +345,8 @@ inline void CapsuleCastTriangles(
 		dx::XMVECTOR best_n = dx::XMVectorZero();
 		bool         hit_any = false;
 
-		size_t tri_count = triangles.size() / 3;
-		for (size_t ti = 0; ti < tri_count; ++ti)
+		for (const auto& tri : culled_triangles)
 		{
-			CollisionTriangle tri{
-				dx::XMLoadFloat3(&triangles[ti * 3 + 0]),
-				dx::XMLoadFloat3(&triangles[ti * 3 + 1]),
-				dx::XMLoadFloat3(&triangles[ti * 3 + 2])
-			};
-
 			// 下スフィア
 			RayHitResult r0 = SphereCastTriangle(ray_bot, capsule.radius, tri, best_t);
 			if (r0.hit && r0.t < best_t)
@@ -364,13 +416,42 @@ inline bool GroundRayCast(
 	float best_t = max_dist;
 	bool  hit_any = false;
 
+	dx::XMFLOAT3 f;
+	dx::XMStoreFloat3(&f, from);
+
+	float ray_min_x = f.x - 1e-4f;
+	float ray_max_x = f.x + 1e-4f;
+	float ray_min_y = f.y - max_dist;
+	float ray_max_y = f.y;
+	float ray_min_z = f.z - 1e-4f;
+	float ray_max_z = f.z + 1e-4f;
+
 	size_t tri_count = triangles.size() / 3;
 	for (size_t ti = 0; ti < tri_count; ++ti)
 	{
+		const dx::XMFLOAT3& p0 = triangles[ti * 3 + 0];
+		const dx::XMFLOAT3& p1 = triangles[ti * 3 + 1];
+		const dx::XMFLOAT3& p2 = triangles[ti * 3 + 2];
+
+		float tri_min_x = (std::min)({ p0.x, p1.x, p2.x });
+		float tri_max_x = (std::max)({ p0.x, p1.x, p2.x });
+		float tri_min_y = (std::min)({ p0.y, p1.y, p2.y });
+		float tri_max_y = (std::max)({ p0.y, p1.y, p2.y });
+		float tri_min_z = (std::min)({ p0.z, p1.z, p2.z });
+		float tri_max_z = (std::max)({ p0.z, p1.z, p2.z });
+
+		// AABB交差判定
+		if (tri_max_x < ray_min_x || tri_min_x > ray_max_x ||
+			tri_max_y < ray_min_y || tri_min_y > ray_max_y ||
+			tri_max_z < ray_min_z || tri_min_z > ray_max_z)
+		{
+			continue;
+		}
+
 		CollisionTriangle tri{
-			dx::XMLoadFloat3(&triangles[ti * 3 + 0]),
-			dx::XMLoadFloat3(&triangles[ti * 3 + 1]),
-			dx::XMLoadFloat3(&triangles[ti * 3 + 2])
+			dx::XMLoadFloat3(&p0),
+			dx::XMLoadFloat3(&p1),
+			dx::XMLoadFloat3(&p2)
 		};
 
 		RayHitResult res = RayCastTriangle(down_ray, tri, best_t);
@@ -424,6 +505,9 @@ public:
 		size_t tri_count = triangles.size() / 3;
 		_cells.reserve(tri_count); // ざっくり予約
 
+		_visited_tokens.assign(tri_count, 0);
+		_query_token = 0;
+
 		for (size_t ti = 0; ti < tri_count; ++ti)
 		{
 			const dx::XMFLOAT3& p0 = triangles[ti * 3 + 0];
@@ -467,7 +551,13 @@ public:
 		int cz0 = static_cast<int>(std::floor((center.z - radius) / _cell_size));
 		int cz1 = static_cast<int>(std::floor((center.z + radius) / _cell_size));
 
-		std::unordered_set<int> visited;
+		_query_token++;
+		if (_query_token == 0)
+		{
+			std::fill(_visited_tokens.begin(), _visited_tokens.end(), 0);
+			_query_token = 1;
+		}
+
 		for (int cx = cx0; cx <= cx1; ++cx)
 		{
 			for (int cz = cz0; cz <= cz1; ++cz)
@@ -477,7 +567,8 @@ public:
 
 				for (int ti : it->second)
 				{
-					if (!visited.insert(ti).second) continue; // 重複三角形除去
+					if (_visited_tokens[ti] == _query_token) continue;
+					_visited_tokens[ti] = _query_token;
 					out.push_back((*_triangles)[ti * 3 + 0]);
 					out.push_back((*_triangles)[ti * 3 + 1]);
 					out.push_back((*_triangles)[ti * 3 + 2]);
@@ -501,4 +592,7 @@ private:
 	float _cell_size = 2.0f;
 	const std::vector<dx::XMFLOAT3>* _triangles = nullptr;
 	std::unordered_map<int64_t, std::vector<int>> _cells;
+
+	mutable std::vector<uint32_t> _visited_tokens;
+	mutable uint32_t _query_token = 0;
 };

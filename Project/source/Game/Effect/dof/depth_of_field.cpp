@@ -29,15 +29,15 @@ DepthOfField::DepthOfField(
 	// ---- CoC マップ（フル解像度） ----
 	coc_map = std::make_unique<Framebuffer>(
 		device, full_width, full_height,
-		DXGI_FORMAT_R16G16_FLOAT, false);
+		DXGI_FORMAT_R16G16_FLOAT, 1, false);
 
 	// ---- Near / Far 分離バッファ（ワーク解像度） ----
 	near_field = std::make_unique<Framebuffer>(
 		device, work_width, work_height,
-		DXGI_FORMAT_R16G16B16A16_FLOAT, false);
+		DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
 	far_field = std::make_unique<Framebuffer>(
 		device, work_width, work_height,
-		DXGI_FORMAT_R16G16B16A16_FLOAT, false);
+		DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
 
 	// ---- FFS ブラー結果テクスチャ [0]=near, [1]=far ----
 	// CS の RWTexture2D（UAV）として書き込み、PS の SRV として読む
@@ -80,9 +80,9 @@ DepthOfField::DepthOfField(
 	// ---- 最終出力（フル解像度） ----
 	dof_final = std::make_unique<Framebuffer>(
 		device, full_width, full_height,
-		DXGI_FORMAT_R16G16B16A16_FLOAT, 0, false);
+		DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
 
-	// ---- FFS デルタバッファ ----
+	// ---- FFS デルタバッファ ----`
 	// パディング: 各辺に (MaxBlurRadius + 1) ピクセル追加
 	// MaxBlurRadius の最大値を定数で決め打ち（例: 64px）
 	//   → 実行時に MaxBlurRadius が変化した場合は再生成が必要

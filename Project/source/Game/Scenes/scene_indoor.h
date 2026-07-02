@@ -87,7 +87,7 @@ private:
 	std::vector<DirectX::XMFLOAT3> _nearby_collision_triangles;
 
 	/// プレイヤー周辺の三角形を検索する半径（m）
-	static constexpr float COLLISION_QUERY_RADIUS = 5.0f;
+	static constexpr float COLLISION_QUERY_RADIUS = 2.0f;
 
 	/**
 	 * @brief 指定インスタンスを当たり判定対象として登録する

@@ -252,7 +252,7 @@ private:
 		}
 
 		// 床接地（GroundRayCast）
-		if (_enable_ground_snap && collision_triangles && !collision_triangles->empty())
+		if (_enable_ground_snap && len > 0.001f && collision_triangles && !collision_triangles->empty())
 		{
 			// 腰部あたりからレイを下ろす
 			dx::XMVECTOR snap_origin = dx::XMVectorAdd(
