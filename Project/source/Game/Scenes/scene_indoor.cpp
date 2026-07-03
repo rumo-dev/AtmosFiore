@@ -11,10 +11,7 @@
 #include "Game/World/camera/quarter_view_camera.h"
 #include "Game/World/camera/cinematic_camera.h"
 
-
-
 #include "Engine/Audio/AudioSystem.h"
-
 
 #include "Game/World/camera/camera_manager.h"
 #include <string>
@@ -75,102 +72,62 @@ void Scene_Indoor::initialize()
 	log_printf("objモデルシーン初期化開始\n", LogLevel::Info);
 	ID3D11Device* device = Graphics_Core::instance().get_device();
 
-	//Graphics_Core::instance().get_point_light_manager().add_light({ 0,2,1 });
-	//ライトを1024個追加してみる（）
-	//色や強度もランダム
-
 	// スポットライトの追加
-	//Graphics_Core::instance().get_spot_light_manager().add_light(
-	//	{ 0, 5, 0 },           // 位置
-	//	{ 0, -1, 0 },          // 方向（下向き）
-	//	10.0f,                 // 半径
-	//	2.0f,                  // 強度
-	//	0.3f,                  // 内角
-	//	0.6f,                  // 外角
-	//	{ 1.0f, 0.8f, 0.6f, 1.0f } // 色
-	//);
-	//spotLightを1024個Intencity以外ランダムで追加
-
 	for (int i = 0; i < 1; i++) {
-		float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
-		float r = Random::Range(5.0f, 15.0f); // 半径をランダム化
-		float intensity = Random::Range(5.0f, 15.0f); // 強度をランダム化
-		float innerAngle = Random::Range(0.1f, 0.5f); // 内角をランダム化
-		float outerAngle = Random::Range(0.4f, 0.8f); // 外角をランダム化
-		dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) }; // ランダムな方向（下向きが多め）
-		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るいz色
+		float x = Random::Range(-10.0f, 10.0f);
+		float z = Random::Range(-10.0f, 10.0f);
+		float y = Random::Range(3.0f, 7.0f);
+		float r = Random::Range(5.0f, 15.0f);
+		float intensity = Random::Range(5.0f, 15.0f);
+		float innerAngle = Random::Range(0.1f, 0.5f);
+		float outerAngle = Random::Range(0.4f, 0.8f);
+		dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) };
+		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f);
 		Graphics_Core::instance().get_spot_light_manager().add_light({ x, y, z }, direction, r, intensity, innerAngle, outerAngle, diffuseColor);
 	}
 
+	// ポイントライトの追加
 	for (int i = 0; i < 1; i++) {
-		float x = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float z = Random::Range(-10.0f, 10.0f); // -10～10の範囲で配置
-		float y = Random::Range(3.0f, 7.0f); // 高さをランダム化
-		float r = 5.0f; // 半径は固定（必要に応じてランダム化も可能）
-		float intensity = 10.0f; // 強度は固定（必要に応じてランダム化も可能）
-		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f); // ランダムな色相の明るい色
+		float x = Random::Range(-10.0f, 10.0f);
+		float z = Random::Range(-10.0f, 10.0f);
+		float y = Random::Range(3.0f, 7.0f);
+		float r = 5.0f;
+		float intensity = 10.0f;
+		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f);
 		Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
 	}
 	Graphics_Core::instance().get_area_light_manager().add_light();
 
-	ModelInstance s;
-	s.model_key = "Library";
-	s.world_transform = make_world_matrix(
+	// ライブラリモデルの登録
+	ModelInstance library;
+	library.model_key = "Library";
+	library.world_transform = make_world_matrix(
 		CoordinateSystem::RH_Y_UP,
 		{ 1,1,1 },
 		{ 0,3.5f,0 },
 		{ 0,0,0 },
 		1.0f);
-	s.is_animation = false;
-	s.animation_index = 12;
-	s.animation_time = 0.f;
-	s.loop_animation = true;
-	s.animation_speed = 0.01f;
-	s.anim_mode = Gltf_Model::animation_mode::all;
+	library.is_animation = false;
+	library.animation_index = 12;
+	library.animation_time = 0.f;
+	library.loop_animation = true;
+	library.animation_speed = 0.01f;
+	library.anim_mode = Gltf_Model::animation_mode::all;
 
-
-
-	//// 追加時のデバッグ
 	auto& mgr = Resource_Manager::instance().model_manager;
-
-	mgr.add_instance("Library", s);
+	mgr.add_instance("Library", library);
 
 	// -----------------------------------------------------------------------
 	// 当たり判定対象インスタンスの登録
 	// -----------------------------------------------------------------------
-	// "Library" インスタンスだけを明示的に当たり判定対象として登録する。
-	// model_manager に他のインスタンスを追加しても、ここで register_collision_instance()
-	// を呼ばない限り _collision_triangles には混入しない。
 	clear_collision_instances();
-	register_collision_instance("Library", s.world_transform);
-	// 複数インスタンスを当たり判定に含めたい場合はここに追加で呼ぶ
-	// register_collision_instance("Terrain", terrain_instance.world_transform);
-
+	register_collision_instance("Library", library.world_transform);
 	rebuild_collision_grid();
-
-	//ModelInstance c;
-	//c.world_transform = make_world_matrix(
-	//	CoordinateSystem::RH_Y_UP,
-	//	{ 10,10,10 },
-	//	{ 0,3.5f,0 },
-	//	{ 0,3,0 },
-	//	1.f);
-	//c.model_key = "Spider";
-	//c.is_animation = true;
-	//c.animation_index = 0;
-	//c.animation_time = 0.f;
-	//c.loop_animation = true;
-	//c.animation_speed = 0.001f;
-	//c.anim_mode = Gltf_Model::animation_mode::single;
-	//mgr.add_instance("DamagedHelmet", c);
-
 
 	IBL::Initialize(device, L"./data/ibl");
 
 	// -------------------------------------------------------------
-	// ?? すべてのカメラの生成と登録
+	// すべてのカメラの生成と登録
 	// -------------------------------------------------------------
 	HWND hwnd = Graphics_Core::instance().get_window_handle();
 	auto& camera_mgr = Camera_Manager::instance();
@@ -193,49 +150,46 @@ void Scene_Indoor::initialize()
 
 	// 6. シネマティックカメラ
 	auto cinematic_cam = std::make_shared<Cinematic_Camera>();
-	// ルート（ウェイポイント）の登録（ダミー → 本番ポイント → ダミー）
-	cinematic_cam->add_way_point(dx::XMVectorSet(-10.0f, 5.0f, -15.0f, 1.0f), target_pos); // P0:ダミー
-	cinematic_cam->add_way_point(dx::XMVectorSet(-5.0f, 4.0f, -10.0f, 1.0f), target_pos); // P1:始点
-	cinematic_cam->add_way_point(dx::XMVectorSet(0.0f, 8.0f, -8.0f, 1.0f), target_pos); // P2:経由
-	cinematic_cam->add_way_point(dx::XMVectorSet(5.0f, 4.0f, -10.0f, 1.0f), target_pos); // P3:終点
-	cinematic_cam->add_way_point(dx::XMVectorSet(10.0f, 5.0f, -15.0f, 1.0f), target_pos); // P4:ダミー
+	cinematic_cam->add_way_point(dx::XMVectorSet(-10.0f, 5.0f, -15.0f, 1.0f), target_pos);
+	cinematic_cam->add_way_point(dx::XMVectorSet(-5.0f, 4.0f, -10.0f, 1.0f), target_pos);
+	cinematic_cam->add_way_point(dx::XMVectorSet(0.0f, 8.0f, -8.0f, 1.0f), target_pos);
+	cinematic_cam->add_way_point(dx::XMVectorSet(5.0f, 4.0f, -10.0f, 1.0f), target_pos);
+	cinematic_cam->add_way_point(dx::XMVectorSet(10.0f, 5.0f, -15.0f, 1.0f), target_pos);
 	camera_mgr.register_camera("Cinematic", cinematic_cam);
 
-	// デフォルトカメラをスペクテイターに設定
-	camera_mgr.switch_camera("Spectator");
-	float elapsedTime = 0.0f; // 初期化時のダミー値
+	// デフォルトカメラをサードパーソンに設定
+	camera_mgr.switch_camera("ThirdPerson");
 
 	// -----------------------------------------------------------------
-	// プレイヤー初期化
+	// プレイヤー（ドローン）初期化
 	// -----------------------------------------------------------------
-	// プレイヤー前方を照らすスポットライトを事前に登録し、インデックスを記憶する
 	auto& spot_mgr = Graphics_Core::instance().get_spot_light_manager();
 	_player_spotlight_index = static_cast<int>(spot_mgr.get_lights().size());
 	spot_mgr.add_light(
-		{ 0.0f, 1.5f, 0.0f },   // 初期位置（後で毎フレーム上書き）
-		{ 0.0f, 0.0f, 1.0f },   // 初期方向（後で毎フレーム上書き）
-		15.0f,                   // 半径
-		8.0f,                    // 強度
-		0.15f,                   // 内角
-		0.40f,                   // 外角
-		{ 1.0f, 0.95f, 0.85f, 1.0f } // 暖色系白
+		{ 0.0f, -0.8f, 0.0f },
+		{ 0.0f, -1.0f, 0.0f },
+		20.0f,
+		12.0f,
+		0.10f,
+		0.30f,
+		{ 1.0f, 0.9f, 0.7f, 1.0f }
 	);
 
 	_player.initialize(
 		hwnd,
-		dx::XMVectorSet(0.0f, 10.0f, 0.0f, 1.0f),
+		dx::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f),
 		_player_spotlight_index
 	);
 
 	// -------------------------------------------------------------
-	// プレイヤーモデルの登録（Spider）
+	// プレイヤーモデルの登録（ドローン）
 	// -------------------------------------------------------------
 	ModelInstance player_model;
-	player_model.model_key = "Spider";
+	player_model.model_key = _player.get_model_name();  // ← モデル名をPlayerから取得
 	player_model.world_transform = _player.get_world_transform();
 	player_model.is_animation = true;
 	player_model.animation_index = 0;
-	player_model.animation_time = 0.01f;
+	player_model.animation_time = 0.0f;
 	player_model.loop_animation = true;
 	player_model.animation_speed = 1.0f;
 	player_model.anim_mode = Gltf_Model::animation_mode::single;
@@ -247,7 +201,6 @@ void Scene_Indoor::initialize()
 
 // 終了化
 void Scene_Indoor::finalize() {
-	//sprite_object[static_cast<int>(Sprite_Type::None)] & delete;
 	Graphics_Core::instance().get_point_light_manager().clear_light();
 	Graphics_Core::instance().get_spot_light_manager().clear_light();
 	clear_collision_instances();
@@ -259,14 +212,11 @@ void Scene_Indoor::update(float elapsedTime)
 {
 	auto& camera_mgr = Camera_Manager::instance();
 
-
 	// -----------------------------------------------------------------
 	// カメラ更新
 	// -----------------------------------------------------------------
-	// アクティブカメラの向き（Yaw）をビュー行列から逆算してプレイヤーに渡す
 	auto& active_cam = camera_mgr.get_active_camera()->get_camera();
 
-	// カメラ前方ベクトル（target - position）からYaw・Pitchを計算
 	dx::XMFLOAT3 cam_pos_f, cam_tar_f;
 	dx::XMStoreFloat3(&cam_pos_f, active_cam.position);
 	dx::XMStoreFloat3(&cam_tar_f, active_cam.target);
@@ -281,18 +231,14 @@ void Scene_Indoor::update(float elapsedTime)
 	// -----------------------------------------------------------------
 	// コリジョン三角形をプレイヤー周辺だけに絞り込む
 	// -----------------------------------------------------------------
-	// 空間グリッドから、プレイヤー座標を中心に COLLISION_QUERY_RADIUS 以内の
-	// 三角形だけを抽出する。これにより、シーン全体の三角形を毎フレーム
-	// 総当たりする必要がなくなり、移動中の負荷が大幅に下がる。
 	dx::XMFLOAT3 player_pos_f;
 	dx::XMStoreFloat3(&player_pos_f, _player.get_position());
 	_collision_grid.query(player_pos_f, COLLISION_QUERY_RADIUS, _nearby_collision_triangles);
 
-	// プレイヤー更新（絞り込み済みコリジョン三角形リストを渡す）
+	// プレイヤー更新
 	_player.update(elapsedTime, cam_yaw_deg, cam_pitch_deg,
 		_nearby_collision_triangles.empty() ? nullptr : &_nearby_collision_triangles);
 
-	// プレイヤーの実座標
 	dx::XMVECTOR player_pos = _player.get_position();
 
 	std::string active_name = camera_mgr.get_active_camera_name();
@@ -310,12 +256,11 @@ void Scene_Indoor::update(float elapsedTime)
 		camera_mgr.update(elapsedTime);
 	}
 	else {
-		// 引数の要らない通常カメラ（Spectator, Orbit, QuarterView, Cinematic）は一括更新
 		camera_mgr.update(elapsedTime);
 	}
 
 	// -----------------------------------------------------------------
-	// プレイヤー前方スポットライトを毎フレーム更新
+	// プレイヤー真下スポットライトを毎フレーム更新
 	// -----------------------------------------------------------------
 	auto& spot_lights = Graphics_Core::instance().get_spot_light_manager().get_lights();
 	if (_player_spotlight_index >= 0 &&
@@ -331,7 +276,6 @@ void Scene_Indoor::update(float elapsedTime)
 		pl.diffuseColor = _player.get_light_color();
 	}
 
-	// _directional_light.set_camera(Camera_Manager::instance().get_active_camera()->get_camera());
 	_directional_light.update();
 	_directional_light.tick(elapsedTime);
 	IBL::Bind(Graphics_Core::instance().get_device_context());
@@ -345,7 +289,6 @@ void Scene_Indoor::update(float elapsedTime)
 	// -----------------------------------------------------------------
 	// プレイヤーモデルインスタンスの更新とデバッグ操作の受付
 	// -----------------------------------------------------------------
-	// Kキーで死亡状態トグル
 	static bool k_pressed = false;
 	if (GetAsyncKeyState('K') & 0x8000)
 	{
@@ -360,41 +303,53 @@ void Scene_Indoor::update(float elapsedTime)
 		k_pressed = false;
 	}
 
-	// Gキーで大きい待機アニメーショントリガー
-	static bool g_pressed = false;
-	if (GetAsyncKeyState('G') & 0x8000)
-	{
-		if (!g_pressed)
-		{
-			_player.trigger_idle_large();
-			g_pressed = true;
-		}
-	}
-	else
-	{
-		g_pressed = false;
-	}
-
 	auto player_inst = Resource_Manager::instance().model_manager.get_instance("Player");
 	if (player_inst)
 	{
 		player_inst->world_transform = _player.get_world_transform();
 		player_inst->animation_speed = _player.get_animation_speed();
-		player_inst->loop_animation = (_player.get_animation_index() != 3);
+		player_inst->loop_animation = true;
 
-		// --- ここを変更：アニメーションの種類が変わった瞬間だけ時間を0にする ---
+		// モデル名が変更されたら再登録
+		static std::string last_model_name = _player.get_model_name();
+		if (last_model_name != _player.get_model_name())
+		{
+			last_model_name = _player.get_model_name();
+
+			// 古いインスタンスを削除
+			Resource_Manager::instance().model_manager.remove_instance("Player");
+
+			// 新しいモデルで再登録
+			ModelInstance new_model;
+			new_model.model_key = _player.get_model_name();
+			new_model.world_transform = _player.get_world_transform();
+			new_model.is_animation = true;
+			new_model.animation_index = 0;
+			new_model.animation_time = 0.0f;
+			new_model.loop_animation = true;
+			new_model.animation_speed = 1.0f;
+			new_model.anim_mode = Gltf_Model::animation_mode::single;
+
+			Resource_Manager::instance().model_manager.add_instance("Player", new_model);
+			player_inst = Resource_Manager::instance().model_manager.get_instance("Player");
+		}
+
 		int next_anim_index = _player.get_animation_index();
 		if (player_inst->animation_index != next_anim_index)
 		{
 			player_inst->animation_index = next_anim_index;
-			player_inst->animation_time = 0.0f; // モーション切り替え時のみリセット
+			player_inst->animation_time = 0.0f;
 		}
-		// インデックスが同じ間は、player_inst->animation_time を弄らない！
-		//（model_manager.update 内で自動で進むようにする）
+		std::string active_name = camera_mgr.get_active_camera_name();
+		if (active_name == "FirstPerson") {
+			player_inst->visible = false;
+		}
+		else {
+			player_inst->visible = true;
+		}
 	}
 
-	// 最後にマネージャー全体の時間を進める
-	Resource_Manager::instance().model_manager.update(elapsedTime);;
+	Resource_Manager::instance().model_manager.update(elapsedTime);
 }
 
 // 描画処理
@@ -404,7 +359,6 @@ void Scene_Indoor::render(float elapsedTime) {
 	render_shadowmap(elapsedTime);
 	render_defferd(elapsedTime);
 	render_forward(elapsedTime);
-	//render_debug(elapsedTime);
 	render_UI(elapsedTime);
 }
 

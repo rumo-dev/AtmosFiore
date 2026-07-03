@@ -29,13 +29,14 @@ private:
 	float _max_pitch = 80.0f;
 
 	// 追従対象の最新座標を保持する変数
-	dx::XMVECTOR _target_position{ dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f) };
-
+	dx::XMVECTOR _target_position{ dx::XMVectorSet(0,0,0,1) };
+	dx::XMVECTOR _smoothed_target{ dx::XMVectorSet(0,0,0,1) };
 public:
 	Third_Person_Camera(HWND hwnd = nullptr) : _hwnd(hwnd) {
 		camera_.position = dx::XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
 		camera_.target = dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		camera_.up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		_smoothed_target = _target_position;
 	}
 
 	/**
@@ -49,33 +50,65 @@ public:
 	 * @brief マネージャーから毎フレーム呼ばれる主更新処理
 	 */
 	void update(float deltaTime) override {
-		// 1. 右クリックドラッグによる視点旋回処理
+
+		//=========================================
+		// 1. マウスによる回転
+		//=========================================
 		if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) {
+
 			POINT current_mouse_pos;
 			GetCursorPos(&current_mouse_pos);
-			if (_hwnd) ScreenToClient(_hwnd, &current_mouse_pos);
+
+			if (_hwnd)
+				ScreenToClient(_hwnd, &current_mouse_pos);
 
 			if (_first_mouse) {
 				_last_mouse_pos = current_mouse_pos;
 				_first_mouse = false;
 			}
 			else {
-				float offsetX = static_cast<float>(current_mouse_pos.x - _last_mouse_pos.x);
-				float offsetY = static_cast<float>(current_mouse_pos.y - current_mouse_pos.y);
+
+				float offsetX =
+					static_cast<float>(
+						current_mouse_pos.x - _last_mouse_pos.x
+						);
+
+				// 修正: 元コードは常に0になっていた
+				float offsetY =
+					static_cast<float>(
+						_last_mouse_pos.y - current_mouse_pos.y
+						);
+
 				_last_mouse_pos = current_mouse_pos;
 
-				_yaw += offsetX * _mouse_sensitivity;
+				_yaw -= offsetX * _mouse_sensitivity;
 				_pitch += offsetY * _mouse_sensitivity;
 
-				// 地面にめり込んだり真上で行き過ぎたりしないようクランプ
-				_pitch = std::clamp(_pitch, _min_pitch, _max_pitch);
+				_pitch = std::clamp(
+					_pitch,
+					_min_pitch,
+					_max_pitch
+				);
 			}
 		}
 		else {
 			_first_mouse = true;
 		}
 
-		// 2. 回転角（ヨー・ピッチ）から球面座標のオフセットベクトルを計算
+
+		//=========================================
+		// 2. ターゲット位置を滑らかに追従
+		//=========================================
+		_smoothed_target = dx::XMVectorLerp(
+			_smoothed_target,
+			_target_position,
+			_lerp_factor
+		);
+
+
+		//=========================================
+		// 3. カメラのオフセット計算
+		//=========================================
 		float pitch_rad = dx::XMConvertToRadians(_pitch);
 		float yaw_rad = dx::XMConvertToRadians(_yaw);
 
@@ -85,22 +118,65 @@ public:
 			cosf(pitch_rad) * sinf(yaw_rad),
 			0.0f
 		);
-		offset = dx::XMVectorScale(dx::XMVector3Normalize(offset), _distance);
 
-		// 3. 目標とするカメラ位置（キャラクター座標 + オフセット）
-		dx::XMVECTOR desired_position = dx::XMVectorAdd(_target_position, offset);
+		offset = dx::XMVectorScale(
+			dx::XMVector3Normalize(offset),
+			_distance
+		);
 
-		// 4. 線形補間(Lerp)を用いて滑らかに追従
-		camera_.position = dx::XMVectorLerp(camera_.position, desired_position, _lerp_factor);
 
-		// 注視点は常にキャラクターの座標
-		camera_.target = _target_position;
+		//=========================================
+		// 4. 目標カメラ位置
+		//=========================================
+		dx::XMVECTOR desired_position =
+			dx::XMVectorAdd(_smoothed_target, offset);
 
-		// ビュー行列が崩れないよう、直交する正確なUpベクトルを再計算
-		dx::XMVECTOR world_up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-		dx::XMVECTOR forward = dx::XMVector3Normalize(dx::XMVectorSubtract(camera_.target, camera_.position));
-		dx::XMVECTOR right = dx::XMVector3Normalize(dx::XMVector3Cross(world_up, forward));
-		camera_.up = dx::XMVector3Normalize(dx::XMVector3Cross(forward, right));
+
+		//=========================================
+		// 5. カメラ位置も滑らかに補間
+		//=========================================
+		camera_.position = dx::XMVectorLerp(
+			camera_.position,
+			desired_position,
+			_lerp_factor
+		);
+
+
+		//=========================================
+		// 6. 注視点も遅延させる
+		//=========================================
+		camera_.target = _smoothed_target;
+
+
+		//=========================================
+		// 7. Upベクトル再計算
+		//=========================================
+		dx::XMVECTOR world_up =
+			dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+		dx::XMVECTOR forward =
+			dx::XMVector3Normalize(
+				dx::XMVectorSubtract(
+					camera_.target,
+					camera_.position
+				)
+			);
+
+		dx::XMVECTOR right =
+			dx::XMVector3Normalize(
+				dx::XMVector3Cross(
+					world_up,
+					forward
+				)
+			);
+
+		camera_.up =
+			dx::XMVector3Normalize(
+				dx::XMVector3Cross(
+					forward,
+					right
+				)
+			);
 	}
 
 	void set_distance(float distance) { _distance = (std::max)(1.0f, distance); }

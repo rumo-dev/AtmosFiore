@@ -46,6 +46,13 @@ struct CollisionCapsule
 	float        radius; ///< 半径（m）
 };
 
+/// @brief ワールド空間の球体
+struct CollisionSphere
+{
+	dx::XMVECTOR center;  ///< 中心座標（w=1）
+	float        radius;  ///< 半径（m）
+};
+
 // ============================================================
 //  レイキャスト結果
 // ============================================================
@@ -109,7 +116,7 @@ inline RayHitResult RayCastTriangle(const Ray& ray, const CollisionTriangle& tri
 }
 
 // ============================================================
-//  SphereCast vs Triangle（スフィア掃引 vs 三角形）
+//  カプセル vs 三角形（スフィア掃引 vs 三角形）
 // ============================================================
 
 /**
@@ -325,7 +332,7 @@ inline void CapsuleCastTriangles(
 			dx::XMLoadFloat3(&p0),
 			dx::XMLoadFloat3(&p1),
 			dx::XMLoadFloat3(&p2)
-		});
+			});
 	}
 
 	if (culled_triangles.empty()) return;
@@ -388,6 +395,139 @@ inline void CapsuleCastTriangles(
 			out_corrected = dx::XMVectorScale(dir, best_t);
 			break;
 			// -----------------------------------------------------------
+		}
+	}
+}
+
+// ============================================================
+//  球体 vs 三角形リスト（壁ずり補正付き）
+// ============================================================
+
+/**
+ * @brief 三角形リストに対して球体キャストを行い、壁ずり補正後の移動ベクトルを返す
+ *
+ * 球体で SphereCastTriangle を実行し、
+ * 最も近い衝突面の法線に対して移動ベクトルの法線成分を除去（壁ずり）する。
+ * max_iterations 回反復することでコーナー処理も行う。
+ *
+ * @param sphere         現在フレームの球体（移動前）
+ * @param move_delta     今フレームの移動ベクトル
+ * @param triangles      ワールド空間三角形頂点リスト（3頂点で1三角形）
+ * @param out_corrected  補正後の移動ベクトル
+ * @param max_iterations 壁ずり反復回数（通常 3 で十分）
+ */
+inline void SphereCastTriangles(
+	const CollisionSphere& sphere,
+	const dx::XMVECTOR& move_delta,
+	const std::vector<dx::XMFLOAT3>& triangles,
+	dx::XMVECTOR& out_corrected,
+	int max_iterations = 3)
+{
+	out_corrected = move_delta;
+
+	float move_len = dx::XMVectorGetX(dx::XMVector3Length(out_corrected));
+	if (move_len < 1e-6f) return;
+
+	// ---- 球体の現在位置と移動後の位置を包む最大AABBを計算 ----
+	dx::XMFLOAT3 center_f;
+	dx::XMStoreFloat3(&center_f, sphere.center);
+
+	float r = sphere.radius;
+	float sphere_min_x = center_f.x - r;
+	float sphere_max_x = center_f.x + r;
+	float sphere_min_y = center_f.y - r;
+	float sphere_max_y = center_f.y + r;
+	float sphere_min_z = center_f.z - r;
+	float sphere_max_z = center_f.z + r;
+
+	dx::XMFLOAT3 d;
+	dx::XMStoreFloat3(&d, move_delta);
+
+	float sweep_min_x = (std::min)(sphere_min_x, sphere_min_x + d.x);
+	float sweep_max_x = (std::max)(sphere_max_x, sphere_max_x + d.x);
+	float sweep_min_y = (std::min)(sphere_min_y, sphere_min_y + d.y);
+	float sweep_max_y = (std::max)(sphere_max_y, sphere_max_y + d.y);
+	float sweep_min_z = (std::min)(sphere_min_z, sphere_min_z + d.z);
+	float sweep_max_z = (std::max)(sphere_max_z, sphere_max_z + d.z);
+
+	// ---- AABB交差する三角形だけを抽出 ----
+	thread_local std::vector<CollisionTriangle> culled_triangles;
+	culled_triangles.clear();
+
+	size_t tri_count = triangles.size() / 3;
+	for (size_t ti = 0; ti < tri_count; ++ti)
+	{
+		const dx::XMFLOAT3& p0 = triangles[ti * 3 + 0];
+		const dx::XMFLOAT3& p1 = triangles[ti * 3 + 1];
+		const dx::XMFLOAT3& p2 = triangles[ti * 3 + 2];
+
+		float tri_min_x = (std::min)({ p0.x, p1.x, p2.x });
+		float tri_max_x = (std::max)({ p0.x, p1.x, p2.x });
+		float tri_min_y = (std::min)({ p0.y, p1.y, p2.y });
+		float tri_max_y = (std::max)({ p0.y, p1.y, p2.y });
+		float tri_min_z = (std::min)({ p0.z, p1.z, p2.z });
+		float tri_max_z = (std::max)({ p0.z, p1.z, p2.z });
+
+		if (tri_max_x < sweep_min_x || tri_min_x > sweep_max_x ||
+			tri_max_y < sweep_min_y || tri_min_y > sweep_max_y ||
+			tri_max_z < sweep_min_z || tri_min_z > sweep_max_z)
+		{
+			continue;
+		}
+
+		culled_triangles.push_back({
+			dx::XMLoadFloat3(&p0),
+			dx::XMLoadFloat3(&p1),
+			dx::XMLoadFloat3(&p2)
+			});
+	}
+
+	if (culled_triangles.empty()) return;
+
+	// ---- 壁ずり反復 ----
+	dx::XMVECTOR current_pos = sphere.center;
+
+	for (int iter = 0; iter < max_iterations; ++iter)
+	{
+		float iter_len = dx::XMVectorGetX(dx::XMVector3Length(out_corrected));
+		if (iter_len < 1e-6f) break;
+
+		dx::XMVECTOR dir = dx::XMVector3Normalize(out_corrected);
+
+		// 球体の中心レイ
+		Ray sphere_ray{ current_pos, dir };
+
+		float        best_t = iter_len;
+		dx::XMVECTOR best_n = dx::XMVectorZero();
+		bool         hit_any = false;
+
+		for (const auto& tri : culled_triangles)
+		{
+			RayHitResult r = SphereCastTriangle(sphere_ray, sphere.radius, tri, best_t);
+			if (r.hit && r.t < best_t)
+			{
+				best_t = r.t;
+				best_n = r.normal;
+				hit_any = true;
+			}
+		}
+
+		if (!hit_any) break;
+
+		// 壁ずり：法線方向成分を除去
+		float dot = dx::XMVectorGetX(dx::XMVector3Dot(out_corrected, best_n));
+		if (dot < 0.0f)
+		{
+			out_corrected = dx::XMVectorSubtract(
+				out_corrected,
+				dx::XMVectorScale(best_n, dot)
+			);
+		}
+		else
+		{
+			// 貫通防止クランプ
+			out_corrected = dx::XMVectorScale(dir, best_t);
+			break;
 		}
 	}
 }
@@ -483,7 +623,7 @@ inline bool RayCastTriangles(
 	const Ray& ray,
 	const std::vector<dx::XMFLOAT3>& triangles,
 	float                            max_dist,
-	RayHitResult&                    out_result)
+	RayHitResult& out_result)
 {
 	out_result.hit = false;
 	out_result.t = max_dist;
