@@ -675,22 +675,41 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	{
 		_ASSERT_EXPR(FALSE, L"Unknown pass_mode");
 	}
-	std::vector<Gltf_Model::node> animated_nodes{ nodes };
+	std::vector<Gltf_Model::node> animated_nodes;
 
 	if (is_animation && animations.size() > 0)
 	{
+		// アニメーションする場合のみノードをコピーする。
+		// （以前はここが無条件のコピーになっており、非アニメーションモデルでも
+		//   毎フレーム5パス分、無駄にノード配列全体をヒープコピーしていた）
+		animated_nodes = nodes;
+
 		time += delta_time;
 
 		if (anim_mode == animation_mode::single)
 		{
-			current_animation_index = animation_index;
-			const float duration = animations.at(current_animation_index).duration;
-
-			if (time >= duration)
+			// animations.at() は範囲外だと例外を投げてクラッシュする。
+			// ModelInstance::animation_index はゲーム側から自由に設定されるため、
+			// 範囲外や duration<=0 のクリップを指していても落ちないようにする。
+			if (animation_index < 0 || animation_index >= static_cast<int>(animations.size()))
 			{
-				time = 0.0f; // ループ
+				animated_nodes.clear(); // バインドポーズにフォールバック
 			}
-			animate(current_animation_index, time, animated_nodes);
+			else
+			{
+				current_animation_index = animation_index;
+				const float duration = animations[current_animation_index].duration;
+
+				if (duration <= 0.0f)
+				{
+					time = 0.0f;
+				}
+				else if (time >= duration)
+				{
+					time = 0.0f; // ループ
+				}
+				animate(current_animation_index, time, animated_nodes);
+			}
 		}
 		else if (anim_mode == animation_mode::all)
 		{
@@ -699,7 +718,7 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	}
 
 	using namespace DirectX;
-	const std::vector<node>& nodes{ animated_nodes.size() > 0 ? animated_nodes : Gltf_Model::nodes };
+	const std::vector<node>& nodes{ !animated_nodes.empty() ? animated_nodes : Gltf_Model::nodes };
 
 	const char* vertex_shader_name;
 
@@ -733,12 +752,15 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	{
 		const skin& skin{ skins.at(node.skin) };
 		primitive_joint_constants primitive_joint_data{};
+		// ノードのグローバル変換の逆行列はジョイント数に関係なく同じ値なので、
+		// ループの外で1回だけ計算する（以前はジョイントの数だけ毎回計算していた）
+		const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
 		for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
 		{
 			XMStoreFloat4x4(&primitive_joint_data.matrices[joint_index],
 				XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
 				XMLoadFloat4x4(&nodes.at(skin.joints.at(joint_index)).global_transform) *
-				XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform))
+				node_global_inverse
 			);
 		}
 		immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, &primitive_joint_data, 0, 0);
@@ -764,14 +786,16 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	material.data.occlusion_texture.index,
   };
   ID3D11ShaderResourceView* null_shader_resource_view{};
-  std::vector<ID3D11ShaderResourceView*> shader_resource_views(_countof(texture_indices));
-  for (int texture_index = 0; texture_index < shader_resource_views.size(); ++texture_index)
+  // texture_indices は要素数固定（5個）なので、プリミティブ描画のたびに
+  // std::vector をヒープ確保する必要はない。固定長配列にして確保コストを消す。
+  ID3D11ShaderResourceView* shader_resource_views[_countof(texture_indices)]{};
+  for (int texture_index = 0; texture_index < static_cast<int>(_countof(texture_indices)); ++texture_index)
   {
-	shader_resource_views.at(texture_index) = texture_indices[texture_index] > -1 ?
+	shader_resource_views[texture_index] = texture_indices[texture_index] > -1 ?
 	  texture_resource_views.at(textures.at(texture_indices[texture_index]).source).Get() :
 	  null_shader_resource_view;
   }
-  immediate_context->PSSetShaderResources(1, static_cast<UINT>(shader_resource_views.size()),shader_resource_views.data());
+  immediate_context->PSSetShaderResources(1, static_cast<UINT>(_countof(shader_resource_views)), shader_resource_views);
 
 
 
@@ -827,6 +851,186 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 		traverse(node_index);
 	}
 
+}
+
+// =============================================================================
+// render_with_nodes()
+// update() \u3067\u4e8b\u524d\u8a08\u7b97\u3057\u305f animated_nodes \u3092\u4f7f\u3044\u3001\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\u518d\u8a08\u7b97\u3092\u30b9\u30ad\u30c3\u30d7\u3059\u308b\u9ad8\u901f\u7248\u3002
+// =============================================================================
+void Gltf_Model::render_with_nodes(
+	ID3D11DeviceContext* immediate_context,
+	const DirectX::XMFLOAT4X4& world,
+	pass_mode pass,
+	const std::vector<node>* precomputed_nodes,
+	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices)
+{
+	// precomputed_nodes \u304c null \u306a\u3089\u901a\u5e38\u7248\u306b\u30d5\u30a9\u30fc\u30eb\u30d0\u30c3\u30af
+	if (!precomputed_nodes || precomputed_nodes->empty())
+	{
+		render(immediate_context, world, pass, false, 0.0f);
+		return;
+	}
+
+	// --- \u30b7\u30a7\u30fc\u30c0\u30fc\u30bb\u30c3\u30c8 ---
+	if (pass == pass_mode::deferred_geometry)
+	{
+		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
+	}
+	else if (pass == pass_mode::forward_opaque)
+	{
+		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
+	}
+	else if (pass == pass_mode::forward_transparency)
+	{
+		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
+	}
+	else if (pass == pass_mode::directional_shadow)
+	{
+		immediate_context->PSSetShader(nullptr, nullptr, 0);
+	}
+	else if (pass == pass_mode::shadow)
+	{
+		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("POINT_SHADOW_PS"), NULL, 0);
+	}
+	else
+	{
+		_ASSERT_EXPR(FALSE, L"Unknown pass_mode");
+	}
+
+	using namespace DirectX;
+
+	const char* vertex_shader_name;
+	switch (pass)
+	{
+	case pass_mode::directional_shadow:
+		vertex_shader_name = "DIRECTIONAL_SHADOW_VS";
+		break;
+	case pass_mode::shadow:
+		vertex_shader_name = "POINT_SHADOW_VS";
+		break;
+	default:
+		vertex_shader_name = "GLTF_VS";
+		break;
+	}
+	immediate_context->VSSetShader(Resource_Manager::instance().shader_manager.GetNative<Vertex_Shader>(vertex_shader_name), nullptr, 0);
+	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
+	immediate_context->IASetInputLayout(Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name)->get_input_layout());
+	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	const std::vector<node>& nodes_ref = *precomputed_nodes;
+
+	std::function<void(int)> traverse{ [&](int node_index)->void {
+	  const node& node{nodes_ref.at(node_index)};
+	  if (node.skin > -1)
+	  {
+		  // ModelManager::update() で1フレームに1回だけ計算済みのジョイント行列があれば、
+		  // 描画パスごとに再計算せずそれをそのまま使う（deferred/shadow x2/directional/forward の
+		  // 5パス分の重複計算とXMMatrixInverseの重複呼び出しを回避する）
+		  const primitive_joint_constants* cached_data = nullptr;
+		  if (precomputed_joint_matrices)
+		  {
+			  auto cached_it = precomputed_joint_matrices->find(node_index);
+			  if (cached_it != precomputed_joint_matrices->end())
+			  {
+				  cached_data = &cached_it->second;
+			  }
+		  }
+
+		  if (cached_data)
+		  {
+			  immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, cached_data, 0, 0);
+			  immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+		  }
+		  else
+		  {
+			  // キャッシュが無い場合のフォールバック（従来通りその場で計算）
+			  const skin& skin{ skins.at(node.skin) };
+			  primitive_joint_constants primitive_joint_data{};
+			  const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
+			  for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
+			  {
+				  XMStoreFloat4x4(&primitive_joint_data.matrices[joint_index],
+					  XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
+					  XMLoadFloat4x4(&nodes_ref.at(skin.joints.at(joint_index)).global_transform) *
+					  node_global_inverse
+				  );
+			  }
+			  immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, &primitive_joint_data, 0, 0);
+			  immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+		  }
+		}
+		if (node.mesh > -1)
+		{
+		  const mesh& mesh{ meshes.at(node.mesh) };
+		  for (std::vector<mesh::primitive>::const_reference primitive : mesh.primitives)
+		  {
+			const material& material{ materials.at(primitive.material) };
+			if (!is_material_in_pass(material.data.alpha_mode, pass))
+			{
+				continue;
+			}
+			const int texture_indices[]
+			{
+			  material.data.pbr_metallic_roughness.basecolor_texture.index,
+			  material.data.pbr_metallic_roughness.metallic_roughness_texture.index,
+			  material.data.normal_texture.index,
+			  material.data.emissive_texture.index,
+			  material.data.occlusion_texture.index,
+			};
+			ID3D11ShaderResourceView* null_shader_resource_view{};
+			ID3D11ShaderResourceView* shader_resource_views[_countof(texture_indices)]{};
+			for (int texture_index = 0; texture_index < static_cast<int>(_countof(texture_indices)); ++texture_index)
+			{
+			  shader_resource_views[texture_index] = texture_indices[texture_index] > -1 ?
+				texture_resource_views.at(textures.at(texture_indices[texture_index]).source).Get() :
+				null_shader_resource_view;
+			}
+			immediate_context->PSSetShaderResources(1, static_cast<UINT>(_countof(shader_resource_views)), shader_resource_views);
+
+			ID3D11Buffer* vertex_buffers[]{
+			  primitive.vertex_buffer_views.at("POSITION").buffer.Get(),
+			  primitive.vertex_buffer_views.at("NORMAL").buffer.Get(),
+			  primitive.vertex_buffer_views.at("TANGENT").buffer.Get(),
+			  primitive.vertex_buffer_views.at("TEXCOORD_0").buffer.Get(),
+			  primitive.vertex_buffer_views.at("JOINTS_0").buffer.Get(),
+			  primitive.vertex_buffer_views.at("WEIGHTS_0").buffer.Get(),
+			};
+			UINT strides[]{
+			  static_cast<UINT>(primitive.vertex_buffer_views.at("POSITION").stride_in_bytes),
+			  static_cast<UINT>(primitive.vertex_buffer_views.at("NORMAL").stride_in_bytes),
+			  static_cast<UINT>(primitive.vertex_buffer_views.at("TANGENT").stride_in_bytes),
+			  static_cast<UINT>(primitive.vertex_buffer_views.at("TEXCOORD_0").stride_in_bytes),
+			  static_cast<UINT>(primitive.vertex_buffer_views.at("JOINTS_0").stride_in_bytes),
+			  static_cast<UINT>(primitive.vertex_buffer_views.at("WEIGHTS_0").stride_in_bytes),
+			};
+			UINT offsets[_countof(vertex_buffers)]{ 0 };
+			immediate_context->IASetVertexBuffers(0, _countof(vertex_buffers), vertex_buffers, strides, offsets);
+			immediate_context->IASetIndexBuffer(primitive.index_buffer_view.buffer.Get(),
+			  primitive.index_buffer_view.format, 0);
+
+			primitive_constants primitive_data{};
+			primitive_data.material = primitive.material;
+			primitive_data.has_tangent = primitive.vertex_buffer_views.at("TANGENT").buffer != NULL;
+			primitive_data.skin = node.skin;
+			XMStoreFloat4x4(&primitive_data.world,
+			  XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world));
+			immediate_context->UpdateSubresource(primitive_cbuffer.Get(), 0, 0, &primitive_data, 0, 0);
+			immediate_context->VSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
+			immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
+
+			immediate_context->DrawIndexed(static_cast<UINT>(primitive.index_buffer_view.count()), 0, 0);
+		  }
+		}
+		for (std::vector<int>::value_type child_index : node.children)
+		{
+		  traverse(child_index);
+		}
+	  } };
+
+	for (std::vector<int>::value_type node_index : scenes.at(0).nodes)
+	{
+		traverse(node_index);
+	}
 }
 
 
@@ -900,6 +1104,39 @@ void Gltf_Model::animate(size_t animation_index, float time, std::vector<node>& 
 		cumulate_transforms(animated_nodes);
 	}
 }
+void Gltf_Model::compute_joint_matrices(
+	const std::vector<node>& animated_nodes,
+	std::unordered_map<int, primitive_joint_constants>& out_joint_matrices) const
+{
+	using namespace DirectX;
+
+	out_joint_matrices.clear();
+
+	for (size_t node_index = 0; node_index < animated_nodes.size(); ++node_index)
+	{
+		const node& node{ animated_nodes[node_index] };
+		if (node.skin < 0) continue;
+
+		const skin& skin{ skins.at(node.skin) };
+		primitive_joint_constants data{};
+
+		// ノードのグローバル変換の逆行列はジョイント数に関係なく同じ値なので、
+		// ループの外で1回だけ計算する
+		const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
+
+		for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
+		{
+			XMStoreFloat4x4(&data.matrices[joint_index],
+				XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
+				XMLoadFloat4x4(&animated_nodes.at(skin.joints.at(joint_index)).global_transform) *
+				node_global_inverse
+			);
+		}
+
+		out_joint_matrices.emplace(static_cast<int>(node_index), data);
+	}
+}
+
 void Gltf_Model::animate_all(float time, std::vector<node>& animated_nodes)
 {
 	using namespace std;

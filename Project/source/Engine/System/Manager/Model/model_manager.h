@@ -30,6 +30,13 @@ struct ModelInstance
 
 	// single モード用
 	int animation_index = 0;
+
+	// アニメーションノードキャッシュ（update()で計算、render()で再利用）
+	std::vector<Gltf_Model::node> cached_animated_nodes;
+
+	// スキン行列（ジョイント行列）キャッシュ（update()で1回だけ計算し、
+	// 各描画パス（deferred/shadow x2/directional/forward）で使い回す）
+	std::unordered_map<int, Gltf_Model::primitive_joint_constants> cached_joint_matrices;
 };
 
 /**
@@ -177,8 +184,8 @@ public:
 	// culling stats
 	int last_culled_count = 0;
 	int last_total_count = 0;
-	int last_point_face_culled[6] = {0,0,0,0,0,0};
-	int last_point_face_total[6] = {0,0,0,0,0,0};
+	int last_point_face_culled[6] = { 0,0,0,0,0,0 };
+	int last_point_face_total[6] = { 0,0,0,0,0,0 };
 
 private:
 	/// モデルキャッシュ（共有）

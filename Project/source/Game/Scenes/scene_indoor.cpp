@@ -223,9 +223,24 @@ void Scene_Indoor::initialize()
 
 	_player.initialize(
 		hwnd,
-		dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
+		dx::XMVectorSet(0.0f, 10.0f, 0.0f, 1.0f),
 		_player_spotlight_index
 	);
+
+	// -------------------------------------------------------------
+	// プレイヤーモデルの登録（Spider）
+	// -------------------------------------------------------------
+	ModelInstance player_model;
+	player_model.model_key = "Spider";
+	player_model.world_transform = _player.get_world_transform();
+	player_model.is_animation = true;
+	player_model.animation_index = 0;
+	player_model.animation_time = 0.01f;
+	player_model.loop_animation = true;
+	player_model.animation_speed = 1.0f;
+	player_model.anim_mode = Gltf_Model::animation_mode::single;
+
+	mgr.add_instance("Player", player_model);
 
 	log_printf("objモデルシーン初期化終了\n", LogLevel::Info);
 }
@@ -326,7 +341,60 @@ void Scene_Indoor::update(float elapsedTime)
 	Graphics_Core::instance().get_spot_light_manager().upload_to_gpu(Graphics_Core::instance().get_device_context());
 	Graphics_Core::instance().get_area_light_manager().update();
 	Graphics_Core::instance().get_area_light_manager().upload_to_gpu(Graphics_Core::instance().get_device_context());
-	Resource_Manager::instance().model_manager.update(elapsedTime);
+
+	// -----------------------------------------------------------------
+	// プレイヤーモデルインスタンスの更新とデバッグ操作の受付
+	// -----------------------------------------------------------------
+	// Kキーで死亡状態トグル
+	static bool k_pressed = false;
+	if (GetAsyncKeyState('K') & 0x8000)
+	{
+		if (!k_pressed)
+		{
+			_player.set_dead(!_player.is_dead());
+			k_pressed = true;
+		}
+	}
+	else
+	{
+		k_pressed = false;
+	}
+
+	// Gキーで大きい待機アニメーショントリガー
+	static bool g_pressed = false;
+	if (GetAsyncKeyState('G') & 0x8000)
+	{
+		if (!g_pressed)
+		{
+			_player.trigger_idle_large();
+			g_pressed = true;
+		}
+	}
+	else
+	{
+		g_pressed = false;
+	}
+
+	auto player_inst = Resource_Manager::instance().model_manager.get_instance("Player");
+	if (player_inst)
+	{
+		player_inst->world_transform = _player.get_world_transform();
+		player_inst->animation_speed = _player.get_animation_speed();
+		player_inst->loop_animation = (_player.get_animation_index() != 3);
+
+		// --- ここを変更：アニメーションの種類が変わった瞬間だけ時間を0にする ---
+		int next_anim_index = _player.get_animation_index();
+		if (player_inst->animation_index != next_anim_index)
+		{
+			player_inst->animation_index = next_anim_index;
+			player_inst->animation_time = 0.0f; // モーション切り替え時のみリセット
+		}
+		// インデックスが同じ間は、player_inst->animation_time を弄らない！
+		//（model_manager.update 内で自動で進むようにする）
+	}
+
+	// 最後にマネージャー全体の時間を進める
+	Resource_Manager::instance().model_manager.update(elapsedTime);;
 }
 
 // 描画処理

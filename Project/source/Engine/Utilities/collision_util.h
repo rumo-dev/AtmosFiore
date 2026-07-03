@@ -470,6 +470,77 @@ inline bool GroundRayCast(
 	return false;
 }
 
+/**
+ * @brief 任意の方向にレイを飛ばし、最も近い衝突点情報を返す
+ *
+ * @param ray        レイ（始点と方向）
+ * @param triangles  三角形頂点リスト（3頂点で1三角形）
+ * @param max_dist   探索最大距離
+ * @param out_result 衝突結果
+ * @return true: ヒットあり、false: ヒットなし
+ */
+inline bool RayCastTriangles(
+	const Ray& ray,
+	const std::vector<dx::XMFLOAT3>& triangles,
+	float                            max_dist,
+	RayHitResult&                    out_result)
+{
+	out_result.hit = false;
+	out_result.t = max_dist;
+
+	dx::XMFLOAT3 origin_f, dir_f;
+	dx::XMStoreFloat3(&origin_f, ray.origin);
+	dx::XMStoreFloat3(&dir_f, ray.direction);
+
+	// レイのAABB（簡易的な絞り込み用）
+	float min_x = (std::min)(origin_f.x, origin_f.x + dir_f.x * max_dist) - 0.5f;
+	float max_x = (std::max)(origin_f.x, origin_f.x + dir_f.x * max_dist) + 0.5f;
+	float min_y = (std::min)(origin_f.y, origin_f.y + dir_f.y * max_dist) - 0.5f;
+	float max_y = (std::max)(origin_f.y, origin_f.y + dir_f.y * max_dist) + 0.5f;
+	float min_z = (std::min)(origin_f.z, origin_f.z + dir_f.z * max_dist) - 0.5f;
+	float max_z = (std::max)(origin_f.z, origin_f.z + dir_f.z * max_dist) + 0.5f;
+
+	size_t tri_count = triangles.size() / 3;
+	bool hit_any = false;
+
+	for (size_t ti = 0; ti < tri_count; ++ti)
+	{
+		const dx::XMFLOAT3& p0 = triangles[ti * 3 + 0];
+		const dx::XMFLOAT3& p1 = triangles[ti * 3 + 1];
+		const dx::XMFLOAT3& p2 = triangles[ti * 3 + 2];
+
+		float tri_min_x = (std::min)({ p0.x, p1.x, p2.x });
+		float tri_max_x = (std::max)({ p0.x, p1.x, p2.x });
+		float tri_min_y = (std::min)({ p0.y, p1.y, p2.y });
+		float tri_max_y = (std::max)({ p0.y, p1.y, p2.y });
+		float tri_min_z = (std::min)({ p0.z, p1.z, p2.z });
+		float tri_max_z = (std::max)({ p0.z, p1.z, p2.z });
+
+		// AABB交差判定
+		if (tri_max_x < min_x || tri_min_x > max_x ||
+			tri_max_y < min_y || tri_min_y > max_y ||
+			tri_max_z < min_z || tri_min_z > max_z)
+		{
+			continue;
+		}
+
+		CollisionTriangle tri{
+			dx::XMLoadFloat3(&p0),
+			dx::XMLoadFloat3(&p1),
+			dx::XMLoadFloat3(&p2)
+		};
+
+		RayHitResult res = RayCastTriangle(ray, tri, out_result.t);
+		if (res.hit && res.t < out_result.t)
+		{
+			out_result = res;
+			hit_any = true;
+		}
+	}
+
+	return hit_any;
+}
+
 // ============================================================
 //  空間グリッド（近傍三角形の高速絞り込み）
 // ============================================================

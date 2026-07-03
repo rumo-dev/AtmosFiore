@@ -41,12 +41,20 @@ public:
 	 * @param spotlight_index プレイヤーライトのスポットライト配列インデックス（-1 で無効）
 	 */
 	void initialize(HWND hwnd,
-		dx::XMVECTOR start_pos = dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
+		dx::XMVECTOR start_pos = dx::XMVectorSet(0.0f, 0.0f, 10.0f, 1.0f),
 		int spotlight_index = -1)
 	{
 		_hwnd = hwnd;
 		_position = start_pos;
 		_spotlight_index = spotlight_index;
+		_up_vector = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		_forward_vector = dx::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+		_is_climbing = false;
+		_is_dead = false;
+		_animation_index = 0;
+		_animation_speed = 1.0f;
+		_idle_large_timer = 0.0f;
+		_trigger_idle_large = false;
 	}
 
 	/**
@@ -65,7 +73,7 @@ public:
 	}
 
 	// ======================================================
-	//  ゲッター
+	//  ゲッター / セッター
 	// ======================================================
 
 	/// ワールド座標（w=1）
@@ -74,7 +82,8 @@ public:
 	/// 頭部座標（First Person Camera用, 目の高さ分だけY+）
 	dx::XMVECTOR get_head_position() const
 	{
-		return dx::XMVectorAdd(_position, dx::XMVectorSet(0.0f, _eye_height, 0.0f, 0.0f));
+		// 蜘蛛の上方向（_up_vector）を考慮した頭部座標
+		return dx::XMVectorAdd(_position, dx::XMVectorScale(_up_vector, _eye_height));
 	}
 
 	/// 前方ベクトル（正規化済み・Y成分なし水平）
@@ -86,6 +95,40 @@ public:
 
 	/// スポットライト配列インデックス（-1 で無効）
 	int get_spotlight_index() const { return _spotlight_index; }
+
+	/// プレイヤーのモデル用ワールド行列（右手系 glTF 用）
+	dx::XMFLOAT4X4 get_world_transform() const
+	{
+		dx::XMVECTOR U = dx::XMVector3Normalize(_up_vector);
+		dx::XMVECTOR F = dx::XMVector3Normalize(_forward_vector);
+		dx::XMVECTOR R = dx::XMVector3Normalize(dx::XMVector3Cross(U, F));
+		F = dx::XMVector3Cross(R, U); // 完全な直交化
+
+		dx::XMMATRIX rot_matrix = dx::XMMatrixIdentity();
+		rot_matrix.r[0] = R;
+		rot_matrix.r[1] = U;
+		rot_matrix.r[2] = F;
+
+		// 座標系変換行列 (RH_Y_UP 用に X 軸反転)
+		dx::XMMATRIX C = dx::XMLoadFloat4x4(&COORDINATE_SYSTEM_TABLE[0]);
+
+		// 平行移動
+		dx::XMMATRIX T = dx::XMMatrixTranslationFromVector(_position);
+
+		// 合成（C * rot * T）
+		dx::XMMATRIX M = C * rot_matrix * T;
+
+		dx::XMFLOAT4X4 out;
+		dx::XMStoreFloat4x4(&out, M);
+		return out;
+	}
+
+	int get_animation_index() const { return _animation_index; }
+	float get_animation_speed() const { return _animation_speed; }
+
+	void set_dead(bool dead) { _is_dead = dead; }
+	bool is_dead() const { return _is_dead; }
+	void trigger_idle_large() { _trigger_idle_large = true; }
 
 	// ======================================================
 	//  デバッグUI
@@ -123,6 +166,12 @@ public:
 		ImGui::BulletText("Position : X:%.2f  Y:%.2f  Z:%.2f", p.x, p.y, p.z);
 		ImGui::BulletText("Yaw      : %.1f deg", _yaw);
 		ImGui::BulletText("Pitch    : %.1f deg", _pitch);
+		ImGui::BulletText("State    : %s", _is_climbing ? "Climbing" : "Falling");
+		ImGui::BulletText("Dead     : %s", _is_dead ? "Yes" : "No");
+
+		dx::XMFLOAT3 uv;
+		dx::XMStoreFloat3(&uv, _up_vector);
+		ImGui::BulletText("UpVector : X:%.2f  Y:%.2f  Z:%.2f", uv.x, uv.y, uv.z);
 
 		ImGui::Spacing();
 		ImGui::Separator();
@@ -144,8 +193,8 @@ public:
 	/// スポットライト位置（頭部よりやや前）
 	dx::XMFLOAT3 get_light_position() const
 	{
-		dx::XMVECTOR fwd = get_forward();
-		dx::XMVECTOR base = dx::XMVectorAdd(_position, dx::XMVectorSet(0.0f, _light_height_offset, 0.0f, 0.0f));
+		dx::XMVECTOR fwd = _forward_vector;
+		dx::XMVECTOR base = dx::XMVectorAdd(_position, dx::XMVectorScale(_up_vector, _light_height_offset));
 		dx::XMVECTOR shifted = dx::XMVectorAdd(base, dx::XMVectorScale(fwd, 0.3f)); // 少し前にオフセット
 		dx::XMFLOAT3 out;
 		dx::XMStoreFloat3(&out, shifted);
@@ -161,7 +210,7 @@ public:
 		// Yaw + Pitch から完全な3D向きベクトルを計算
 		dx::XMVECTOR dir = dx::XMVectorSet(
 			cosf(pitch_rad) * sinf(yaw_rad),   // X
-			sinf(pitch_rad),                   // Y（上下山）
+			sinf(pitch_rad),                   // Y（上下）
 			cosf(pitch_rad) * cosf(yaw_rad),   // Z
 			0.0f
 		);
@@ -185,89 +234,225 @@ private:
 	//  内部処理
 	// ======================================================
 
-
-
 	/**
-	 * @brief WASD / 矢印キーによる水平移動（カプセルコリジョン付き）
+	 * @brief 蜘蛛としての移動処理（壁這い・重力・アニメーション選択）
 	 * @param collision_triangles コリジョン用三角形リスト（nullptr で無効）
 	 */
 	void _handle_movement(float elapsed_time,
 		const std::vector<dx::XMFLOAT3>* collision_triangles = nullptr)
 	{
+		// 死亡状態なら移動させず、死亡アニメーション再生
+		if (_is_dead)
+		{
+			_animation_index = 3;
+			_animation_speed = 1.0f;
+			return;
+		}
+
 		float yaw_rad = dx::XMConvertToRadians(_yaw);
 
 		// カメラ基準の前方・右方ベクトル（水平）
-		dx::XMVECTOR forward = dx::XMVectorSet(sinf(yaw_rad), 0.0f, cosf(yaw_rad), 0.0f);
-		dx::XMVECTOR right = dx::XMVectorSet(cosf(yaw_rad), 0.0f, -sinf(yaw_rad), 0.0f);
+		dx::XMVECTOR cam_forward = dx::XMVectorSet(sinf(yaw_rad), 0.0f, cosf(yaw_rad), 0.0f);
+		dx::XMVECTOR cam_right = dx::XMVectorSet(cosf(yaw_rad), 0.0f, -sinf(yaw_rad), 0.0f);
+
+		dx::XMVECTOR input_move = dx::XMVectorZero();
+
+		if (GetAsyncKeyState('W') & 0x8000) input_move = dx::XMVectorAdd(input_move, cam_forward);
+		if (GetAsyncKeyState('S') & 0x8000) input_move = dx::XMVectorAdd(input_move, dx::XMVectorNegate(cam_forward));
+		if (GetAsyncKeyState('D') & 0x8000) input_move = dx::XMVectorAdd(input_move, cam_right);
+		if (GetAsyncKeyState('A') & 0x8000) input_move = dx::XMVectorAdd(input_move, dx::XMVectorNegate(cam_right));
+		if (GetAsyncKeyState(VK_UP) & 0x8000) input_move = dx::XMVectorAdd(input_move, cam_forward);
+		if (GetAsyncKeyState(VK_DOWN) & 0x8000) input_move = dx::XMVectorAdd(input_move, dx::XMVectorNegate(cam_forward));
+		if (GetAsyncKeyState(VK_RIGHT) & 0x8000) input_move = dx::XMVectorAdd(input_move, cam_right);
+		if (GetAsyncKeyState(VK_LEFT) & 0x8000) input_move = dx::XMVectorAdd(input_move, dx::XMVectorNegate(cam_right));
+
+		float len = Length(input_move);
+		bool is_moving = (len > 0.001f);
 
 		dx::XMVECTOR move_dir = dx::XMVectorZero();
-
-		if (GetAsyncKeyState('W') & 0x8000) move_dir = dx::XMVectorAdd(move_dir, forward);
-		if (GetAsyncKeyState('S') & 0x8000) move_dir = dx::XMVectorAdd(move_dir, dx::XMVectorNegate(forward));
-		if (GetAsyncKeyState('D') & 0x8000) move_dir = dx::XMVectorAdd(move_dir, right);
-		if (GetAsyncKeyState('A') & 0x8000) move_dir = dx::XMVectorAdd(move_dir, dx::XMVectorNegate(right));
-		if (GetAsyncKeyState(VK_UP) & 0x8000) move_dir = dx::XMVectorAdd(move_dir, forward);
-		if (GetAsyncKeyState(VK_DOWN) & 0x8000) move_dir = dx::XMVectorAdd(move_dir, dx::XMVectorNegate(forward));
-		if (GetAsyncKeyState(VK_RIGHT) & 0x8000) move_dir = dx::XMVectorAdd(move_dir, right);
-		if (GetAsyncKeyState(VK_LEFT) & 0x8000) move_dir = dx::XMVectorAdd(move_dir, dx::XMVectorNegate(right));
-
-		// 長さが 0 でなければ正規化して移動
-		float len = Length(move_dir);
-		if (len > 0.001f)
+		if (is_moving)
 		{
-			move_dir = dx::XMVector3Normalize(move_dir);
+			input_move = dx::XMVector3Normalize(input_move);
+		}
+
+		dx::XMVECTOR target_up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+		if (_is_climbing && collision_triangles && !collision_triangles->empty())
+		{
+			// 接地面上に移動入力を投影
+			if (is_moving)
+			{
+				dx::XMVECTOR proj_move = dx::XMVectorSubtract(input_move,
+					dx::XMVectorScale(_up_vector, dx::XMVectorGetX(dx::XMVector3Dot(input_move, _up_vector))));
+				float proj_len = Length(proj_move);
+				if (proj_len > 0.001f)
+				{
+					move_dir = dx::XMVector3Normalize(proj_move);
+				}
+				else
+				{
+					move_dir = input_move;
+				}
+			}
 
 			bool sprint = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
 			float actual_speed = _speed * (sprint ? _sprint_mult : 1.0f);
-
 			dx::XMVECTOR move_delta = dx::XMVectorScale(move_dir, actual_speed * elapsed_time);
 
-			if (collision_triangles && !collision_triangles->empty())
+			// 壁這い用カプセルの定義 (Upベクトル方向に軸を向ける)
+			dx::XMVECTOR capsule_base = dx::XMVectorAdd(_position, dx::XMVectorScale(_up_vector, _capsule_radius));
+			dx::XMVECTOR capsule_tip = dx::XMVectorAdd(_position, dx::XMVectorScale(_up_vector, _capsule_height - _capsule_radius));
+			CollisionCapsule capsule{ capsule_base, capsule_tip, _capsule_radius };
+
+			dx::XMVECTOR corrected_delta = move_delta;
+			if (is_moving)
 			{
-				// カプセル下端・上端スフィア中心を計算
-				// base: 足元の一段上（radius 分浮かせる）
-				// tip:  頭部（height - radius）
-				dx::XMVECTOR capsule_base = dx::XMVectorAdd(
-					_position,
-					dx::XMVectorSet(0.0f, _capsule_radius, 0.0f, 0.0f));
-				dx::XMVECTOR capsule_tip = dx::XMVectorAdd(
-					_position,
-					dx::XMVectorSet(0.0f, _capsule_height - _capsule_radius, 0.0f, 0.0f));
-
-				CollisionCapsule capsule{ capsule_base, capsule_tip, _capsule_radius };
-
-				dx::XMVECTOR corrected_delta;
+				// 制限をかけない3次元の壁ずり
 				CapsuleCastTriangles(capsule, move_delta, *collision_triangles, corrected_delta);
+			}
 
-				// Y成分はコリジョン補正から除外（水平移動のみ補正）
-				corrected_delta = dx::XMVectorSetY(corrected_delta,
-					dx::XMVectorGetY(move_delta)); // 元の Y を維持
+			dx::XMVECTOR next_position = dx::XMVectorAdd(_position, corrected_delta);
 
-				_position = dx::XMVectorAdd(_position, corrected_delta);
+			// 接地スナップ（お腹方向へレイキャスト）
+			float offset = 0.5f;
+			dx::XMVECTOR ray_origin = dx::XMVectorAdd(next_position, dx::XMVectorScale(_up_vector, offset));
+			dx::XMVECTOR ray_dir = dx::XMVectorNegate(_up_vector);
+			Ray ray{ ray_origin, ray_dir };
+
+			RayHitResult hit_res;
+			bool snap_success = false;
+
+			// 通常接地判定
+			if (RayCastTriangles(ray, *collision_triangles, offset + _ground_snap_dist, hit_res))
+			{
+				_position = dx::XMVectorAdd(hit_res.point, dx::XMVectorScale(hit_res.normal, 0.02f));
+				target_up = hit_res.normal;
+				snap_success = true;
+			}
+			// 凸角の回り込み判定（通常の接地が外れた場合）
+			else if (is_moving)
+			{
+				dx::XMVECTOR edge_ray_origin = dx::XMVectorAdd(next_position, dx::XMVectorScale(_up_vector, 0.2f));
+				dx::XMVECTOR edge_ray_dir = dx::XMVector3Normalize(dx::XMVectorAdd(dx::XMVectorNegate(_up_vector), dx::XMVectorScale(move_dir, 0.5f)));
+				Ray edge_ray{ edge_ray_origin, edge_ray_dir };
+
+				if (RayCastTriangles(edge_ray, *collision_triangles, _ground_snap_dist * 2.0f, hit_res))
+				{
+					_position = dx::XMVectorAdd(hit_res.point, dx::XMVectorScale(hit_res.normal, 0.02f));
+					target_up = hit_res.normal;
+					snap_success = true;
+				}
+				else
+				{
+					// 壁激突判定（目の前に壁がある場合の吸い付き）
+					dx::XMVECTOR forward_ray_origin = dx::XMVectorAdd(_position, dx::XMVectorScale(_up_vector, _capsule_radius));
+					Ray forward_ray{ forward_ray_origin, move_dir };
+					if (RayCastTriangles(forward_ray, *collision_triangles, _capsule_radius * 2.0f, hit_res))
+					{
+						_position = dx::XMVectorAdd(hit_res.point, dx::XMVectorScale(hit_res.normal, 0.02f));
+						target_up = hit_res.normal;
+						snap_success = true;
+					}
+				}
+			}
+
+			if (snap_success)
+			{
+				_is_climbing = true;
 			}
 			else
 			{
+				// 接地消失：落下状態へ移行
+				_is_climbing = false;
+				_position = next_position;
+				target_up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			}
+		}
+		else
+		{
+			// 落下中
+			_position = dx::XMVectorAdd(_position, dx::XMVectorSet(0.0f, -_gravity * elapsed_time, 0.0f, 0.0f));
+
+			if (is_moving)
+			{
+				bool sprint = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+				float actual_speed = _speed * (sprint ? _sprint_mult : 1.0f);
+				dx::XMVECTOR move_delta = dx::XMVectorScale(input_move, actual_speed * elapsed_time);
 				_position = dx::XMVectorAdd(_position, move_delta);
+			}
+
+			// 着地判定
+			if (collision_triangles && !collision_triangles->empty())
+			{
+				dx::XMVECTOR ray_origin = dx::XMVectorAdd(_position, dx::XMVectorSet(0.0f, 0.5f, 0.0f, 0.0f));
+				Ray ray{ ray_origin, dx::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f) };
+				RayHitResult hit_res;
+				if (RayCastTriangles(ray, *collision_triangles, 0.5f + 0.1f, hit_res))
+				{
+					_position = dx::XMVectorSetY(_position, dx::XMVectorGetY(hit_res.point) + 0.02f);
+					target_up = hit_res.normal;
+					_is_climbing = true;
+				}
 			}
 		}
 
-		// 床接地（GroundRayCast）
-		if (_enable_ground_snap && len > 0.001f && collision_triangles && !collision_triangles->empty())
-		{
-			// 腰部あたりからレイを下ろす
-			dx::XMVECTOR snap_origin = dx::XMVectorAdd(
-				_position,
-				dx::XMVectorSet(0.0f, _capsule_height * 0.5f, 0.0f, 0.0f));
+		// --- 姿勢の更新 ---
+		_up_vector = dx::XMVector3Normalize(dx::XMVectorLerp(_up_vector, target_up, _climb_lerp_speed * elapsed_time));
 
-			float ground_y;
-			if (GroundRayCast(snap_origin, *collision_triangles, _ground_snap_dist + _capsule_height * 0.5f, ground_y))
+		if (is_moving && Length(move_dir) > 0.001f)
+		{
+			// 移動入力がある場合、その方向へスムーズに旋回
+			_forward_vector = dx::XMVector3Normalize(dx::XMVectorLerp(_forward_vector, move_dir, 15.0f * elapsed_time));
+		}
+		else
+		{
+			// 移動入力がない場合、現在の前方向を接平面に直交化して維持
+			dx::XMVECTOR dot_val = dx::XMVector3Dot(_forward_vector, _up_vector);
+			dx::XMVECTOR orth_forward = dx::XMVectorSubtract(_forward_vector, dx::XMVectorScale(_up_vector, dx::XMVectorGetX(dot_val)));
+			if (Length(orth_forward) > 0.001f)
 			{
-				// ground_y をプレイヤー足元の Y として設定
-				float current_y = dx::XMVectorGetY(_position);
-				float target_y = ground_y;
-				// スムーズに近づける（急降下防止）
-				float new_y = current_y + (target_y - current_y) * min(elapsed_time * 10.0f, 1.0f);
-				_position = dx::XMVectorSetY(_position, new_y);
+				_forward_vector = dx::XMVector3Normalize(orth_forward);
+			}
+			else
+			{
+				// 特異点回避
+				dx::XMVECTOR global_fwd = dx::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+				dx::XMVECTOR dot_val2 = dx::XMVector3Dot(global_fwd, _up_vector);
+				orth_forward = dx::XMVectorSubtract(global_fwd, dx::XMVectorScale(_up_vector, dx::XMVectorGetX(dot_val2)));
+				if (Length(orth_forward) > 0.001f)
+					_forward_vector = dx::XMVector3Normalize(orth_forward);
+			}
+		}
+
+		// --- アニメーション状態の切り替え ---
+		if (is_moving)
+		{
+			_animation_index = 2; // 歩き
+			bool sprint = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+			_animation_speed = sprint ? 1.5f : 1.0f;
+		}
+		else
+		{
+			// 待機中
+			if (_trigger_idle_large)
+			{
+				_animation_index = 1; // 動きの大きい待機
+				_animation_speed = 0.01f;
+				_trigger_idle_large = false;
+				_idle_large_timer = 2.0f; // アニメーション終了時間（仮）
+			}
+			else if (_idle_large_timer > 0.0f)
+			{
+				_idle_large_timer -= elapsed_time;
+				if (_idle_large_timer <= 0.0f)
+				{
+					_animation_index = 0; // 通常待機に戻す
+				}
+			}
+			else
+			{
+				_animation_index = 0; // 通常待機
+				_animation_speed = 1.0f;
 			}
 		}
 	}
@@ -282,16 +467,30 @@ private:
 	float            _yaw = 0.0f;   ///< 水平向き（度）
 	float            _pitch = 0.0f;   ///< 上下向き（度）：ライト方向に使用
 
+	// 姿勢ベクトル
+	dx::XMVECTOR     _up_vector = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	dx::XMVECTOR     _forward_vector = dx::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	bool             _is_climbing = false;
+	float            _climb_lerp_speed = 5.0f;
+	float            _gravity = 9.8f;
+
+	// アニメーション制御
+	int              _animation_index = 0;
+	float            _animation_speed = 1.0f;
+	bool             _is_dead = false;
+	float            _idle_large_timer = 0.0f;
+	bool             _trigger_idle_large = false;
+
 	// 移動パラメータ
 	float            _speed = 5.0f;
 	float            _sprint_mult = 2.0f;
-	float            _eye_height = 1.7f;   ///< 目の高さ（m）
+	float            _eye_height = 0.5f;   ///< 蜘蛛なので目の高さを低めに
 
 	// カプセルコリジョン
-	float            _capsule_radius = 0.4f;  ///< カプセル半径（m）
-	float            _capsule_height = 1.8f;  ///< カプセル全高（m）
-	bool             _enable_ground_snap = false; ///< 床スナップ有効フラグ
-	float            _ground_snap_dist = 1.0f;  ///< 床スナップ探索距離（m）
+	float            _capsule_radius = 0.6f;  ///< 蜘蛛に合わせて半径を大きめにする
+	float            _capsule_height = 0.8f;  ///< 蜘蛛に合わせて全高を低めにする
+	bool             _enable_ground_snap = true; ///< 床スナップ有効
+	float            _ground_snap_dist = 1.5f;
 
 	// スポットライト
 	int              _spotlight_index = -1;
@@ -299,6 +498,6 @@ private:
 	float            _light_intensity = 8.0f;
 	float            _light_inner_angle = 0.15f;
 	float            _light_outer_angle = 0.40f;
-	float            _light_height_offset = 1.5f; ///< ライト発生位置のY+オフセット
-	dx::XMFLOAT4     _light_color = { 1.0f, 0.95f, 0.85f, 1.0f }; ///< 暖色系白
+	float            _light_height_offset = 0.5f; ///< 蜘蛛に合わせてライトオフセットを低めに
+	dx::XMFLOAT4     _light_color = { 1.0f, 0.95f, 0.85f, 1.0f };
 };

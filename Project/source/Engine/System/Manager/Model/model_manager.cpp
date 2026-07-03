@@ -112,16 +112,35 @@ void ModelManager::update(float delta_time)
 {
 	for (auto& [key, inst] : instances_)
 	{
-		if (!inst.is_animation) continue;
-
 		Gltf_Model* model = get_model(inst.model_key);
-		if (!model || model->animations.empty()) continue;
+
+		if (!inst.is_animation || !model || model->animations.empty())
+		{
+			// アニメーションなし：スタテぅ1回分のノードをキャッシュ
+			// (render内でノード参照するてことがあるので空にする)
+			inst.cached_animated_nodes.clear();
+			inst.cached_joint_matrices.clear();
+
+			if (!inst.is_animation) continue;
+			continue;
+		}
 
 		float duration = 0.0f;
 
 		if (inst.anim_mode == Gltf_Model::animation_mode::single)
 		{
-			if (inst.animation_index >= static_cast<int>(model->animations.size())) continue;
+			if (inst.animation_index < 0 ||
+				inst.animation_index >= static_cast<int>(model->animations.size()))
+			{
+				// 無効なアニメーションインデックス：以前は何もせず continue していたため、
+				// cached_animated_nodes が直前の有効な姿勢のまま残り続け、
+				// render_with_nodes() がそれを毎フレーム使い回す結果
+				// 「モーションが固まって見える」バグになっていた。
+				// キャッシュを明示的にクリアしてバインドポーズへフォールバックする。
+				inst.cached_animated_nodes.clear();
+				inst.cached_joint_matrices.clear();
+				continue;
+			}
 			duration = model->animations[inst.animation_index].duration;
 		}
 		else // all
@@ -131,12 +150,42 @@ void ModelManager::update(float delta_time)
 				duration = std::max(duration, anim.duration);
 		}
 
+		if (duration <= 0.0f)
+		{
+			// duration 0（不正/空のクリップ）だと std::fmod(x, 0) が NaN になり、
+			// 以降ずっとポーズが崩れた/固まったままになるため、ここで弾く。
+			inst.cached_animated_nodes.clear();
+			inst.cached_joint_matrices.clear();
+			continue;
+		}
+
 		inst.animation_time += delta_time * inst.animation_speed;
 
 		if (inst.loop_animation)
 			inst.animation_time = std::fmod(inst.animation_time, duration);
 		else
 			inst.animation_time = std::min(inst.animation_time, duration);
+
+		// --- アニメーション計算をキャッシュ（ここでで1回だけ行う）---
+		inst.cached_animated_nodes = model->nodes; // ノードをコピー
+		if (inst.anim_mode == Gltf_Model::animation_mode::single)
+		{
+			model->animate(
+				static_cast<size_t>(inst.animation_index),
+				inst.animation_time,
+				inst.cached_animated_nodes);
+		}
+		else
+		{
+			model->animate_all(inst.animation_time, inst.cached_animated_nodes);
+		}
+
+		// --- スキン行列（ジョイント行列）もここで1回だけ計算してキャッシュ ---
+		// (以前は render_with_nodes() 内で描画パスのたびに再計算していたため、
+		//  1フレームに5回（deferred/shadow x2/directional/forward）も
+		//  同じ計算を繰り返しており、これがアニメーション付きモデル
+		//  （プレイヤー等）描画時のFPS低下の主因だった)
+		model->compute_joint_matrices(inst.cached_animated_nodes, inst.cached_joint_matrices);
 	}
 }
 
@@ -237,14 +286,27 @@ void ModelManager::render_all(pass_mode pass)
 			continue;
 		}
 
-		model->render(
-			Graphics_Core::instance().get_device_context(),
-			inst.world_transform,
-			pass,
-			inst.is_animation,
-			inst.animation_time,
-			inst.anim_mode,
-			inst.animation_index);
+		// \u30ad\u30e3\u30c3\u30b7\u30e5\u6e08\u307f\u30ce\u30fc\u30c9\u304c\u3042\u308b\u5834\u5408\u306f\u9ad8\u901f\u7248\u3092\u4f7f\u7528\u3001\u306a\u3051\u308c\u3070\u901a\u5e38\u7248\u306b\u30d5\u30a9\u30fc\u30eb\u30d0\u30c3\u30af
+		if (!inst.cached_animated_nodes.empty())
+		{
+			model->render_with_nodes(
+				Graphics_Core::instance().get_device_context(),
+				inst.world_transform,
+				pass,
+				&inst.cached_animated_nodes,
+				&inst.cached_joint_matrices);
+		}
+		else
+		{
+			model->render(
+				Graphics_Core::instance().get_device_context(),
+				inst.world_transform,
+				pass,
+				inst.is_animation,
+				inst.animation_time,
+				inst.anim_mode,
+				inst.animation_index);
+		}
 	}
 
 	// store stats

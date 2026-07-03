@@ -381,6 +381,25 @@ public:
 		int animation_index = 0
 	);
 
+	/**
+	 * @brief モデル描画（計算済みアニメーションノード使用）
+	 *
+	 * update() で事前計算した animated_nodes を受け取り、描画パスごとの
+	 * アニメーション再計算を省略する高速版。
+	 *
+	 * @param immediate_context デバイスコンテキスト
+	 * @param world ワールド行列
+	 * @param pass 描画パス
+	 * @param precomputed_nodes update() で計算済みのノード配列（nullptr で通常版にフォールバック）
+	 */
+	void render_with_nodes(
+		ID3D11DeviceContext* immediate_context,
+		const DirectX::XMFLOAT4X4& world,
+		pass_mode pass,
+		const std::vector<node>* precomputed_nodes,
+		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr
+	);
+
 	// 全アニメーション同時適用
 	void animate_all(float time, std::vector<node>& animated_nodes);
 
@@ -392,6 +411,26 @@ public:
 	 * @param animated_nodes アニメーション適用先ノード配列
 	 */
 	void animate(size_t animation_index, float time, std::vector<node>& animated_nodes);
+
+	/**
+	 * @brief スキン行列（ジョイント行列）を事前計算
+	 *
+	 * @details
+	 * render() / render_with_nodes() では、スキンを持つノードごとに
+	 * 「ノードのグローバル変換の逆行列」を関節数ぶん重複して計算していたため、
+	 * 描画パス（deferred / shadow x2 / directional_shadow / forward）の回数だけ
+	 * 同じ計算を無駄に繰り返していた。
+	 *
+	 * この関数を ModelManager::update() から1フレームに1回だけ呼び出し、
+	 * 結果をノードインデックスをキーにキャッシュしておくことで、
+	 * 各描画パスでは再計算せずに使い回せるようにする。
+	 *
+	 * @param animated_nodes 事前計算済みのノード配列（アニメーション適用後）
+	 * @param out_joint_matrices [出力] ノードインデックス→ジョイント行列群
+	 */
+	void compute_joint_matrices(
+		const std::vector<node>& animated_nodes,
+		std::unordered_map<int, primitive_joint_constants>& out_joint_matrices) const;
 
 	/**
 	 * @brief マテリアルがパスに含まれるか判定
