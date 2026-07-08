@@ -1,5 +1,6 @@
 #include "frame_buffer.h"
 #include "Engine/Utilities/misc.h"
+#include "Engine/Utilities/render_marker_util.h"
 
 Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format/*format of render target*/, int mip_levels, bool use_depth, bool use_stencil)
 {
@@ -62,6 +63,18 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	m_viewport.MaxDepth = 1.0f;
 	m_viewport.TopLeftX = 0.0f;
 	m_viewport.TopLeftY = 0.0f;
+
+	DX_SET_NAME(render_target_buffer.Get(), L"Framebuffer_" DX_WCHAR_STR(render_target_buffer));
+
+	DX_SET_NAME(m_renderTargetView.Get(), L"Framebuffer_" DX_WCHAR_STR(m_renderTargetView));
+
+	DX_SET_NAME(m_colorMap.Get(), L"Framebuffer_" DX_WCHAR_STR(m_colorMap));
+
+	if (use_depth)
+	{
+		DX_SET_NAME(m_depthStencilView.Get(), L"Framebuffer_" DX_WCHAR_STR(m_depthStencilView));
+		DX_SET_NAME(m_depthMap.Get(), L"Framebuffer_" DX_WCHAR_STR(m_depthMap));
+	}
 }
 void Framebuffer::Clear(ID3D11DeviceContext* immediate_context,
 	float r, float g, float b, float a, float depth)

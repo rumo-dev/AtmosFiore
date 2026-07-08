@@ -27,6 +27,8 @@ bool Frame_Work::initialize()
 	AudioSystem::instance().SetListenerPosition(0.0f, 0.0f, 0.0f);
 	AudioSystem::instance().SetListenerOrientation(0.0f, 0.0f, 1.0f,   // front
 		0.0f, 1.0f, 0.0f);  // up
+
+
 	return true;
 }
 
@@ -80,18 +82,22 @@ void Frame_Work::render(float elapsed_time) {
 		Dashboard::Instance().Render();
 	}
 
-	ImGui::Render();
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+	// 変換したワイド文字列ポインタを渡す
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render IMGUI");
+		ImGui::Render();
+		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-	if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-		// 別ウィンドウの描画
-		ImGui::UpdatePlatformWindows();
-		ImGui::RenderPlatformWindowsDefault();
+		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+			// 別ウィンドウの描画
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
 
-		// --- 修正の鍵 ---
-		// 別ウィンドウの描画完了後に、デバイスコンテキストをメインに戻す
-		// これをしないと、次のフレームの描画が別ウィンドウ側の設定に引きずられます
-		Graphics_Core::instance().set_render_targets();
+			// --- 修正の鍵 ---
+			// 別ウィンドウの描画完了後に、デバイスコンテキストをメインに戻す
+			// これをしないと、次のフレームの描画が別ウィンドウ側の設定に引きずられます
+			Graphics_Core::instance().set_render_targets();
+		}
 	}
 #endif
 

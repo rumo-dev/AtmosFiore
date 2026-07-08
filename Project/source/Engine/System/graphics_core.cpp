@@ -34,7 +34,7 @@ void Graphics_Core::initialize(HWND hwnd) {
 	spot_light_manager.initialize(_device.Get());
 	area_light_manager.initialize(_device.Get());
 
-
+	g_MarkerUtil.Initialize(_immediate_context.Get());
 	log_printf("グラフィックスコアの初期化終了\n", LogLevel::Info);
 }
 

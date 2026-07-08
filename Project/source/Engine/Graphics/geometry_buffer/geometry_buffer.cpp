@@ -4,55 +4,9 @@
 
 #include "Engine/System/graphics_core.h"
 #include "Game/World/Camera/camera_manager.h"
-
 GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 {
 	HRESULT hr = S_OK;
-
-	/*
-	  G-Buffer Layout (Deferred Rendering, PBR-Compatible)
-
-	  This configuration uses 4 Render Targets + Depth Buffer.
-	  Designed for high-quality physically based rendering (PBR) pipelines.
-
-	  GBuffer0 : R16G16B16A16_FLOAT
-		  xyz = World-space normal vector
-		  w   = Surface roughness (0?1)
-
-	  GBuffer1 : R8G8B8A8_UNORM
-		  rgb = Base color (albedo, sRGB)
-		  a   = Metalness (0 for dielectric, 1 for metal)
-
-	  GBuffer2 : R16G16B16A16_FLOAT
-		  xyz = World-space position (high precision)
-		  w   = Ambient occlusion (AO)
-
-	  GBuffer3 : R16G16B16A16_FLOAT
-		  rgb = Emissive color
-		  w   = Subsurface / Clearcoat / Specular intensity (material-dependent)
-
-	  Depth Buffer : D32_FLOAT
-		  Stores per-pixel depth value used for position reconstruction,
-		  shadow mapping, and post-processing effects.
-
-	  Notes:
-		- Memory cost at 1920x1080 ? 64 MB per frame.
-		- For optimization, position may be reconstructed from depth instead of
-		  being stored directly in GBuffer2.
-		- Optional extensions:
-			* Velocity buffer (for motion blur / TAA)
-			* Material ID buffer (for special effects)
-
-	  Example usage in lighting pass:
-		  float3 normal    = normalize(gbuffer0.xyz);
-		  float  roughness = gbuffer0.w;
-		  float3 albedo    = SRGBToLinear(gbuffer1.rgb);
-		  float  metalness = gbuffer1.a;
-		  float3 position  = gbuffer2.xyz;
-		  float  ao        = gbuffer2.w;
-		  float3 emissive  = gbuffer3.rgb;
-	*/
-
 
 	DXGI_FORMAT formats[GBUFFER_COUNT] =
 	{
@@ -60,6 +14,15 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 		DXGI_FORMAT_R8G8B8A8_UNORM,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
+	};
+
+	// ★ 各Gバッファの用途名を定義
+	const wchar_t* semantic_names[GBUFFER_COUNT] =
+	{
+		L"GBuffer0_Normal_Roughness",
+		L"GBuffer1_Albedo_Metalness",
+		L"GBuffer2_Position_AO",
+		L"GBuffer3_Emissive_Specular"
 	};
 
 	for (size_t render_target_index = 0; render_target_index < GBUFFER_COUNT; ++render_target_index)
@@ -91,6 +54,12 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 		shader_resource_view_desc.Texture2D.MipLevels = 1;
 		hr = device->CreateShaderResourceView(m_renderTargetBuffers[render_target_index], &shader_resource_view_desc, &m_renderTargetShaderResourceViews[render_target_index]);
 		_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+
+		// ★ 用途に沿った名前を動的に生成して設定
+		std::wstring base_name = semantic_names[render_target_index];
+		DX_SET_NAME(m_renderTargetBuffers[render_target_index], (base_name + L"_Tex").c_str());
+		DX_SET_NAME(m_renderTargetViews[render_target_index], (base_name + L"_RTV").c_str());
+		DX_SET_NAME(m_renderTargetShaderResourceViews[render_target_index], (base_name + L"_SRV").c_str());
 	}
 
 	D3D11_TEXTURE2D_DESC texture2d_desc = {};
@@ -108,6 +77,9 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 	hr = device->CreateTexture2D(&texture2d_desc, 0, &m_depthStencilBuffer);
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
+	// ★ 深度バッファ本体
+	DX_SET_NAME(m_depthStencilBuffer, L"GBuffer_DepthBuffer_Tex");
+
 	D3D11_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc{};
 	depth_stencil_view_desc.Format = DXGI_FORMAT_D32_FLOAT;
 	depth_stencil_view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
@@ -115,7 +87,8 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 	hr = device->CreateDepthStencilView(m_depthStencilBuffer, &depth_stencil_view_desc, &m_depthStencilView);
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
-
+	// ★ DSV
+	DX_SET_NAME(m_depthStencilView, L"GBuffer_DepthBuffer_DSV");
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc = {};
 	shader_resource_view_desc.Format = DXGI_FORMAT_R32_FLOAT;
@@ -123,6 +96,9 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 	shader_resource_view_desc.Texture2D.MipLevels = 1;
 	hr = device->CreateShaderResourceView(m_depthStencilBuffer, &shader_resource_view_desc, &m_depthStencilShaderResourceView);
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+
+	// ★ 深度SRV
+	DX_SET_NAME(m_depthStencilShaderResourceView, L"GBuffer_DepthBuffer_SRV");
 
 	m_viewport.Width = static_cast<float>(width);
 	m_viewport.Height = static_cast<float>(height);

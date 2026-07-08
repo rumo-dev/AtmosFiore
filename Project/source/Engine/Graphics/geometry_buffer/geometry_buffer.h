@@ -1,6 +1,7 @@
 #pragma once
 #include <d3d11.h>
 #include <wrl.h>
+#include "Engine/utilities/render_marker_util.h"
 
 /// Gバッファのレンダーターゲット数（位置・法線・アルベド・マテリアルなど）
 #define GBUFFER_COUNT  4

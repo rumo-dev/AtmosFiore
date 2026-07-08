@@ -80,10 +80,12 @@ void Post_Process_Manager::begin()
 	srvs[GBUFFER_COUNT + 1] = shadower->get_point_shadow_back_map();
 	srvs[GBUFFER_COUNT + 2] = shadower->get_directional_shadow_map();
 
-	Graphics_Core::instance().get_fullscreen_quad()->Blit(
-		ctx, srvs, 0, GBUFFER_COUNT + 3,
-		Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DEFERRED_LIGHTING_PS")
-	);
+	DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Lighting Pass"); {
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			ctx, srvs, 0, GBUFFER_COUNT + 3,
+			Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DEFERRED_LIGHTING_PS")
+		);
+	}
 }
 
 // ─── 終了 ─────────────────────────────────────────────────────────
@@ -113,55 +115,97 @@ void Post_Process_Manager::draw()
 	auto* ctx = Graphics_Core::instance().get_device_context();
 
 	// 1. Sky
-	skyer->make(ctx, fsquad.GetColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Sky Pass");
+		skyer->make(ctx, fsquad.GetColorMap());
+	}
 
 	// ★ 2. VolumetricFog（Sky 直後 ＝ HDR 生輝度に対してフォグを乗せる）
 	//       シェーダー側で GBuffer2(position) を t1 として読む。
 	//       事前にバインドしておく必要がある場合はここで行うこと。
-	vol_fog->make(ctx, skyer->get_color_map());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"VolumetricFog");
+		vol_fog->make(ctx, skyer->get_color_map());
+	}
 
 	// ★ 3. HeightFog
-	hgt_fog->make(ctx, vol_fog->get_color_map());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"HeightFog");
+		hgt_fog->make(ctx, vol_fog->get_color_map());
+	}
 
 	// ★ 4. DistanceFog
-	dst_fog->make(ctx, hgt_fog->get_color_map());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DistanceFog");
+		dst_fog->make(ctx, hgt_fog->get_color_map());
+	}
 
 	// ★ 5. ExponentialFog
-	exp_fog->make(ctx, dst_fog->get_color_map());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ExponentialFog");
+		exp_fog->make(ctx, dst_fog->get_color_map());
+	}
 
 	// 6. DoF（フォグ後に被写界深度を適用することでボケ端にフォグが馴染む）
-	dofer->make(ctx, exp_fog->get_color_map());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DoF");
+		dofer->make(ctx, exp_fog->get_color_map());
+	}
 
 	// 7. Exposure
-	exposurer->make(ctx, dofer->GetColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Exposure");
+		exposurer->make(ctx, dofer->GetColorMap());
+	}
 	//exposurer->make(ctx, exp_fog->get_color_map());
 
 	// 8. ChromaticAberration
-	ca_effect->make(ctx, exposurer->GetColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ChromaticAberration");
+		ca_effect->make(ctx, exposurer->GetColorMap());
+	}
 
 	// 9. LensDistortion
-	lens_distortion->make(ctx, ca_effect->GetColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"LensDistortion");
+		lens_distortion->make(ctx, ca_effect->GetColorMap());
+	}
 
 	// 10. Vignetting
-	vignetting->make(ctx, lens_distortion->GetColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Vignetting");
+		vignetting->make(ctx, lens_distortion->GetColorMap());
+	}
 
 	// 11. Bloom
-	bloomer->make(ctx, vignetting->GetColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Bloom");
+		bloomer->make(ctx, vignetting->GetColorMap());
+	}
 
 	// 12. Adaptation（自動露出）
-	adaptation->make(ctx, bloomer->getColorMap());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Adaptation");
+		adaptation->make(ctx, bloomer->getColorMap());
+	}
 
 	// 13. ToneMapping
-	tone_mapper->make(ctx, adaptation->get_color_map());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ToneMapping");
+		tone_mapper->make(ctx, adaptation->get_color_map());
+	}
 }
 
 // ─── 最終描画 ─────────────────────────────────────────────────────
 void Post_Process_Manager::render()
 {
-	Graphics_Core::instance().get_fullscreen_quad()->Blit(
-		Graphics_Core::instance().get_device_context(),
-		tone_mapper->get_color_map_address(), 0, 1
-	);
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Final");
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			Graphics_Core::instance().get_device_context(),
+			tone_mapper->get_color_map_address(), 0, 1
+		);
+	}
 }
 
 // ─── GUI ─────────────────────────────────────────────────────────

@@ -18,6 +18,8 @@
 #include "Engine/System/Manager/Light/spot_light_manager.h"
 #include "Engine/System/Manager/Light/area_light_manager.h"
 
+#include "Engine/Utilities/render_marker_util.h"
+
 
 CONST LONG SCREEN_WIDTH{ 1280 };
 CONST LONG SCREEN_HEIGHT{ 720 };
@@ -252,4 +254,5 @@ private:
 
 public:
 	Post_Process_Manager post_procss;
+	RenderDebug::MarkerUtil g_MarkerUtil;
 };

@@ -192,6 +192,7 @@ void ModelManager::update(float delta_time)
 void ModelManager::render_all(pass_mode pass)
 {
 	// Prepare frustum from active camera
+
 	auto active_cam = Camera_Manager::instance().get_active_camera();
 	Frustum cam_frustum{};
 	bool have_frustum = false;
@@ -285,27 +286,40 @@ void ModelManager::render_all(pass_mode pass)
 		if (!is_visible) {
 			continue;
 		}
+		{
 
-		// \u30ad\u30e3\u30c3\u30b7\u30e5\u6e08\u307f\u30ce\u30fc\u30c9\u304c\u3042\u308b\u5834\u5408\u306f\u9ad8\u901f\u7248\u3092\u4f7f\u7528\u3001\u306a\u3051\u308c\u3070\u901a\u5e38\u7248\u306b\u30d5\u30a9\u30fc\u30eb\u30d0\u30c3\u30af
-		if (!inst.cached_animated_nodes.empty())
-		{
-			model->render_with_nodes(
-				Graphics_Core::instance().get_device_context(),
-				inst.world_transform,
-				pass,
-				&inst.cached_animated_nodes,
-				&inst.cached_joint_matrices);
-		}
-		else
-		{
-			model->render(
-				Graphics_Core::instance().get_device_context(),
-				inst.world_transform,
-				pass,
-				inst.is_animation,
-				inst.animation_time,
-				inst.anim_mode,
-				inst.animation_index);
+			std::string marker_name = "DrawAllModel: " + key;
+
+			// ワイド文字への変換バッファをスタックに用意
+			wchar_t w_buffer[256];
+			size_t convertedChars = 0;
+
+			// char* から wchar_t* へ変換
+			mbstowcs_s(&convertedChars, w_buffer, marker_name.c_str(), _TRUNCATE);
+
+			// 変換したワイド文字列ポインタを渡す
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, w_buffer);
+
+			if (!inst.cached_animated_nodes.empty())
+			{
+				model->render_with_nodes(
+					Graphics_Core::instance().get_device_context(),
+					inst.world_transform,
+					pass,
+					&inst.cached_animated_nodes,
+					&inst.cached_joint_matrices);
+			}
+			else
+			{
+				model->render(
+					Graphics_Core::instance().get_device_context(),
+					inst.world_transform,
+					pass,
+					inst.is_animation,
+					inst.animation_time,
+					inst.anim_mode,
+					inst.animation_index);
+			}
 		}
 	}
 

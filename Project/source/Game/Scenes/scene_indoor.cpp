@@ -1,4 +1,5 @@
 #include "Scene_indoor.h"
+#include "Engine/System/Graphics_Core.h"	
 #include "Engine/system/manager/resource_manager.h"
 #include "Engine/Utilities/math_util.h"
 #include "Engine/Utilities/collision_util.h"
@@ -100,7 +101,7 @@ void Scene_Indoor::initialize()
 
 	// ライブラリモデルの登録
 	ModelInstance library;
-	library.model_key = "Library";
+	library.model_key = "City";
 	library.world_transform = make_world_matrix(
 		CoordinateSystem::RH_Y_UP,
 		{ 1,1,1 },
@@ -353,74 +354,100 @@ void Scene_Indoor::update(float elapsedTime)
 }
 
 // 描画処理
-void Scene_Indoor::render(float elapsedTime) {
+void Scene_Indoor::render(float elapsedTime)
+{
+
 	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
 	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CCW);
-	render_shadowmap(elapsedTime);
-	render_defferd(elapsedTime);
-	render_forward(elapsedTime);
-	render_UI(elapsedTime);
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Scene Indoor");
+		render_shadowmap(elapsedTime);
+		render_defferd(elapsedTime);
+		render_forward(elapsedTime);
+		render_UI(elapsedTime);
+	}
 }
 
 void Scene_Indoor::render_shadowmap(float elapsedTime) {
-	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	auto& shadower = Graphics_Core::instance().post_procss.GetShadow();
-
-	shadower.make_directional_shadow_begin();
-	Resource_Manager::instance().model_manager.render_all(pass_mode::directional_shadow);
-	shadower.make_shadow_end();
-
-	shadower.make_shadow_begin(shadow::PointShadowFace::Front);
-	Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
-	shadower.make_shadow_end();
-
-	shadower.make_shadow_begin(shadow::PointShadowFace::Back);
-	Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
-	shadower.make_shadow_end();
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Shadow Map");
+		ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
+		auto& shadower = Graphics_Core::instance().post_procss.GetShadow();
+		{
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Directional Shadow");
+			shadower.make_directional_shadow_begin();
+			Resource_Manager::instance().model_manager.render_all(pass_mode::directional_shadow);
+			shadower.make_shadow_end();
+		}
+		{
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Point Shadow Front");
+			shadower.make_shadow_begin(shadow::PointShadowFace::Front);
+			Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
+			shadower.make_shadow_end();
+		}
+		{
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Point Shadow Back");
+			shadower.make_shadow_begin(shadow::PointShadowFace::Back);
+			Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
+			shadower.make_shadow_end();
+		}
+	}
 }
 
 void Scene_Indoor::render_defferd(float elapsedTime) {
-	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	Graphics_Core::instance().update_constants();
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Deferred");
+		ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
+		Graphics_Core::instance().update_constants();
 
-	Graphics_Core::instance().get_geometry_buffer()->Clear(Graphics_Core::instance().get_device_context());
-	Graphics_Core::instance().get_geometry_buffer()->Activate(Graphics_Core::instance().get_device_context());
-	Render_State::instance().set_deferred_render_states(immediate_context, Rasterizer_State::Cull_None_CCW);
+		Graphics_Core::instance().get_geometry_buffer()->Clear(Graphics_Core::instance().get_device_context());
+		Graphics_Core::instance().get_geometry_buffer()->Activate(Graphics_Core::instance().get_device_context());
+		Render_State::instance().set_deferred_render_states(immediate_context, Rasterizer_State::Cull_None_CCW);
 
-	Resource_Manager::instance().model_manager.render_all(pass_mode::deferred_geometry);
-	Graphics_Core::instance().get_geometry_buffer()->Deactivate(Graphics_Core::instance().get_device_context());
+		Resource_Manager::instance().model_manager.render_all(pass_mode::deferred_geometry);
+		Graphics_Core::instance().get_geometry_buffer()->Deactivate(Graphics_Core::instance().get_device_context());
+	}
 }
 
 void Scene_Indoor::render_forward(float elapsedTime) {
-	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	immediate_context->OMSetRenderTargets(1, Graphics_Core::instance().get_render_target_view().GetAddressOf(), Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Forward");
+		ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
+		immediate_context->OMSetRenderTargets(1, Graphics_Core::instance().get_render_target_view().GetAddressOf(), Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
 
-	Render_State::instance().set_2d_render_states(immediate_context);
-	Graphics_Core::instance().clear(Color_Utils::from_hex("#291F32"));
+		Render_State::instance().set_2d_render_states(immediate_context);
+		Graphics_Core::instance().clear(Color_Utils::from_hex("#291F32"));
 
-	Graphics_Core::instance().post_procss.begin();
-	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
+		Graphics_Core::instance().post_procss.begin();
+		Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 
-	Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
+		Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
+	}
 }
 
 void Scene_Indoor::render_UI(float elapsedTime) {
-	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	Render_State::instance().set_2d_render_states(immediate_context);
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render UI");
+		ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
+		Render_State::instance().set_2d_render_states(immediate_context);
 
-	Graphics_Core::instance().post_procss.end();
-	Graphics_Core::instance().post_procss.draw();
-	Graphics_Core::instance().post_procss.render();
+		Graphics_Core::instance().post_procss.end();
+		Graphics_Core::instance().post_procss.draw();
+		Graphics_Core::instance().post_procss.render();
 
-	Text::text_data.Color = Color_Utils::hex_to_colorF("#F2D7EE");
+		Text::text_data.Color = Color_Utils::hex_to_colorF("#F2D7EE");
 
-	Text::draw(L"Indoor", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+		Text::draw(L"Indoor", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+	}
 }
 
 void Scene_Indoor::render_debug(float elapsedTime) {
-	Graphics_Core::instance().get_point_light_manager().debug_render();
-	Graphics_Core::instance().get_spot_light_manager().debug_render();
-	Graphics_Core::instance().get_area_light_manager().debug_render();
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Debug");
+		Graphics_Core::instance().get_point_light_manager().debug_render();
+		Graphics_Core::instance().get_spot_light_manager().debug_render();
+		Graphics_Core::instance().get_area_light_manager().debug_render();
+	}
 }
 
 // GUI描画

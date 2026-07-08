@@ -363,6 +363,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Utilities\collision_util.h" />
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Utilities\math_util.h" />
+    <ClInclude Include="source\Engine\Utilities\render_marker_util.h" />
     <ClInclude Include="source\Game\Effect\adaptation\adaptation.h" />
     <ClInclude Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.h" />
     <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />

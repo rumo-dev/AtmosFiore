@@ -12,6 +12,7 @@ inline constexpr std::string_view ICON_RENDER = "\ue8c2";
 inline constexpr std::string_view ICON_LIGHT = "\ue5b6";
 inline constexpr std::string_view ICON_RESOURCE = "\ueaa2";
 inline constexpr std::string_view ICON_CAMERA = "\ue10e";
+inline constexpr std::string_view ICON_UITEST = "\ue564";
 
 inline std::string_view get_icon(std::string_view name) {
 	static const std::unordered_map<std::string_view, std::string_view> icon_map = {
@@ -23,7 +24,8 @@ inline std::string_view get_icon(std::string_view name) {
 		{"Rendering", ICON_RENDER},
 		{"Light",     ICON_LIGHT},
 		{"Resource",  ICON_RESOURCE},
-		{"Camera",    ICON_CAMERA}
+		{"Camera",    ICON_CAMERA},
+		{"UITest",    ICON_UITEST},
 	};
 
 	for (const auto& [key, icon] : icon_map) {
