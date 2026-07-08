@@ -28,17 +28,17 @@ struct Camera {
 	DirectX::XMVECTOR prevPosition{ 0.0f, 5.0f, -10.0f, 1.0f };
 
 	float shutterDenominator = 5.0f;
-	float FNumber = 2.8f;
+	float FNumber = 7.9f;
 	float FocalLength = 50.0f;
-	float SensorSize = 35.f;
-	float FocusDist = 5.f;
-	float MaxBlurRadius = 10.f;
+	float SensorSize = 35.5f;
+	float FocusDist = 8.8f;
+	float MaxBlurRadius = 21.2f;
 	bool isReversed_Z = false;
 
-	float TStop = 2.8f;
+	float TStop = 3.1f;
 	float ShutterSpeed = 1.0f / shutterDenominator;
-	float ISO = 800.0f;
-	float EV_Compensation = 0.0f;
+	float ISO = 617.0f;
+	float EV_Compensation = -0.8f;
 
 	// --- 手振れ用パラメータ (ランダムウォーク) ---
 	bool enableCameraShake = false;

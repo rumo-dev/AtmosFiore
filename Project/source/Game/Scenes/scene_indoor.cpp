@@ -73,7 +73,7 @@ void Scene_Indoor::initialize()
 	ID3D11Device* device = Graphics_Core::instance().get_device();
 
 	// スポットライトの追加
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 10; i++) {
 		float x = Random::Range(-10.0f, 10.0f);
 		float z = Random::Range(-10.0f, 10.0f);
 		float y = Random::Range(3.0f, 7.0f);

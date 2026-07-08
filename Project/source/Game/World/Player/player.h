@@ -50,7 +50,7 @@ public:
 
 		// デフォルトモデル名
 		_model_name = "Spider";
-		_scale = dx::XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
+		_scale = dx::XMVectorSet(0.3f, 0.3f, 0.3f, 1.0f);
 	}
 
 	void update(float elapsed_time, float camera_yaw_deg, float camera_pitch_deg = 0.0f,
@@ -498,7 +498,7 @@ private:
 	int              _model_forward_axis = 1; // 0:+Z, 1:+X, 2:-Z, 3:-X
 
 	// 移動パラメータ
-	float            _speed = 8.0f;
+	float            _speed = 3.0f;
 	float            _vertical_speed = 5.0f;
 	float            _sprint_mult = 2.0f;
 	float            _yaw_follow_speed = 8.0f;

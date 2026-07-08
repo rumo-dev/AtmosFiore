@@ -156,6 +156,18 @@ void Resource_Manager::load_models() {
 		"Spider",
 		"./data/model/drone.glb"
 	);
+	model_manager.load(
+		"Spider1",
+		"./data/model/drone2.glb"
+	);
+	model_manager.load(
+		"Spider2",
+		"./data/model/drone3.glb"
+	);
+	model_manager.load(
+		"Spider3",
+		"./data/model/drone4.glb"
+	);
 	//model_manager.load(
 	//	"Cafe",
 	//	"./data/model/cafe/scene.gltf"
