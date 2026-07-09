@@ -7,11 +7,15 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 
 	HRESULT hr{ S_OK };
 	// レンダーターゲットバッファの作成
+	// mip_levels が 1 以外（0 = フルチェイン、または 2 以上）の場合のみミップマップを有効化する。
+	// デフォルト（mip_levels = 1）ではミップマップ生成に関わるフラグは一切立てない。
+	m_mipmapEnabled = (mip_levels != 1);
+
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> render_target_buffer;
 	D3D11_TEXTURE2D_DESC texture2d_desc{};
 	texture2d_desc.Width = width;
 	texture2d_desc.Height = height;
-	texture2d_desc.MipLevels = 1;
+	texture2d_desc.MipLevels = mip_levels;
 	texture2d_desc.ArraySize = 1;
 	texture2d_desc.Format = format;
 	texture2d_desc.SampleDesc.Count = 1;
@@ -19,7 +23,9 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	texture2d_desc.Usage = D3D11_USAGE_DEFAULT;
 	texture2d_desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 	texture2d_desc.CPUAccessFlags = 0;
-	texture2d_desc.MiscFlags = mip_levels > 1 ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+	// ミップマップ自動生成には D3D11_RESOURCE_MISC_GENERATE_MIPS に加え、
+	// レンダーターゲット兼シェーダーリソースとしてのバインドが必要（上記 BindFlags で満たしている）。
+	texture2d_desc.MiscFlags = m_mipmapEnabled ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
 	hr = device->CreateTexture2D(&texture2d_desc, 0, render_target_buffer.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 	// レンダーターゲットビューの作成
@@ -32,7 +38,8 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	D3D11_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc{};
 	shader_resource_view_desc.Format = texture2d_desc.Format;
 	shader_resource_view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	shader_resource_view_desc.Texture2D.MipLevels = 1;
+	// ミップマップ有効時は全レベルを参照できるように -1（全ミップ）を指定する
+	shader_resource_view_desc.Texture2D.MipLevels = m_mipmapEnabled ? static_cast<UINT>(-1) : 1;
 	hr = device->CreateShaderResourceView(render_target_buffer.Get(), &shader_resource_view_desc, m_colorMap.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 	// 深度ステンシルバッファの作成
@@ -105,4 +112,12 @@ void Framebuffer::Deactivate(ID3D11DeviceContext* immediate_context)
 	immediate_context->OMSetRenderTargets(1, m_cachedRenderTargetView.GetAddressOf(),
 		m_cachedDepthStencilView.Get());
 }
-
+void Framebuffer::GenerateMips(ID3D11DeviceContext* immediate_context)
+{
+	// mip_levels = 1（デフォルト）で生成された場合は何もしない
+	if (!m_mipmapEnabled)
+	{
+		return;
+	}
+	immediate_context->GenerateMips(m_colorMap.Get());
+}

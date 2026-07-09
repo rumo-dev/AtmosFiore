@@ -72,6 +72,18 @@ public:
 	 */
 	void Deactivate(ID3D11DeviceContext* immediate_context);
 
+	/**
+	 * @brief カラーバッファのミップマップを生成する
+	 *
+	 * コンストラクタで mip_levels に 1 より大きい値（または 0 ＝フルチェイン）を
+	 * 指定して生成されたフレームバッファに対してのみ有効。
+	 * デフォルト（mip_levels = 1）では何もしない。
+	 * カラーバッファへの描画が完了したあとに呼び出すこと。
+	 *
+	 * @param immediate_context デバイスコンテキスト
+	 */
+	void GenerateMips(ID3D11DeviceContext* immediate_context);
+
 public:
 	/**
 	 * @brief カラーバッファのShaderResourceViewを取得
@@ -146,4 +158,7 @@ private:
 
 	/// ビューポート設定
 	D3D11_VIEWPORT m_viewport;
+
+	/// ミップマップ生成が有効かどうか（mip_levels != 1 のときのみ true）
+	bool m_mipmapEnabled{ false };
 };

@@ -8,7 +8,8 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
 
 	glow_extraction = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT,
-		false
+		1,		// mip_levels: ミップマップ不要
+		false	// use_depth
 	);
 
 	for (size_t downsampled_index = 0; downsampled_index < downsampled_count; ++downsampled_index)
@@ -17,24 +18,23 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 			device,
 			width >> downsampled_index,
 			height >> downsampled_index, DXGI_FORMAT_R16G16B16A16_FLOAT,
-			false
-
+			1,		// mip_levels: ミップマップ不要
+			false	// use_depth
 		);
 		gaussian_blur[downsampled_index][1] = std::make_unique<Framebuffer>(
 			device,
 			width >> downsampled_index,
 			height >> downsampled_index, DXGI_FORMAT_R16G16B16A16_FLOAT,
-			false
-
+			1,		// mip_levels: ミップマップ不要
+			false	// use_depth
 		);
 	}
 	bloom_final = std::make_unique<Framebuffer>(
 		device,
 		width,
 		height, DXGI_FORMAT_R16G16B16A16_FLOAT,
-		0,
-		false
-
+		0,		// mip_levels: 0 = 最小サイズ(1x1)までのフルミップチェインを生成
+		false	// use_depth
 	);
 	create_ps_from_cso(device, "glow_extraction_ps.cso", glow_extraction_ps.GetAddressOf());
 	create_ps_from_cso(device, "gaussian_blur_downsampling_ps.cso", gaussian_blur_downsampling_ps.GetAddressOf());
@@ -163,6 +163,8 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 
 
 	bloom_final->Deactivate(immediate_context);
+	// 最小サイズ(1x1)までのミップマップを生成
+	bloom_final->GenerateMips(immediate_context);
 	// Restore states
 	immediate_context->PSSetConstantBuffers(8, 1, cached_constant_buffer.GetAddressOf());
 
@@ -180,4 +182,3 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 
 
 }
-

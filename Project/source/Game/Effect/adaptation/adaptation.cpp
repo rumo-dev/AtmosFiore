@@ -5,7 +5,10 @@
 Adaptation::Adaptation(ID3D11Device* device, uint32_t width, uint32_t height)
 {
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
-	color_map = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, false);
+	color_map = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT,
+		1,		// mip_levels: ミップマップ不要
+		false	// use_depth
+	);
 
 	// 1x1 露出テクスチャ (SRV / UAV) の作成
 	// 初期値: 1.0f (露出なし) から開始
