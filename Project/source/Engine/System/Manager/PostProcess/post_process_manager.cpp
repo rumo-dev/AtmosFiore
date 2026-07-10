@@ -536,3 +536,6 @@ void Post_Process_Manager::drawToneMappingGUI()
 	}
 	ImGui::EndChild();
 }
+void Post_Process_Manager::drawDOFGUI() {
+	CheckboxInt("Enable Dof", dofer->is_dof, "Enable bloom effect");
+}

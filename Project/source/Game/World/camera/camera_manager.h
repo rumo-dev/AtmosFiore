@@ -10,21 +10,21 @@
 /**
  * @brief カメラ管理マネージャークラス（シングルトン）
  */
-class Camera_Manager {
+class CameraManager {
 private:
 	std::unordered_map<std::string, std::shared_ptr<ICamera>> _cameras;
 	std::shared_ptr<ICamera> _active_camera;
 	std::shared_ptr<ICamera> _dummy_camera; // Fallback camera
 
-	Camera_Manager() {
+	CameraManager() {
 		// Initialize with a dummy camera implementation if necessary
 		_dummy_camera = std::make_shared<NullCamera>();
 	}
 	//Camera_Manager() = default;
 
 public:
-	static Camera_Manager& instance() {
-		static Camera_Manager ins;
+	static CameraManager& instance() {
+		static CameraManager ins;
 		return ins;
 	}
 

@@ -1,5 +1,5 @@
 #include "Scene_indoor.h"
-#include "Engine/System/Graphics_Core.h"	
+#include "Engine/System/Graphics_Core.h"
 #include "Engine/system/manager/resource_manager.h"
 #include "Engine/Utilities/math_util.h"
 #include "Engine/Utilities/collision_util.h"
@@ -101,7 +101,7 @@ void Scene_Indoor::initialize()
 
 	// ライブラリモデルの登録
 	ModelInstance library;
-	library.model_key = "City";
+	library.model_key = "Library";
 	library.world_transform = make_world_matrix(
 		CoordinateSystem::RH_Y_UP,
 		{ 1,1,1 },
@@ -122,7 +122,7 @@ void Scene_Indoor::initialize()
 	// 当たり判定対象インスタンスの登録
 	// -----------------------------------------------------------------------
 	clear_collision_instances();
-	register_collision_instance("Library", library.world_transform);
+	register_collision_instance("City", library.world_transform);
 	rebuild_collision_grid();
 
 	IBL::Initialize(device, L"./data/ibl");
@@ -131,26 +131,26 @@ void Scene_Indoor::initialize()
 	// すべてのカメラの生成と登録
 	// -------------------------------------------------------------
 	HWND hwnd = Graphics_Core::instance().get_window_handle();
-	auto& camera_mgr = Camera_Manager::instance();
+	auto& camera_mgr = CameraManager::instance();
 
 	// 1. スペクテイターカメラ
-	camera_mgr.register_camera("Spectator", std::make_shared<Spectator_Camera>(hwnd));
+	camera_mgr.register_camera("Spectator", std::make_shared<SpectatorCamera>(hwnd));
 
 	// 2. サードパーソンカメラ
-	camera_mgr.register_camera("ThirdPerson", std::make_shared<Third_Person_Camera>(hwnd));
+	camera_mgr.register_camera("ThirdPerson", std::make_shared<ThirdPersonCamera>(hwnd));
 
 	// 3. ファーストパーソンカメラ
-	camera_mgr.register_camera("FirstPerson", std::make_shared<First_Person_Camera>(hwnd));
+	camera_mgr.register_camera("FirstPerson", std::make_shared<FirstPersonCamera>(hwnd));
 
 	// 4. オービットカメラ（初期注視点をLibraryモデルの座標にする）
 	dx::XMVECTOR target_pos = dx::XMVectorSet(0.0f, 3.5f, 0.0f, 1.0f);
-	camera_mgr.register_camera("Orbit", std::make_shared<Orbit_Camera>(hwnd, target_pos));
+	camera_mgr.register_camera("Orbit", std::make_shared<OrbitCamera>(hwnd, target_pos));
 
 	// 5. クォータービューカメラ
-	camera_mgr.register_camera("QuarterView", std::make_shared<Quarter_View_Camera>(target_pos));
+	camera_mgr.register_camera("QuarterView", std::make_shared<QuarterViewCamera>(target_pos));
 
 	// 6. シネマティックカメラ
-	auto cinematic_cam = std::make_shared<Cinematic_Camera>();
+	auto cinematic_cam = std::make_shared<CinematicCamera>();
 	cinematic_cam->add_way_point(dx::XMVectorSet(-10.0f, 5.0f, -15.0f, 1.0f), target_pos);
 	cinematic_cam->add_way_point(dx::XMVectorSet(-5.0f, 4.0f, -10.0f, 1.0f), target_pos);
 	cinematic_cam->add_way_point(dx::XMVectorSet(0.0f, 8.0f, -8.0f, 1.0f), target_pos);
@@ -211,7 +211,7 @@ void Scene_Indoor::finalize() {
 // 更新処理
 void Scene_Indoor::update(float elapsedTime)
 {
-	auto& camera_mgr = Camera_Manager::instance();
+	auto& camera_mgr = CameraManager::instance();
 
 	// -----------------------------------------------------------------
 	// カメラ更新
@@ -245,12 +245,12 @@ void Scene_Indoor::update(float elapsedTime)
 	std::string active_name = camera_mgr.get_active_camera_name();
 
 	if (active_name == "ThirdPerson") {
-		auto tp_cam = std::dynamic_pointer_cast<Third_Person_Camera>(camera_mgr.get_active_camera());
+		auto tp_cam = std::dynamic_pointer_cast<ThirdPersonCamera>(camera_mgr.get_active_camera());
 		if (tp_cam) tp_cam->set_target_position(player_pos);
 		camera_mgr.update(elapsedTime);
 	}
 	else if (active_name == "FirstPerson") {
-		auto fp_cam = std::dynamic_pointer_cast<First_Person_Camera>(camera_mgr.get_active_camera());
+		auto fp_cam = std::dynamic_pointer_cast<FirstPersonCamera>(camera_mgr.get_active_camera());
 		if (fp_cam) {
 			fp_cam->set_character_head_position(_player.get_head_position());
 		}

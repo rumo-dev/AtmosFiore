@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief クォータービュー（定点・俯瞰・RTS）カメラクラス
  */
-class Quarter_View_Camera : public ICamera {
+class QuarterViewCamera : public ICamera {
 private:
 	// ImGui から調整できるように const を外しました
 	float _fixed_pitch = 45.0f;
@@ -23,7 +23,7 @@ public:
 	/**
 	 * @param initial_focus_point 初期状態のターゲット（地面の中心点など）
 	 */
-	Quarter_View_Camera(const dx::XMVECTOR& initial_focus_point = dx::XMVectorZero()) {
+	QuarterViewCamera(const dx::XMVECTOR& initial_focus_point = dx::XMVectorZero()) {
 		camera_.target = initial_focus_point;
 		update_camera_position();
 	}

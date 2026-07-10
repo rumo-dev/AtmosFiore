@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief 対象追従カメラ（TPS/三人称視点など）クラス
  */
-class Follow_Camera : public ICamera {
+class FollowCamera : public ICamera {
 private:
 	HWND _hwnd{};
 
@@ -23,7 +23,7 @@ private:
 	float _lerp_factor = 5.0f; // カメラ遅延追従のスムーズさ（補間係数）
 
 public:
-	Follow_Camera(HWND hwnd = Graphics_Core::instance().get_window_handle())
+	FollowCamera(HWND hwnd = Graphics_Core::instance().get_window_handle())
 		: _hwnd(hwnd)
 	{
 		// 初期姿勢を安定させるための初期位置設定

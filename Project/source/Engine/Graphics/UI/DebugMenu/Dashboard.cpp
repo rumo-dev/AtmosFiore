@@ -245,7 +245,8 @@ void Dashboard::InitializeUI() {
 		{"Tone Mapping","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawToneMappingGUI(); }},
 		{"Exposure","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawExposureGUI(); }},
 		{"LensImperfections","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawLensImperfectionsGUI(); }},
-		{"Fog","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawFogGUI(); }}
+		{"Fog","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawFogGUI(); }},
+		{"DOF","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawDOFGUI(); }},
 
 	} });
 
@@ -261,13 +262,13 @@ void Dashboard::InitializeUI() {
 	} });
 
 	dash.RegisterModule({ "Camera", {
-		{"Setting", "Adjust camera properties", [](SharedMetricsData& d) { Camera_Manager::instance().get_active_camera()->get_camera().DrawCameraSettingsUI(); }},
-		{"View",    "View camera transform info", [](SharedMetricsData& d) { Camera_Manager::instance().draw_imgui(); }},
+		{"Setting", "Adjust camera properties", [](SharedMetricsData& d) { CameraManager::instance().get_active_camera()->get_camera().DrawCameraSettingsUI(); }},
+		{"View",    "View camera transform info", [](SharedMetricsData& d) { CameraManager::instance().draw_imgui(); }},
 	} });
 
 	dash.RegisterModule({ "UITest", {
 		{"Setting", "Test custom UI widgets", [](SharedMetricsData& d) { CustomUI::DrawCustomUIWidgetsTestWindow(); }},
-		{"View",    "Test UI Camera view", [](SharedMetricsData& d) { Camera_Manager::instance().draw_imgui(); }},
+		{"View",    "Test UI Camera view", [](SharedMetricsData& d) { CameraManager::instance().draw_imgui(); }},
 	} });
 }
 

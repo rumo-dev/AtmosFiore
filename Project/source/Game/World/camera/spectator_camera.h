@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief スペクテイター（凝視・デバッグ自由移動）カメラクラス
  */
-class Spectator_Camera : public ICamera {
+class SpectatorCamera : public ICamera {
 private:
 	// 初期状態リセット用のバックアップパラメータ
 	dx::XMVECTOR default_position;
@@ -30,7 +30,7 @@ private:
 	float _mouse_sensitivity = 0.1f;
 
 public:
-	Spectator_Camera(HWND hwnd = Graphics_Core::instance().get_window_handle())
+	SpectatorCamera(HWND hwnd = Graphics_Core::instance().get_window_handle())
 		: _hwnd(hwnd)
 	{
 		// 初期状態のパラメータを保存

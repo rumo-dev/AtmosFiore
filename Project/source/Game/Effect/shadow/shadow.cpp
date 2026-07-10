@@ -110,7 +110,7 @@ void shadow::make_directional_shadow_begin()
 	XMFLOAT4X4 VP;
 
 	Camera cam =
-		Camera_Manager::instance().get_active_camera()->get_camera();
+		CameraManager::instance().get_active_camera()->get_camera();
 
 	const float aspect_ratio =
 		directional_shadow_map->viewport.Width /

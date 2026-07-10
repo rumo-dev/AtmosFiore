@@ -2,8 +2,7 @@
 // ffs_scatter_cs.hlsl
 // Pass 3: Fast Filter Spreading — Scatter（デルタ書き込み）
 //
-// GDC 2017「Cinematic Depth of Field」Hillesland & Skelton (AMD)
-// スライドの Compute Shader 実装を忠実に再現。
+
 //
 // アルゴリズム概要:
 //   各スレッドが 1 ピクセルを担当し、

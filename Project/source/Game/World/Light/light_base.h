@@ -5,10 +5,10 @@
 //------------------------------------
 // ライト基底クラス
 //------------------------------------
-class Light_Base
+class LightBase
 {
 public:
-	virtual ~Light_Base() = default;
+	virtual ~LightBase() = default;
 
 	// 共通属性
 	dx::XMFLOAT4 ambientColor = { 0.2f, 0.2f, 0.2f, 1.0f };

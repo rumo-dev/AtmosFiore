@@ -323,8 +323,54 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>@echo off
+setlocal
+
+rem --- パスの定義 ---
+set "OUTPUT_DIR=$(SolutionDir)..\LastBuild"
+set "ZIP_FILE=$(SolutionDir)..\LastBuild.zip"
+
+rem --- 1. LastBuildの初期化 ---
+if exist "%OUTPUT_DIR%" rmdir /S /Q "%OUTPUT_DIR%"
+mkdir "%OUTPUT_DIR%"
+
+rem --- 2. dataフォルダのコピー ---
+rem ブロック構文を使わず、以前成功していた確実な一行書きを採用
+xcopy "$(SolutionDir)data*" "%OUTPUT_DIR%\data" /E /I /Y
+
+rem --- 3. シェーダーのコピー ---
+rem Releaseビルドの場合は、この処理をスキップする
+if "$(ConfigurationName)"=="Release" goto SKIP_SHADER
+
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader*.hlsl" "%OUTPUT_DIR%\source\Engine\Graphics\Shader" /S /I /Y
+xcopy "$(SolutionDir)source\Engine\Graphics\Shader*.hlsli" "%OUTPUT_DIR%\source\Engine\Graphics\Shader" /S /I /Y
+
+:SKIP_SHADER
+
+rem --- 4. exeのコピー ---
+copy /Y "$(TargetPath)" "%OUTPUT_DIR%"
+
+rem --- 5. Zip圧縮 ---
+rem 既存の古いZipがある場合は強制的に削除する
+if exist "%ZIP_FILE%" del /F /Q "%ZIP_FILE%"
+
+echo [INFO] 圧縮処理を開始します...
+rem .NETの機能を使って、ファイルを1つずつ追加しながらログに出力
+powershell -NoProfile -Command ^
+    "[System.Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem') | Out-Null;" ^
+    "$files = Get-ChildItem -Path '%OUTPUT_DIR%' -Recurse;" ^
+    "$total = $files.Count;" ^
+    "$i = 0;" ^
+    "foreach ($file in $files) {" ^
+        "if (-not $file.PSIsContainer) {" ^
+            "$i++;" ^
+            "Write-Host ('[{0}/{1}] 圧縮中: {2}' -f $i, $total, $file.FullName);" ^
+        "}" ^
+    "}" ^
+    "Compress-Archive -Path '%OUTPUT_DIR%*' -DestinationPath '%ZIP_FILE%' -Force"
+rem --- 6. アクセス権限の修正 ---
+rem 生成されたZipファイルの権限を親フォルダ（プロジェクトのある場所）と同じ状態にリセットする
+if exist "%ZIP_FILE%" icacls "%ZIP_FILE%" /reset /T /Q</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>

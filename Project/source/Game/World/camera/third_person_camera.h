@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief サードパーソン（三人称・キャラクター追従）カメラクラス
  */
-class Third_Person_Camera : public ICamera {
+class ThirdPersonCamera : public ICamera {
 private:
 	HWND _hwnd{};
 	bool _first_mouse = true;
@@ -32,7 +32,7 @@ private:
 	dx::XMVECTOR _target_position{ dx::XMVectorSet(0,0,0,1) };
 	dx::XMVECTOR _smoothed_target{ dx::XMVectorSet(0,0,0,1) };
 public:
-	Third_Person_Camera(HWND hwnd = nullptr) : _hwnd(hwnd) {
+	ThirdPersonCamera(HWND hwnd = nullptr) : _hwnd(hwnd) {
 		camera_.position = dx::XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
 		camera_.target = dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		camera_.up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);

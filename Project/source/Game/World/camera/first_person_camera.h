@@ -11,7 +11,7 @@ namespace dx = DirectX;
 /**
  * @brief ファーストパーソン（一人称・FPS）カメラクラス
  */
-class First_Person_Camera : public ICamera {
+class FirstPersonCamera : public ICamera {
 private:
 	HWND _hwnd{};
 	bool _first_mouse = true;
@@ -25,7 +25,7 @@ private:
 	dx::XMVECTOR _current_forward{ dx::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f) };
 
 public:
-	First_Person_Camera(HWND hwnd = nullptr) : _hwnd(hwnd) {
+	FirstPersonCamera(HWND hwnd = nullptr) : _hwnd(hwnd) {
 		camera_.position = _character_head_pos;
 		camera_.target = dx::XMVectorSet(0.0f, 1.8f, 1.0f, 1.0f);
 		camera_.up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);

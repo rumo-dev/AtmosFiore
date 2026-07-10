@@ -7,7 +7,7 @@
  *
  * 指定方向に円錐状に光を照らすライト
  */
-class SpotLight : public Light_Base
+class SpotLight : public LightBase
 {
 public:
 	/**
@@ -27,7 +27,7 @@ public:
 	/**
 	 * @brief GPU転送用構造体
 	 */
-	struct SpotLight_GPU
+	struct SpotLightGpu
 	{
 		dx::XMFLOAT3 position;
 		float radius;

@@ -85,6 +85,7 @@ public:
 	void drawExposureGUI();
 	void drawLensImperfectionsGUI();
 	void drawFogGUI();
+	void drawDOFGUI();
 
 private:
 	static Framebuffer fsquad;

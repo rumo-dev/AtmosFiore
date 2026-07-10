@@ -495,7 +495,7 @@ void Render_State::set_2d_render_states(ID3D11DeviceContext* immediate_context)
 }
 void Render_State::set_deferred_render_states(ID3D11DeviceContext* immediate_context, Rasterizer_State rs)
 {
-	if (Camera_Manager::instance().get_active_camera()->get_camera().isReversed_Z) {
+	if (CameraManager::instance().get_active_camera()->get_camera().isReversed_Z) {
 
 		set_depth_stencil_state(immediate_context, Depth_State::Reversed_Z_Test_Enable_Write_Enable, Stencil_Ref::Default);
 	}

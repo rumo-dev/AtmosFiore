@@ -10,7 +10,7 @@ namespace dx = DirectX;
 /**
  * @brief オービット（注視点中心・ターンテーブル）カメラクラス
  */
-class Orbit_Camera : public ICamera {
+class OrbitCamera : public ICamera {
 private:
 	HWND _hwnd{};
 	bool _first_mouse = true;
@@ -35,7 +35,7 @@ public:
 	 * @param hwnd ウィンドウハンドル
 	 * @param initial_target 注視する中心の初期座標
 	 */
-	Orbit_Camera(HWND hwnd = nullptr, const dx::XMVECTOR& initial_target = dx::XMVectorZero())
+	OrbitCamera(HWND hwnd = nullptr, const dx::XMVECTOR& initial_target = dx::XMVectorZero())
 		: _hwnd(hwnd)
 	{
 		camera_.target = initial_target;

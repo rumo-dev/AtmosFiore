@@ -236,7 +236,7 @@ public:
 	}
 	void update_constants()
 	{
-		update_scene_constants(Camera_Manager::instance().get_active_camera()->get_camera());
+		update_scene_constants(CameraManager::instance().get_active_camera()->get_camera());
 	}
 
 	void set_directional_light(const dx::XMFLOAT4 ambient, const dx::XMFLOAT4& direction, const dx::XMFLOAT4& color)

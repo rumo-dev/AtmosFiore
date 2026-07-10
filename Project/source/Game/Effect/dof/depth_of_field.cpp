@@ -234,13 +234,13 @@ void DepthOfField::make(
 
 		Render_State::instance().set_blend_state(immediate_context, Blend_State::Replace);
 		ID3D11ShaderResourceView* srvs[2] = { color_map, coc_map->GetColorMap() };
-		near_field->Clear(immediate_context, 0, 0, 0, 1);
+		near_field->Clear(immediate_context, 0, 0, 0, 0);
 		near_field->Activate(immediate_context);
 		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, field_separation_near_ps.Get());
 		near_field->Deactivate(immediate_context);
 		immediate_context->PSSetShaderResources(0, 2, null_srvs);
 
-		far_field->Clear(immediate_context, 0, 0, 0, 1);
+		far_field->Clear(immediate_context, 0, 0, 0, 0);
 		far_field->Activate(immediate_context);
 		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, field_separation_far_ps.Get());
 		far_field->Deactivate(immediate_context);

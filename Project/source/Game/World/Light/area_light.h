@@ -18,7 +18,7 @@ enum class AreaLightShape : uint32_t
  * 矩形・円形・球形の面光源を表現するライト
  * ソフトシャドウやよりリアルなライティングを実現する
  */
-class AreaLight : public Light_Base
+class AreaLight : public LightBase
 {
 public:
 	/**
@@ -40,7 +40,7 @@ public:
 	/**
 	 * @brief GPU転送用構造体
 	 */
-	struct AreaLight_GPU
+	struct AreaLightGpu
 	{
 		dx::XMFLOAT3 position;
 		float width;

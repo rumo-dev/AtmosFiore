@@ -2,7 +2,7 @@
 #include "Engine/utilities/dx_common.h"
 #include "light_base.h"
 
-class PointLight : public Light_Base
+class PointLight : public LightBase
 {
 public:
 	PointLight()
@@ -13,7 +13,7 @@ public:
 		diffuseColor = { 1.0f, 1.0f, 1.0f , 1.0f };
 	}
 
-	struct PointLight_GPU
+	struct PointLightGpu
 	{
 		dx::XMFLOAT3 position;
 		float radius;

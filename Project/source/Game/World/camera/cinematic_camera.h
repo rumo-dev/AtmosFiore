@@ -26,7 +26,7 @@ struct Camera_Way_Point {
 /**
  * @brief シネマティック（スプライン曲線移動）カメラクラス
  */
-class Cinematic_Camera : public ICamera {
+class CinematicCamera : public ICamera {
 private:
 	static constexpr int kTimelineFPS = 30; // タイムライン表示・スクラブ用のフレームレート
 
@@ -56,7 +56,7 @@ private:
 	bool _wp_section_open = true;
 
 public:
-	Cinematic_Camera() : _json_manager("", false) {
+	CinematicCamera() : _json_manager("", false) {
 		camera_.position = dx::XMVectorSet(0.0f, 5.0f, -10.0f, 1.0f);
 		camera_.target = dx::XMVectorZero();
 		camera_.up = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -483,7 +483,7 @@ public:
 
 		// --- ツールバー: Capture / Clear All ---
 		if (CustomUI::Button("+ Capture Current Camera", ImVec2(ImGui::GetContentRegionAvail().x - 90, 26))) {
-			auto activeCam = Camera_Manager::instance().get_active_camera();
+			auto activeCam = CameraManager::instance().get_active_camera();
 			if (activeCam && activeCam.get() != this) {
 				const auto& data = activeCam->get_camera();
 				add_way_point(data.position, data.target);
@@ -543,15 +543,15 @@ public:
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.98f, 0.89f, 0.68f, 1.0f));
 				if (ImGui::SmallButton("Jump")) {
 					stop();
-					auto activeCam = Camera_Manager::instance().get_active_camera();
+					auto activeCam = CameraManager::instance().get_active_camera();
 					if (activeCam) {
 						dx::XMVECTOR forward = dx::XMVector3Normalize(dx::XMVectorSubtract(_user_way_points[i].target, _user_way_points[i].position));
 						dx::XMFLOAT4 f4; dx::XMStoreFloat4(&f4, forward);
 						float pitch_deg = dx::XMConvertToDegrees(asinf(f4.y));
 						float yaw_deg = dx::XMConvertToDegrees(atan2f(f4.z, f4.x));
-						if (auto sp = std::dynamic_pointer_cast<Spectator_Camera>(activeCam))
+						if (auto sp = std::dynamic_pointer_cast<SpectatorCamera>(activeCam))
 							sp->set_rotation(yaw_deg, pitch_deg, _user_way_points[i].position, _user_way_points[i].target);
-						else if (auto tp = std::dynamic_pointer_cast<Third_Person_Camera>(activeCam))
+						else if (auto tp = std::dynamic_pointer_cast<ThirdPersonCamera>(activeCam))
 							tp->set_rotation(yaw_deg, pitch_deg, _user_way_points[i].position, _user_way_points[i].target);
 						else {
 							auto& c = const_cast<Camera&>(activeCam->get_camera());
@@ -571,7 +571,7 @@ public:
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.17f, 0.28f, 1.0f));
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
 				if (ImGui::SmallButton("Ins")) {
-					auto activeCam = Camera_Manager::instance().get_active_camera();
+					auto activeCam = CameraManager::instance().get_active_camera();
 					if (activeCam && activeCam.get() != this) {
 						const auto& data = activeCam->get_camera();
 						insert_way_point_after(i, data.position, data.target);
@@ -587,7 +587,7 @@ public:
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.22f, 0.16f, 1.0f));
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.89f, 0.63f, 1.0f));
 				if (ImGui::SmallButton("Ovr")) {
-					auto activeCam = Camera_Manager::instance().get_active_camera();
+					auto activeCam = CameraManager::instance().get_active_camera();
 					if (activeCam && activeCam.get() != this) {
 						const auto& data = activeCam->get_camera();
 						_user_way_points[i].position = data.position;
@@ -634,7 +634,7 @@ public:
 					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.54f, 0.71f, 0.98f, 1.0f));
 					char ins_lbl[64]; sprintf_s(ins_lbl, "Insert after [%zu]", i);
 					if (ImGui::Button(ins_lbl, ImVec2(btn_w2, 22))) {
-						auto activeCam = Camera_Manager::instance().get_active_camera();
+						auto activeCam = CameraManager::instance().get_active_camera();
 						if (activeCam && activeCam.get() != this) {
 							const auto& data = activeCam->get_camera();
 							insert_way_point_after(i, data.position, data.target);
@@ -646,7 +646,7 @@ public:
 
 					// Overwrite (詳細)
 					if (ImGui::Button("Overwrite", ImVec2(btn_w2, 22))) {
-						auto activeCam = Camera_Manager::instance().get_active_camera();
+						auto activeCam = CameraManager::instance().get_active_camera();
 						if (activeCam && activeCam.get() != this) {
 							const auto& data = activeCam->get_camera();
 							_user_way_points[i].position = data.position;

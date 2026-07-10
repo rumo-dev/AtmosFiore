@@ -56,10 +56,11 @@ private:
 		Num,
 	};
 	std::unique_ptr<Gltf_Model>_gltf_model;
-	Directional_Light _directional_light;
+	DirectionalLight _directional_light;
 
 	/// プレイヤー
 	Player _player;
+	std::string      stage_name_ = "Library";
 
 	/// プレイヤー用スポットライトの配列インデックス
 	int _player_spotlight_index = -1;

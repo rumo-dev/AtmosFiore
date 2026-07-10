@@ -1,6 +1,6 @@
 #pragma once
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
-class Directional_Light : public Light_Base
+class DirectionalLight : public LightBase
 {
 public:
 	dx::XMFLOAT4 direction = { 0,1,0,0 };

@@ -39,10 +39,11 @@ public:
 	 * @brief コンストラクタ
 	 */
 	PointLightManager()
-	{}
+	{
+	}
 	struct LightBufferData
 	{
-		PointLight::PointLight_GPU lights[32];
+		PointLight::PointLightGpu lights[32];
 
 		UINT numLights;
 		UINT padding[3];

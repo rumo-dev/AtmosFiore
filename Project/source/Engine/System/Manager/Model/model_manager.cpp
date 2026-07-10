@@ -193,7 +193,7 @@ void ModelManager::render_all(pass_mode pass)
 {
 	// Prepare frustum from active camera
 
-	auto active_cam = Camera_Manager::instance().get_active_camera();
+	auto active_cam = CameraManager::instance().get_active_camera();
 	Frustum cam_frustum{};
 	bool have_frustum = false;
 	if (active_cam) {
