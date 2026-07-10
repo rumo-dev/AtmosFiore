@@ -21,18 +21,24 @@ public:
 	// ── HLSL 側定数バッファ (b0) と 1:1 対応 ──────────────────────
 	struct alignas(16) Config
 	{
-		int   step_count = 16;       // レイマーチングステップ数 [4..64]
-		float density_base = 0.02f;    // 基底密度
-		float scattering = 0.8f;     // 散乱係数
-		float absorption = 0.002f;   // 吸収係数
+		int   grid_width = 160;
+		int   grid_height = 90;
+		int   grid_depth = 128;
+		int   pad_grid = 0;
 
-		float anisotropy = 0.65f;    // Henyey-Greenstein g 値 [-1..1]
-		float height_falloff = 0.15f;    // 高さ方向の密度減衰
-		float noise_scale = 0.5f;     // FBM ノイズスケール
-		float intensity = 1.0f;     // フォグ全体の輝度乗数
+		float density_base = 0.02f;
+		float scattering = 0.8f;
+		float absorption = 0.002f;
+		float anisotropy = 0.65f;
 
-		int   is_enabled = 1;        // 有効フラグ
-		float padding[3]{};
+		float noise_scale = 0.0f;
+		float intensity = 1.0f;
+		float fog_near = 0.1f;
+		float fog_far = 60.0f;
+
+		int   is_enabled = 1;
+		float time = 0.0f;
+		float padding[2]{};
 	};
 	static_assert(sizeof(Config) % 16 == 0, "VolumetricFog::Config must be 16-byte aligned");
 
@@ -55,4 +61,18 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> ps_;
 	Microsoft::WRL::ComPtr<ID3D11Buffer>      cb_;
+
+	// Froxel 用コンピュートシェーダー
+	Microsoft::WRL::ComPtr<ID3D11ComputeShader> cs_injection_;
+	Microsoft::WRL::ComPtr<ID3D11ComputeShader> cs_accumulation_;
+
+	// 3D テクスチャ (ライト注入バッファ)
+	Microsoft::WRL::ComPtr<ID3D11Texture3D>           light_volume_tex_;
+	Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> light_volume_uav_;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>  light_volume_srv_;
+
+	// 3D テクスチャ (累積バッファ)
+	Microsoft::WRL::ComPtr<ID3D11Texture3D>           accum_volume_tex_;
+	Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> accum_volume_uav_;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>  accum_volume_srv_;
 };

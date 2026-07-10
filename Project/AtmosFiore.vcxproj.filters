@@ -109,6 +109,12 @@
     <FxCompile Include="source\Engine\Graphics\Shader\exponential_fog_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\height_fog_ps.hlsl" />
     <FxCompile Include="source\Engine\Graphics\Shader\volumetric_fog_ps.hlsl" />
+    <FxCompile Include="source\Engine\Graphics\Shader\volumetric_fog_injection_cs.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\volumetric_fog_accumulation_cs.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Engine\Graphics\geometry_buffer\geometry_buffer.cpp">

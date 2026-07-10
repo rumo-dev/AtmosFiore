@@ -61,6 +61,7 @@ void Post_Process_Manager::update(float elapsedtime)
 	adaptation->delta_time = elapsedtime;
 	skyer->time += elapsedtime;
 	hgt_fog->config.time += elapsedtime;
+	vol_fog->config.time += elapsedtime;
 
 
 }

@@ -108,6 +108,14 @@ public:
 	 */
 	void set_sampler_state(ID3D11DeviceContext* immediate_context);
 
+	void set_cs_sampler_state(ID3D11DeviceContext* immediate_context) {
+		ID3D11SamplerState* samplers[14];
+		for (int i = 0; i < 14; ++i) {
+			samplers[i] = _sampler_states[i].Get();
+		}
+		immediate_context->CSSetSamplers(0, 14, samplers);
+	}
+
 	/**
 	 * @brief 深度・ステンシルステート設定
 	 * @param immediate_context デバイスコンテキスト

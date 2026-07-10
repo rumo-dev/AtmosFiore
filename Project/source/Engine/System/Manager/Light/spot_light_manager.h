@@ -130,6 +130,9 @@ public:
 	 */
 	void debug_render();
 
+	ID3D11ShaderResourceView* get_srv() const { return _sbLightsSRV.Get(); }
+	ID3D11Buffer* get_cb() const { return _cbLightCount.Get(); }
+
 private:
 	/// ライト配列
 	std::vector<SpotLight> _lights;
