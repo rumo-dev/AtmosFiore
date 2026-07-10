@@ -522,6 +522,8 @@ inline void SphereCastTriangles(
 				out_corrected,
 				dx::XMVectorScale(best_n, dot)
 			);
+			// 壁ずり後、次の反復のために現在位置をヒット地点まで進める
+			current_pos = dx::XMVectorAdd(current_pos, dx::XMVectorScale(dir, best_t));
 		}
 		else
 		{

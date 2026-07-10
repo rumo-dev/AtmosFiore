@@ -8,6 +8,8 @@
 #include "Engine/utilities/math_util.h"
 #include "Engine/utilities/collision_util.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
+#include "Engine/System/Manager/resource_manager.h"
+#include "Engine/system/graphics_core.h"
 
 namespace dx = DirectX;
 
@@ -26,12 +28,10 @@ class Player
 public:
 
 	void initialize(HWND hwnd,
-		dx::XMVECTOR start_pos = dx::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f),
-		int spotlight_index = -1)
+		dx::XMVECTOR start_pos = dx::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f))
 	{
 		hwnd_ = hwnd;
 		position_ = start_pos;
-		spotlight_index_ = spotlight_index;
 
 		// 初期姿勢（Z軸正方向が前）
 		up_vector_ = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -53,12 +53,159 @@ public:
 		scale_ = dx::XMVectorSet(0.3f, 0.3f, 0.3f, 1.0f);
 	}
 
-	void update(float elapsed_time, float camera_yaw_deg, float camera_pitch_deg = 0.0f,
-		const std::vector<dx::XMFLOAT3>* collision_triangles = nullptr)
+	// ======================================================
+	//  コリジョン初期化
+	// ======================================================
+
+	/**
+	 * @brief コリジョン対象のモデルインスタンスから三角形を抽出し空間グリッドを構築する
+	 * @param model_key   model_manager 上のモデルキー
+	 * @param world_transform 抽出に使うワールド変換
+	 * @return 成功時 true
+	 */
+	bool setup_collision(const std::string& model_key,
+		const DirectX::XMFLOAT4X4& world_transform)
+	{
+		auto& mgr = Resource_Manager::instance().model_manager;
+		Gltf_Model* model = mgr.get_model(model_key);
+		if (!model) return false;
+
+		collision_triangles_.clear();
+		model->extract_collision_triangles(world_transform, collision_triangles_);
+		collision_grid_.build(collision_triangles_);
+		return true;
+	}
+
+	// ======================================================
+	//  スポットライト初期化
+	// ======================================================
+
+	/**
+	 * @brief プレイヤー追従スポットライトを SpotLightManager に追加する
+	 */
+	void setup_spotlight()
+	{
+		auto& spot_mgr = Graphics_Core::instance().get_spot_light_manager();
+		spotlight_index_ = static_cast<int>(spot_mgr.get_lights().size());
+		spot_mgr.add_light(
+			{ 0.0f, -0.8f, 0.0f },
+			{ 0.0f, -1.0f, 0.0f },
+			light_radius_,
+			light_intensity_,
+			light_inner_angle_,
+			light_outer_angle_,
+			light_color_
+		);
+	}
+
+	// ======================================================
+	//  モデルインスタンス登録
+	// ======================================================
+
+	/**
+	 * @brief ModelManager にプレイヤーモデルのインスタンスを登録する
+	 * @param instance_key インスタンス識別名（"Player" 等）
+	 */
+	void setup_model_instance(const std::string& instance_key = "Player")
+	{
+		instance_key_ = instance_key;
+		last_model_name_ = model_name_;
+
+		ModelInstance inst;
+		inst.model_key = model_name_;
+		inst.world_transform = get_world_transform();
+		inst.is_animation = true;
+		inst.animation_index = 0;
+		inst.animation_time = 0.0f;
+		inst.loop_animation = true;
+		inst.animation_speed = 1.0f;
+		inst.anim_mode = Gltf_Model::animation_mode::single;
+
+		Resource_Manager::instance().model_manager.add_instance(instance_key_, inst);
+	}
+
+	// ======================================================
+	//  毎フレーム更新
+	// ======================================================
+
+	void update(float elapsed_time, float camera_yaw_deg, float camera_pitch_deg = 0.0f)
 	{
 		yaw_ = camera_yaw_deg;
 		pitch_ = camera_pitch_deg;
-		HandleMovement_(elapsed_time, collision_triangles);
+
+		// Kキーによる死亡トグル
+		if (GetAsyncKeyState('K') & 0x8000)
+		{
+			if (!k_pressed_) { is_dead_ = !is_dead_; k_pressed_ = true; }
+		}
+		else { k_pressed_ = false; }
+
+		HandleMovement_(elapsed_time);
+	}
+
+	// ======================================================
+	//  スポットライト同期（update 後に呼ぶ）
+	// ======================================================
+
+	void sync_spotlight()
+	{
+		if (spotlight_index_ < 0) return;
+		auto& spot_lights = Graphics_Core::instance().get_spot_light_manager().get_lights();
+		if (spotlight_index_ >= static_cast<int>(spot_lights.size())) return;
+
+		auto& pl = spot_lights[spotlight_index_];
+		pl.position    = get_light_position();
+		pl.direction   = get_light_direction();
+		pl.radius      = light_radius_;
+		pl.intensity   = light_intensity_;
+		pl.innerAngle  = light_inner_angle_;
+		pl.outerAngle  = light_outer_angle_;
+		pl.diffuseColor = light_color_;
+	}
+
+	// ======================================================
+	//  モデルインスタンス同期（update 後に呼ぶ）
+	// ======================================================
+
+	void sync_model_instance(const std::string& active_camera_name = "")
+	{
+		auto& mgr = Resource_Manager::instance().model_manager;
+
+		// モデル名が変更されたら再登録
+		if (last_model_name_ != model_name_)
+		{
+			last_model_name_ = model_name_;
+			mgr.remove_instance(instance_key_);
+
+			ModelInstance new_inst;
+			new_inst.model_key = model_name_;
+			new_inst.world_transform = get_world_transform();
+			new_inst.is_animation = true;
+			new_inst.animation_index = 0;
+			new_inst.animation_time = 0.0f;
+			new_inst.loop_animation = true;
+			new_inst.animation_speed = 1.0f;
+			new_inst.anim_mode = Gltf_Model::animation_mode::single;
+
+			mgr.add_instance(instance_key_, new_inst);
+		}
+
+		auto* inst = mgr.get_instance(instance_key_);
+		if (!inst) return;
+
+		inst->world_transform = get_world_transform();
+		inst->animation_speed = animation_speed_;
+		inst->loop_animation = true;
+
+		int next_anim = animation_index_;
+		if (inst->animation_index != next_anim)
+		{
+			inst->animation_index = next_anim;
+			inst->animation_time = 0.0f;
+		}
+
+		// ファーストパーソンカメラ時は非表示
+		inst->visible = (active_camera_name != "FirstPerson");
 	}
 
 	// ======================================================
@@ -318,8 +465,7 @@ private:
 		}
 	}
 
-	void HandleMovement_(float _elapsed_time,
-		const std::vector<dx::XMFLOAT3>* _collision_triangles = nullptr)
+	void HandleMovement_(float _elapsed_time)
 	{
 		if (is_dead_)
 		{
@@ -388,10 +534,18 @@ private:
 
 		// ---- コリジョン ----
 		dx::XMVECTOR corrected_delta = move_delta;
-		if (enable_collision_ && _collision_triangles && !_collision_triangles->empty() && Length(move_delta) > 0.001f)
+		if (enable_collision_ && !collision_grid_.empty() && Length(move_delta) > 0.001f)
 		{
-			CollisionSphere sphere{ position_, sphere_radius_ };
-			SphereCastTriangles(sphere, move_delta, *_collision_triangles, corrected_delta);
+			// プレイヤー周辺の三角形だけを抽出
+			dx::XMFLOAT3 pos_f;
+			dx::XMStoreFloat3(&pos_f, position_);
+			collision_grid_.query(pos_f, collision_query_radius_, nearby_triangles_);
+
+			if (!nearby_triangles_.empty())
+			{
+				CollisionSphere sphere{ position_, sphere_radius_ };
+				SphereCastTriangles(sphere, move_delta, nearby_triangles_, corrected_delta);
+			}
 		}
 
 		position_ = dx::XMVectorAdd(position_, corrected_delta);
@@ -492,10 +646,13 @@ private:
 	int              animation_index_ = 0;
 	float            animation_speed_ = 1.0f;
 	bool             is_dead_ = false;
+	bool             k_pressed_ = false;  ///< Kキー入力フラグ
 
 	// モデル設定
 	std::string      model_name_ = "Spider";
 	int              model_forward_axis_ = 1; // 0:+Z, 1:+X, 2:-Z, 3:-X
+	std::string      instance_key_ = "Player";     ///< ModelManager インスタンスキー
+	std::string      last_model_name_ = "Spider";   ///< 前回のモデル名（変更検知用）
 
 	// 移動パラメータ
 	float            speed_ = 3.0f;
@@ -506,9 +663,15 @@ private:
 	float            max_tilt_angle_ = 25.0f;
 	float            eye_height_ = 0.0f;
 
+	// コリジョン
 	float            sphere_radius_ = 0.5f;
 	bool             enable_collision_ = true;
+	float            collision_query_radius_ = 2.0f;  ///< 近傍検索半径（m）
+	std::vector<dx::XMFLOAT3> collision_triangles_;   ///< ワールド空間三角形リスト
+	CollisionTriangleGrid     collision_grid_;          ///< 空間グリッド
+	std::vector<dx::XMFLOAT3> nearby_triangles_;       ///< 近傍クエリバッファ
 
+	// スポットライト
 	int              spotlight_index_ = -1;
 	float            light_radius_ = 20.0f;
 	float            light_intensity_ = 12.0f;
