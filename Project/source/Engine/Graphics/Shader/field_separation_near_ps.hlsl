@@ -28,5 +28,6 @@ float4 main(VS_OUT pin) : SV_TARGET
 
     // Premultiplied Alpha: rgb * near_coc で蓄積し、resolve で alpha(累積CoC合計)で除算
     // これにより scatter→prefix sum→resolve の後に正しい加重平均色が得られる
-    return float4(color.rgb, near_coc);
+    return color;
+    return float4(color.rgb * near_coc, near_coc);
 }

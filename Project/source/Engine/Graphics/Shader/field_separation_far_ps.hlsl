@@ -22,7 +22,7 @@ float4 main(VS_OUT pin) : SV_TARGET
     float4 color = color_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord);
     // LINEAR_CLAMP: フル解像度 coc_map をワーク解像度にダウンサンプルする際に補間する
     float far_coc = coc_map.Sample(sampler_states[LINEAR_CLAMP], pin.texcoord).g;
-    return float4(color.rgb, far_coc);
-    
+    return float4(color.rgb * far_coc, far_coc);
+
 }
 
