@@ -65,10 +65,12 @@ public:
 	}
 
 	// 現在アクティブなカメラの更新と行列計算
-	void update(float deltaTime) {
+	void update(float deltaTime, float viewport_aspect_ratio, float viewport_height) {
 		if (_active_camera) {
 			_active_camera->update(deltaTime);
+			_active_camera->get_camera().apply_auto_settings(deltaTime);
 			_active_camera->get_camera().updateShake(deltaTime);
+			_active_camera->get_camera().update_derived_parameters(viewport_aspect_ratio, viewport_height);
 			_active_camera->get_camera().identity(); // 行列の自動更新
 			_active_camera->get_camera().UpdateAudioListener(deltaTime);
 		}

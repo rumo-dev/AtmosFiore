@@ -1,4 +1,6 @@
 #pragma once
+#include <algorithm>
+#include <cmath>
 #include <directxmath.h>
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
 
@@ -14,7 +16,8 @@ struct Camera {
 	DirectX::XMVECTOR target{ 0.0f, 0.0f, 0.0f, 1.0f };
 	DirectX::XMVECTOR up{ 0.0f, 1.0f, 0.0f, 0.0f };
 
-	float fov{ DirectX::XMConvertToRadians(45.0f) };
+	// Projection data derived from lens, sensor, and output size.
+	float fov{ DirectX::XMConvertToRadians(27.0f) };
 	float aspect_ratio{ 16.0f / 9.0f };
 	float near_z{ 0.1f };
 	float far_z{ 10000.f };
@@ -27,18 +30,31 @@ struct Camera {
 	DirectX::XMMATRIX inv_view_projection{ DirectX::XMMatrixIdentity() };
 	DirectX::XMVECTOR prevPosition{ 0.0f, 5.0f, -10.0f, 1.0f };
 
+	// Parameters controlled by a photographer.
 	float shutterDenominator = 5.0f;
 	float FNumber = 7.9f;
 	float FocalLength = 50.0f;
-	float SensorSize = 35.5f;
+	float SensorSize = 35.5f; // Sensor width [mm]
 	float FocusDist = 8.8f;
-	float MaxBlurRadius = 21.2f;
 	bool isReversed_Z = false;
 
-	float TStop = 3.1f;
+	// Values derived automatically from camera and render settings.
+	float MaxBlurRadius = 21.2f;
+	float TStop = 7.9f;
 	float ShutterSpeed = 1.0f / shutterDenominator;
 	float ISO = 617.0f;
 	float EV_Compensation = -0.8f;
+
+	// Automatic mode can be enabled globally and refined per camera control.
+	bool autoSettingsEnabled = false;
+	bool autoFNumber = true;
+	bool autoFocalLength = true;
+	bool autoSensorSize = true;
+	bool autoFocusDistance = true;
+	bool autoShutterSpeed = true;
+	bool autoISO = true;
+	bool autoEVCompensation = true;
+	float autoExposureTargetEV100 = 2.2f; // Matches the previous indoor exposure.
 
 	// --- 手振れ用パラメータ (ランダムウォーク) ---
 	bool enableCameraShake = false;
@@ -53,6 +69,53 @@ private:
 	std::mt19937 rng{ std::random_device{}() }; // 高精度な乱数エンジン
 
 public:
+	void apply_auto_settings(float delta_time) {
+		if (!autoSettingsEnabled) return;
+
+		const float focus_distance = std::fmax(
+			DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorSubtract(target, position))), 0.1f);
+		const float camera_speed = delta_time > 0.0f
+			? DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorSubtract(position, prevPosition))) / delta_time
+			: 0.0f;
+
+		if (autoFocusDistance) FocusDist = focus_distance;
+		if (autoFocalLength) FocalLength = std::clamp(35.0f + focus_distance * 2.0f, 35.0f, 85.0f);
+		if (autoSensorSize) SensorSize = 36.0f; // Full-frame reference width.
+		if (autoFNumber) FNumber = std::clamp(2.8f + std::log2(focus_distance + 1.0f), 2.8f, 11.0f);
+		if (autoShutterSpeed) shutterDenominator = std::clamp(5.0f + camera_speed * 120.0f, 1.0f, 1000.0f);
+
+		// Keep the scene's indoor EV100 reference. If ISO reaches its limit,
+		// favor a slower shutter over an unnecessarily dark result.
+		if (autoISO) {
+			const float ev100 = std::log2((FNumber * FNumber) * shutterDenominator);
+			ISO = std::clamp(100.0f * std::exp2(ev100 - autoExposureTargetEV100), 100.0f, 6400.0f);
+			if (autoShutterSpeed && ISO >= 6400.0f) {
+				shutterDenominator = std::clamp(
+					std::exp2(autoExposureTargetEV100) * (ISO / 100.0f) / (FNumber * FNumber),
+					1.0f, 8000.0f);
+			}
+		}
+		if (autoEVCompensation) EV_Compensation = 0.0f;
+	}
+
+	// SensorSize is the sensor width. Keep horizontal framing stable while
+	// deriving the vertical FoV required by XMMatrixPerspectiveFovLH.
+	void update_derived_parameters(float viewport_aspect_ratio, float viewport_height) {
+		aspect_ratio = std::fmax(viewport_aspect_ratio, 0.001f);
+
+		const float focal_length = std::fmax(FocalLength, 0.001f);
+		const float sensor_width = std::fmax(SensorSize, 0.001f);
+		const float sensor_height = sensor_width / aspect_ratio;
+		fov = 2.0f * std::atan(sensor_height / (2.0f * focal_length));
+
+		// No lens transmission loss is modeled, so T-stop equals F-number.
+		TStop = std::fmax(FNumber, 0.001f);
+		ShutterSpeed = 1.0f / std::fmax(shutterDenominator, 1.0f);
+
+		// This is a resolution-dependent rendering cap, not a camera control.
+		MaxBlurRadius = std::clamp(viewport_height * 0.02f, 1.0f, 64.0f);
+	}
+
 	// ランダムウォークによる揺れの計算
 	void updateShake(float deltaTime) {
 		if (!enableCameraShake) {
@@ -123,6 +186,12 @@ public:
 		inv_view_projection = DirectX::XMMatrixInverse(nullptr, view_projection);
 	}
 	void DrawCameraSettingsUI() {
+		ImGui::Text("Automatic Camera Settings");
+		CustomUI::Checkbox("Enable Auto Settings", &autoSettingsEnabled);
+		ImGui::TextDisabled("Auto values update every frame; turn off an item to edit it manually.");
+		ImGui::BeginDisabled(!autoSettingsEnabled || !autoISO);
+		CustomUI::SliderFloat("Auto Exposure Target (EV100)", &autoExposureTargetEV100, -2.0f, 8.0f, "%.1f EV");
+		ImGui::EndDisabled();
 
 		CustomUI::Checkbox("Reversed-Z", &isReversed_Z);
 		ImGui::Text("Clipping Planes");
@@ -137,34 +206,46 @@ public:
 
 		ImGui::Text("Camera Parameters");
 		// F値は1.4～22程度が一般的
+		ImGui::BeginDisabled(autoSettingsEnabled && autoFNumber);
 		CustomUI::SliderFloat("F-Number (Aperture)", &FNumber, 1.0f, 22.0f, "f/%.1f");
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto Aperture", &autoFNumber);
 
 		// 焦点距離 (mm)
+		ImGui::BeginDisabled(autoSettingsEnabled && autoFocalLength);
 		CustomUI::SliderFloat("Focal Length (mm)", &FocalLength, 12.0f, 200.0f, "%.0f mm");
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto Focal Length", &autoFocalLength);
 
 		// センサーサイズ (35mmフルサイズなど)
-		CustomUI::SliderFloat("Sensor Size (mm)", &SensorSize, 20.0f, 50.0f, "%.1f mm");
+		ImGui::BeginDisabled(autoSettingsEnabled && autoSensorSize);
+		CustomUI::SliderFloat("Sensor Width (mm)", &SensorSize, 20.0f, 50.0f, "%.1f mm");
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto Sensor Width", &autoSensorSize);
+		ImGui::TextDisabled("Vertical FoV: %.1f deg (calculated)", DirectX::XMConvertToDegrees(fov));
 
 		CustomUI::Separator();
 
 		ImGui::Text("Focus Settings");
 		// ピント距離 (m)
+		ImGui::BeginDisabled(autoSettingsEnabled && autoFocusDistance);
 		CustomUI::DragFloat("Focus Distance", &FocusDist, 0.1f, 0.1f, 100.0f, "%.2f m");
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto Focus", &autoFocusDistance);
 
 		// ブラーの強さ
-		CustomUI::SliderFloat("Max Blur Radius", &MaxBlurRadius, 0.0f, 50.0f);
+		ImGui::TextDisabled("Max Blur Radius: %.1f px (calculated from resolution)", MaxBlurRadius);
 		ImGui::Separator();
-		ImGui::Text("Exposure (T-Stop)");
-		CustomUI::SliderFloat("T-Stop", &TStop, 1.0f, 22.0f, "T%.1f");
+		ImGui::Text("Exposure");
+		ImGui::TextDisabled("T-Stop: T%.1f (calculated from F-Number)", TStop);
 
 
-		if (CustomUI::SliderFloat("Shutter Speed", &shutterDenominator, 1.0f, 8000.0f, "1/%.0f s", ImGuiSliderFlags_Logarithmic)) {
-
-			ShutterSpeed = (1.0f / shutterDenominator);
-		}
+		ImGui::BeginDisabled(autoSettingsEnabled && autoShutterSpeed);
+		CustomUI::SliderFloat("Shutter Speed", &shutterDenominator, 1.0f, 8000.0f, "1/%.0f s", ImGuiSliderFlags_Logarithmic);
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto Shutter", &autoShutterSpeed);
+		ImGui::BeginDisabled(autoSettingsEnabled && autoISO);
 		CustomUI::SliderFloat("ISO", &ISO, 100.0f, 6400.0f, "ISO %.0f",
 			ImGuiSliderFlags_Logarithmic);
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto ISO", &autoISO);
+		ImGui::BeginDisabled(autoSettingsEnabled && autoEVCompensation);
 		CustomUI::SliderFloat("EV Compensation", &EV_Compensation, -3.0f, 3.0f, "%.1f EV");
+		ImGui::EndDisabled(); ImGui::SameLine(); CustomUI::Checkbox("Auto EV Compensation", &autoEVCompensation);
 
 		ImGui::Separator();
 		ImGui::Text("Camera Shake Settings");

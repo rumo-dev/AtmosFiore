@@ -127,6 +127,9 @@ void Scene_Indoor::finalize() {
 void Scene_Indoor::update(float elapsedTime)
 {
 	auto& camera_mgr = CameraManager::instance();
+	const auto& graphics = Graphics_Core::instance();
+	const float viewport_aspect_ratio = graphics.get_aspect_ratio();
+	const float viewport_height = graphics.get_screen_height();
 
 	// -----------------------------------------------------------------
 	// カメラ更新
@@ -156,17 +159,17 @@ void Scene_Indoor::update(float elapsedTime)
 	if (active_name == "ThirdPerson") {
 		auto tp_cam = std::dynamic_pointer_cast<ThirdPersonCamera>(camera_mgr.get_active_camera());
 		if (tp_cam) tp_cam->set_target_position(player_pos);
-		camera_mgr.update(elapsedTime);
+		camera_mgr.update(elapsedTime, viewport_aspect_ratio, viewport_height);
 	}
 	else if (active_name == "FirstPerson") {
 		auto fp_cam = std::dynamic_pointer_cast<FirstPersonCamera>(camera_mgr.get_active_camera());
 		if (fp_cam) {
 			fp_cam->set_character_head_position(_player.get_head_position());
 		}
-		camera_mgr.update(elapsedTime);
+		camera_mgr.update(elapsedTime, viewport_aspect_ratio, viewport_height);
 	}
 	else {
-		camera_mgr.update(elapsedTime);
+		camera_mgr.update(elapsedTime, viewport_aspect_ratio, viewport_height);
 	}
 
 	// -----------------------------------------------------------------
