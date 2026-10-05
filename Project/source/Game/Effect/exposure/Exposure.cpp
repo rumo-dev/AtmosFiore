@@ -2,8 +2,11 @@
 #include "Exposure.h"
 #include "Engine/system/render_state.h"
 
+#include "tracy_util.h"
+
 Exposure::Exposure(ID3D11Device* device, uint32_t width, uint32_t height)
 {
+	TRACY_CPU_ZONE_C("Exposure::Exposure", TracyCategory::System);
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
 
 	exposure_buffer = std::make_unique<Framebuffer>(
@@ -27,6 +30,8 @@ Exposure::Exposure(ID3D11Device* device, uint32_t width, uint32_t height)
 void Exposure::make(ID3D11DeviceContext* immediate_context,
 	ID3D11ShaderResourceView* color_map)
 {
+	TRACY_CPU_ZONE_C("Exposure::make", TracyCategory::PostProcess);
+	TRACY_GPU_ZONE_C("Exposure::make", TracyCategory::PostProcess);
 	// ---- ステート退避 ----
 	ID3D11ShaderResourceView* null_srv{};
 	ID3D11ShaderResourceView* cached_srvs[1]{};

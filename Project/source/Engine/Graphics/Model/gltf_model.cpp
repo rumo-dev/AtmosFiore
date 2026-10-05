@@ -6,7 +6,6 @@
 #include "Engine/System/Manager/resource_manager.h"
 #define TINYGLTF_IMPLEMENTATION
 
-
 bool null_load_image_data(tinygltf::Image*, const int, std::string*, std::string*,
 	int, int, const unsigned char*, int, void*)
 {
@@ -25,16 +24,13 @@ void Gltf_Model::compute_instance_aabb(
 	using namespace DirectX;
 
 	if (!has_bbox) {
-		// Fallback: return identity bbox
 		out_min = XMFLOAT3(-1, -1, -1);
 		out_max = XMFLOAT3(1, 1, 1);
 		return;
 	}
 
-	// Transform model-local bbox corners to world space
 	XMMATRIX world_m = XMLoadFloat4x4(&world);
 
-	// 8 corners of the local bbox
 	XMVECTOR corners[8] = {
 		XMVectorSet(bbox_min.x, bbox_min.y, bbox_min.z, 1.0f),
 		XMVectorSet(bbox_max.x, bbox_min.y, bbox_min.z, 1.0f),
@@ -46,7 +42,6 @@ void Gltf_Model::compute_instance_aabb(
 		XMVectorSet(bbox_max.x, bbox_max.y, bbox_max.z, 1.0f),
 	};
 
-	// Transform all corners
 	XMVECTOR wmin = XMVectorSet(FLT_MAX, FLT_MAX, FLT_MAX, 1.0f);
 	XMVECTOR wmax = XMVectorSet(-FLT_MAX, -FLT_MAX, -FLT_MAX, 1.0f);
 
@@ -59,9 +54,9 @@ void Gltf_Model::compute_instance_aabb(
 	XMStoreFloat3(&out_min, wmin);
 	XMStoreFloat3(&out_max, wmax);
 }
+
 Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : filename(filename)
 {
-
 	tinygltf::TinyGLTF tiny_gltf;
 	tiny_gltf.SetImageLoader(null_load_image_data, nullptr);
 
@@ -80,20 +75,20 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 	_ASSERT_EXPR_A(warning.empty(), warning.c_str());
 	_ASSERT_EXPR_A(error.empty(), error.c_str());
 	_ASSERT_EXPR_A(succeeded, L"Failed to load glTF file");
+
 	for (std::vector<tinygltf::Scene>::const_reference gltf_scene : Gltf_Model.scenes)
 	{
 		scene& scene{ scenes.emplace_back() };
 		scene.name = Gltf_Model.scenes.at(0).name;
 		scene.nodes = Gltf_Model.scenes.at(0).nodes;
 	}
+
 	fetch_nodes(Gltf_Model);
-	fetch_meshes(Graphics_Core::instance().get_device(), Gltf_Model);
-	fetch_materials(Graphics_Core::instance().get_device(), Gltf_Model);
 	fetch_textures(Graphics_Core::instance().get_device(), Gltf_Model);
+	fetch_materials(Graphics_Core::instance().get_device(), Gltf_Model); // textures の後に実行
+	fetch_meshes(Graphics_Core::instance().get_device(), Gltf_Model);
 	fetch_animations(Gltf_Model);
 
-
-	// TODO: This is a force-brute programming, may cause bugs.
 	const std::map<std::string, buffer_view>& vertex_buffer_views{
 	  meshes.at(0).primitives.at(0).vertex_buffer_views };
 	D3D11_INPUT_ELEMENT_DESC input_element_desc[]
@@ -105,42 +100,28 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 	  { "JOINTS", 0, vertex_buffer_views.at("JOINTS_0").format, 4, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	  { "WEIGHTS", 0,vertex_buffer_views.at("WEIGHTS_0").format, 5, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
-	;
-	for (const D3D11_INPUT_ELEMENT_DESC& desc : input_element_desc)
-	{
-		log_printf("    SemanticName: %s, Format: %d, InputSlot: %d\n", LogLevel::Warning,
-			desc.SemanticName, desc.Format, desc.InputSlot);
-	}
-	//create_vs_from_cso(device, "gltf_model_vs.cso", vertex_shader.ReleaseAndGetAddressOf(),
-	//	input_layout.ReleaseAndGetAddressOf(), input_element_desc, _countof(input_element_desc));
+
 	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("GLTF_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
 	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("POINT_SHADOW_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
 	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("DIRECTIONAL_SHADOW_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
-	//create_ps_from_cso(device, "gltf_model_ps.cso", pixel_shader.ReleaseAndGetAddressOf());
 
 	D3D11_BUFFER_DESC buffer_desc{};
 	buffer_desc.ByteWidth = sizeof(primitive_constants);
 	buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 	buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	HRESULT hr;
-	hr = device->CreateBuffer(&buffer_desc, nullptr, primitive_cbuffer.ReleaseAndGetAddressOf());
+	HRESULT hr = device->CreateBuffer(&buffer_desc, nullptr, primitive_cbuffer.ReleaseAndGetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
-	// D3D11_BUFFER_DESC buffer_desc{};
 	buffer_desc.ByteWidth = sizeof(primitive_joint_constants);
 	buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 	buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	hr = device->CreateBuffer(&buffer_desc, NULL, primitive_joint_cbuffer.ReleaseAndGetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
-
-
 }
 
-
-//fetch node
 void Gltf_Model::fetch_nodes(const tinygltf::Model& Gltf_Model)
 {
 	for (std::vector<tinygltf::Node>::const_reference gltf_node : Gltf_Model.nodes)
@@ -194,6 +175,7 @@ void Gltf_Model::fetch_nodes(const tinygltf::Model& Gltf_Model)
 	}
 	cumulate_transforms(nodes);
 }
+
 Gltf_Model::buffer_view Gltf_Model::make_buffer_view(const tinygltf::Accessor& accessor)
 {
 	buffer_view buffer_view;
@@ -266,6 +248,7 @@ Gltf_Model::buffer_view Gltf_Model::make_buffer_view(const tinygltf::Accessor& a
 	buffer_view.size_in_bytes = static_cast<UINT>(accessor.count * buffer_view.stride_in_bytes);
 	return buffer_view;
 }
+
 void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_Model)
 {
 	HRESULT hr;
@@ -273,7 +256,7 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 	{
 		mesh& mesh{ meshes.emplace_back() };
 		mesh.name = gltf_mesh.name;
-		// Accumulate positions to compute model-local AABB
+
 		for (std::vector<tinygltf::Primitive>::const_reference gltf_primitive : gltf_mesh.primitives)
 		{
 			auto it = gltf_primitive.attributes.find("POSITION");
@@ -300,12 +283,12 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				}
 			}
 		}
+
 		for (std::vector<tinygltf::Primitive>::const_reference gltf_primitive : gltf_mesh.primitives)
 		{
 			mesh::primitive& primitive{ mesh.primitives.emplace_back() };
 			primitive.material = gltf_primitive.material;
 
-			// Create index buffer
 			const tinygltf::Accessor& gltf_accessor{ Gltf_Model.accessors.at(gltf_primitive.indices) };
 			const tinygltf::BufferView& gltf_buffer_view{ Gltf_Model.bufferViews.at(gltf_accessor.bufferView) };
 
@@ -322,7 +305,6 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				primitive.index_buffer_view.buffer.ReleaseAndGetAddressOf());
 			_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
-			// CPU-side copy of indices for collision triangle extraction
 			{
 				const void* raw = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()
 					+ gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
@@ -341,7 +323,6 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				}
 			}
 
-			// Create vertex buffers
 			for (std::map<std::string, int>::const_reference gltf_attribute : gltf_primitive.attributes)
 			{
 				const tinygltf::Accessor& gltf_accessor{ Gltf_Model.accessors.at(gltf_attribute.second) };
@@ -360,7 +341,6 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 					vertex_buffer_view.buffer.ReleaseAndGetAddressOf());
 				_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
-				// If this is POSITION attribute, keep a CPU copy for dynamic AABB computation
 				if (gltf_attribute.first == "POSITION")
 				{
 					const size_t byteOffset = gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
@@ -378,7 +358,6 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				primitive.vertex_buffer_views.emplace(std::make_pair(gltf_attribute.first, vertex_buffer_view));
 			}
 
-			// Add dummy attributes if any are missing.
 			const std::unordered_map<std::string, buffer_view> attributes{
 			  { "TANGENT", { DXGI_FORMAT_R32G32B32A32_FLOAT } },
 			  { "TEXCOORD_0", { DXGI_FORMAT_R32G32_FLOAT } },
@@ -393,9 +372,29 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				}
 			}
 
+			// IASetVertexBuffers用キャッシュの登録
+			const std::string attribute_keys[] = {
+				"POSITION", "NORMAL", "TANGENT", "TEXCOORD_0", "JOINTS_0", "WEIGHTS_0"
+			};
+
+			primitive.cached_vertex_buffers.clear();
+			primitive.cached_strides.clear();
+			primitive.cached_offsets.clear();
+
+			for (const auto& key : attribute_keys)
+			{
+				const auto& view = primitive.vertex_buffer_views.at(key);
+				primitive.cached_vertex_buffers.push_back(view.buffer.Get());
+				primitive.cached_strides.push_back(static_cast<UINT>(view.stride_in_bytes));
+				primitive.cached_offsets.push_back(0);
+			}
+
+			// 【追加】has_tangent の初期判定とキャッシュ
+			primitive.has_tangent = (primitive.vertex_buffer_views.at("TANGENT").buffer != nullptr);
 		}
 	}
 }
+
 void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gltf_Model)
 {
 	for (std::vector<tinygltf::Material>::const_reference gltf_material : Gltf_Model.materials)
@@ -445,9 +444,30 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 
 		material.data.emissive_texture.index = gltf_material.emissiveTexture.index;
 		material.data.emissive_texture.texcoord = gltf_material.emissiveTexture.texCoord;
+
+		// 【追加】描画用 SRV ポインタをあらかじめキャッシュ
+		const int texture_indices[5] = {
+			material.data.pbr_metallic_roughness.basecolor_texture.index,
+			material.data.pbr_metallic_roughness.metallic_roughness_texture.index,
+			material.data.normal_texture.index,
+			material.data.emissive_texture.index,
+			material.data.occlusion_texture.index,
+		};
+
+		for (int i = 0; i < 5; ++i)
+		{
+			if (texture_indices[i] > -1)
+			{
+				int source_index = textures.at(texture_indices[i]).source;
+				material.cached_srvs[i] = texture_resource_views.at(source_index).Get();
+			}
+			else
+			{
+				material.cached_srvs[i] = nullptr;
+			}
+		}
 	}
 
-	// Create material data as shader resource view on GPU
 	std::vector<material::cbuffer> material_data;
 	for (std::vector<material>::const_reference material : materials)
 	{
@@ -466,6 +486,7 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 	subresource_data.pSysMem = material_data.data();
 	hr = device->CreateBuffer(&buffer_desc, &subresource_data, material_buffer.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+
 	D3D11_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc{};
 	shader_resource_view_desc.Format = DXGI_FORMAT_UNKNOWN;
 	shader_resource_view_desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -474,6 +495,7 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 		&shader_resource_view_desc, material_resource_view.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 }
+
 void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Gltf_Model)
 {
 	HRESULT hr{ S_OK };
@@ -526,6 +548,7 @@ void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Glt
 		}
 	}
 }
+
 void Gltf_Model::fetch_animations(const tinygltf::Model& Gltf_Model)
 {
 	using namespace std;
@@ -608,8 +631,6 @@ void Gltf_Model::fetch_animations(const tinygltf::Model& Gltf_Model)
 			}
 		}
 	}
-	// Find a longest animation duration in timeline of each channel.
-	// 各チャンネルのタイムライン内で最も長いアニメーション時間を取得する。
 	for (decltype(animations)::reference animation : animations)
 	{
 		for (decltype(animation.timelines)::reference timelines : animation.timelines)
@@ -618,7 +639,6 @@ void Gltf_Model::fetch_animations(const tinygltf::Model& Gltf_Model)
 		}
 	}
 }
-
 
 void Gltf_Model::cumulate_transforms(std::vector<node>& nodes)
 {
@@ -647,9 +667,110 @@ void Gltf_Model::cumulate_transforms(std::vector<node>& nodes)
 		parent_global_transforms.pop();
 	}
 }
+
+// =============================================================================
+// 【新規】ノード単位の最適化描写ヘルパー関数
+// =============================================================================
+void Gltf_Model::render_node(
+	ID3D11DeviceContext* immediate_context,
+	int node_index,
+	const std::vector<node>& current_nodes,
+	const DirectX::XMFLOAT4X4& world,
+	pass_mode pass,
+	int& last_bound_material,
+	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices)
+{
+	using namespace DirectX;
+	const node& node = current_nodes[node_index];
+
+	if (node.skin > -1)
+	{
+		const primitive_joint_constants* cached_data = nullptr;
+		if (precomputed_joint_matrices)
+		{
+			auto cached_it = precomputed_joint_matrices->find(node_index);
+			if (cached_it != precomputed_joint_matrices->end())
+			{
+				cached_data = &cached_it->second;
+			}
+		}
+
+		if (cached_data)
+		{
+			immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, cached_data, 0, 0);
+			immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+		}
+		else
+		{
+			const skin& skin{ skins.at(node.skin) };
+			primitive_joint_constants primitive_joint_data{};
+			const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
+			for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
+			{
+				XMStoreFloat4x4(&primitive_joint_data.matrices[joint_index],
+					XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
+					XMLoadFloat4x4(&current_nodes.at(skin.joints.at(joint_index)).global_transform) *
+					node_global_inverse
+				);
+			}
+			immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, &primitive_joint_data, 0, 0);
+			immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+		}
+	}
+
+	if (node.mesh > -1)
+	{
+		const mesh& mesh = meshes[node.mesh];
+		for (const auto& primitive : mesh.primitives)
+		{
+			const material& material = materials[primitive.material];
+			if (!is_material_in_pass(material.data.alpha_mode, pass))
+			{
+				continue;
+			}
+
+			// マテリアルが切り替わった時のみ PSSetShaderResources を呼び出す (ステート変更スキップ)
+			if (primitive.material != last_bound_material)
+			{
+				immediate_context->PSSetShaderResources(1, 5, material.cached_srvs);
+				last_bound_material = primitive.material;
+			}
+
+			// 頂点バッファのセット（事前に配列化済み）
+			immediate_context->IASetVertexBuffers(
+				0,
+				static_cast<UINT>(primitive.cached_vertex_buffers.size()),
+				primitive.cached_vertex_buffers.data(),
+				primitive.cached_strides.data(),
+				primitive.cached_offsets.data()
+			);
+
+			immediate_context->IASetIndexBuffer(primitive.index_buffer_view.buffer.Get(),
+				primitive.index_buffer_view.format, 0);
+
+			primitive_constants primitive_data{};
+			primitive_data.material = primitive.material;
+			primitive_data.has_tangent = primitive.has_tangent ? 1 : 0; // キャッシュ値を利用
+			primitive_data.skin = node.skin;
+			XMStoreFloat4x4(&primitive_data.world,
+				XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world));
+
+			immediate_context->UpdateSubresource(primitive_cbuffer.Get(), 0, 0, &primitive_data, 0, 0);
+			immediate_context->VSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
+			immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
+
+			immediate_context->DrawIndexed(static_cast<UINT>(primitive.index_buffer_view.count()), 0, 0);
+		}
+	}
+
+	for (int child_index : node.children)
+	{
+		render_node(immediate_context, child_index, current_nodes, world, pass, last_bound_material, precomputed_joint_matrices);
+	}
+}
+
 void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::XMFLOAT4X4& world, pass_mode pass, bool is_animation, float delta_time, animation_mode anim_mode, int animation_index)
 {
-
 	if (pass == pass_mode::deferred_geometry)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
@@ -661,7 +782,6 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	else if (pass == pass_mode::forward_transparency)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
-		//immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_MODEL"), NULL, 0);
 	}
 	else if (pass == pass_mode::directional_shadow)
 	{
@@ -675,57 +795,43 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	{
 		_ASSERT_EXPR(FALSE, L"Unknown pass_mode");
 	}
-	std::vector<Gltf_Model::node> animated_nodes;
+
+	bool use_animation_cache = false;
 
 	if (is_animation && animations.size() > 0)
 	{
-		// アニメーションする場合のみノードをコピーする。
-		// （以前はここが無条件のコピーになっており、非アニメーションモデルでも
-		//   毎フレーム5パス分、無駄にノード配列全体をヒープコピーしていた）
-		animated_nodes = nodes;
-
+		// メンバー変数 animated_nodes_cache を再利用して動的確保を回避
+		animated_nodes_cache = nodes;
 		time += delta_time;
 
 		if (anim_mode == animation_mode::single)
 		{
-			// animations.at() は範囲外だと例外を投げてクラッシュする。
-			// ModelInstance::animation_index はゲーム側から自由に設定されるため、
-			// 範囲外や duration<=0 のクリップを指していても落ちないようにする。
-			if (animation_index < 0 || animation_index >= static_cast<int>(animations.size()))
-			{
-				animated_nodes.clear(); // バインドポーズにフォールバック
-			}
-			else
+			if (animation_index >= 0 && animation_index < static_cast<int>(animations.size()))
 			{
 				current_animation_index = animation_index;
 				const float duration = animations[current_animation_index].duration;
 
-				if (duration <= 0.0f)
+				if (duration <= 0.0f || time >= duration)
 				{
 					time = 0.0f;
 				}
-				else if (time >= duration)
-				{
-					time = 0.0f; // ループ
-				}
-				animate(current_animation_index, time, animated_nodes);
+				animate(current_animation_index, time, animated_nodes_cache);
+				use_animation_cache = true;
 			}
 		}
 		else if (anim_mode == animation_mode::all)
 		{
-			animate_all(time, animated_nodes);
+			animate_all(time, animated_nodes_cache);
+			use_animation_cache = true;
 		}
 	}
 
-	using namespace DirectX;
-	const std::vector<node>& nodes{ !animated_nodes.empty() ? animated_nodes : Gltf_Model::nodes };
+	const std::vector<node>& target_nodes = use_animation_cache ? animated_nodes_cache : nodes;
 
 	const char* vertex_shader_name;
-
 	switch (pass)
 	{
 	case pass_mode::directional_shadow:
-
 		vertex_shader_name = "DIRECTIONAL_SHADOW_VS";
 		break;
 	case pass_mode::shadow:
@@ -735,128 +841,19 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 		vertex_shader_name = "GLTF_VS";
 		break;
 	}
-	auto vs = Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name);
-	//assert(vs != nullptr); // デバッグ用
-	//immediate_context->VSSetShader(vertex_shader.Get(), nullptr, 0);
+
 	immediate_context->VSSetShader(Resource_Manager::instance().shader_manager.GetNative<Vertex_Shader>(vertex_shader_name), nullptr, 0);
-	//immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_PS"), nullptr, 0);
-	//immediate_context->PSSetShader(pixel_shader.Get(), nullptr, 0);
 	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
 	immediate_context->IASetInputLayout(Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name)->get_input_layout());
-	//immediate_context->IASetInputLayout(input_layout.Get());
 	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	std::function<void(int)> traverse{ [&](int node_index)->void {
-	  const node& node{nodes.at(node_index)};
-		if (node.skin > -1)
+	int last_bound_material = -1;
+	for (int node_index : scenes.at(0).nodes)
 	{
-		const skin& skin{ skins.at(node.skin) };
-		primitive_joint_constants primitive_joint_data{};
-		// ノードのグローバル変換の逆行列はジョイント数に関係なく同じ値なので、
-		// ループの外で1回だけ計算する（以前はジョイントの数だけ毎回計算していた）
-		const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
-		for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
-		{
-			XMStoreFloat4x4(&primitive_joint_data.matrices[joint_index],
-				XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
-				XMLoadFloat4x4(&nodes.at(skin.joints.at(joint_index)).global_transform) *
-				node_global_inverse
-			);
-		}
-		immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, &primitive_joint_data, 0, 0);
-		immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+		render_node(immediate_context, node_index, target_nodes, world, pass, last_bound_material, nullptr);
 	}
-	  if (node.mesh > -1)
-	  {
-		const mesh& mesh{ meshes.at(node.mesh) };
-		for (std::vector<mesh::primitive>::const_reference primitive : mesh.primitives)
-		{
-
-  const material& material{ materials.at(primitive.material) };
-  if (!is_material_in_pass(material.data.alpha_mode, pass))
-  {
-	  continue;
-  }
-  const int texture_indices[]
-  {
-	material.data.pbr_metallic_roughness.basecolor_texture.index,
-	material.data.pbr_metallic_roughness.metallic_roughness_texture.index,
-	material.data.normal_texture.index,
-	material.data.emissive_texture.index,
-	material.data.occlusion_texture.index,
-  };
-  ID3D11ShaderResourceView* null_shader_resource_view{};
-  // texture_indices は要素数固定（5個）なので、プリミティブ描画のたびに
-  // std::vector をヒープ確保する必要はない。固定長配列にして確保コストを消す。
-  ID3D11ShaderResourceView* shader_resource_views[_countof(texture_indices)]{};
-  for (int texture_index = 0; texture_index < static_cast<int>(_countof(texture_indices)); ++texture_index)
-  {
-	shader_resource_views[texture_index] = texture_indices[texture_index] > -1 ?
-	  texture_resource_views.at(textures.at(texture_indices[texture_index]).source).Get() :
-	  null_shader_resource_view;
-  }
-  immediate_context->PSSetShaderResources(1, static_cast<UINT>(_countof(shader_resource_views)), shader_resource_views);
-
-
-
-
-
-		  ID3D11Buffer* vertex_buffers[]{
-			primitive.vertex_buffer_views.at("POSITION").buffer.Get(),
-			primitive.vertex_buffer_views.at("NORMAL").buffer.Get(),
-			primitive.vertex_buffer_views.at("TANGENT").buffer.Get(),
-			primitive.vertex_buffer_views.at("TEXCOORD_0").buffer.Get(),
-			primitive.vertex_buffer_views.at("JOINTS_0").buffer.Get(),
-			primitive.vertex_buffer_views.at("WEIGHTS_0").buffer.Get(),
-		  };
-		  UINT strides[]{
-			static_cast<UINT>(primitive.vertex_buffer_views.at("POSITION").stride_in_bytes),
-			static_cast<UINT>(primitive.vertex_buffer_views.at("NORMAL").stride_in_bytes),
-			static_cast<UINT>(primitive.vertex_buffer_views.at("TANGENT").stride_in_bytes),
-			static_cast<UINT>(primitive.vertex_buffer_views.at("TEXCOORD_0").stride_in_bytes),
-			static_cast<UINT>(primitive.vertex_buffer_views.at("JOINTS_0").stride_in_bytes),
-			static_cast<UINT>(primitive.vertex_buffer_views.at("WEIGHTS_0").stride_in_bytes),
-		  };
-		  UINT offsets[_countof(vertex_buffers)]{ 0 };
-		  immediate_context->IASetVertexBuffers(0, _countof(vertex_buffers), vertex_buffers, strides, offsets);
-		  immediate_context->IASetIndexBuffer(primitive.index_buffer_view.buffer.Get(),
-			primitive.index_buffer_view.format, 0);
-
-		  primitive_constants primitive_data{};
-		  primitive_data.material = primitive.material;
-		  primitive_data.has_tangent = primitive.vertex_buffer_views.at("TANGENT").buffer != NULL;
-		  primitive_data.skin = node.skin;
-		  XMStoreFloat4x4(&primitive_data.world,
-			XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world));
-		  immediate_context->UpdateSubresource(primitive_cbuffer.Get(), 0, 0, &primitive_data, 0, 0);
-		  immediate_context->VSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
-		  immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
-		  //primitveの情報をすべてログで出す
-		  //log_printf("Rendering primitive with material index: %d, has_tangent: %d, skin index: %d\n",
-			 // LogLevel::Info, primitive.material, primitive_data.has_tangent, primitive_data.skin);
-
-		  immediate_context->DrawIndexed(static_cast<UINT>(primitive.index_buffer_view.count()), 0, 0);
-
-
-		}
-	  }
-	  for (std::vector<int>::value_type child_index : node.children)
-	  {
-		traverse(child_index);
-	  }
-	} };
-
-	for (std::vector<int>::value_type node_index : scenes.at(0).nodes)
-	{
-		traverse(node_index);
-	}
-
 }
 
-// =============================================================================
-// render_with_nodes()
-// update() \u3067\u4e8b\u524d\u8a08\u7b97\u3057\u305f animated_nodes \u3092\u4f7f\u3044\u3001\u30a2\u30cb\u30e1\u30fc\u30b7\u30e7\u30f3\u518d\u8a08\u7b97\u3092\u30b9\u30ad\u30c3\u30d7\u3059\u308b\u9ad8\u901f\u7248\u3002
-// =============================================================================
 void Gltf_Model::render_with_nodes(
 	ID3D11DeviceContext* immediate_context,
 	const DirectX::XMFLOAT4X4& world,
@@ -864,14 +861,12 @@ void Gltf_Model::render_with_nodes(
 	const std::vector<node>* precomputed_nodes,
 	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices)
 {
-	// precomputed_nodes \u304c null \u306a\u3089\u901a\u5e38\u7248\u306b\u30d5\u30a9\u30fc\u30eb\u30d0\u30c3\u30af
 	if (!precomputed_nodes || precomputed_nodes->empty())
 	{
 		render(immediate_context, world, pass, false, 0.0f);
 		return;
 	}
 
-	// --- \u30b7\u30a7\u30fc\u30c0\u30fc\u30bb\u30c3\u30c8 ---
 	if (pass == pass_mode::deferred_geometry)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
@@ -897,8 +892,6 @@ void Gltf_Model::render_with_nodes(
 		_ASSERT_EXPR(FALSE, L"Unknown pass_mode");
 	}
 
-	using namespace DirectX;
-
 	const char* vertex_shader_name;
 	switch (pass)
 	{
@@ -912,159 +905,49 @@ void Gltf_Model::render_with_nodes(
 		vertex_shader_name = "GLTF_VS";
 		break;
 	}
+
 	immediate_context->VSSetShader(Resource_Manager::instance().shader_manager.GetNative<Vertex_Shader>(vertex_shader_name), nullptr, 0);
 	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
 	immediate_context->IASetInputLayout(Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name)->get_input_layout());
 	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	const std::vector<node>& nodes_ref = *precomputed_nodes;
-
-	std::function<void(int)> traverse{ [&](int node_index)->void {
-	  const node& node{nodes_ref.at(node_index)};
-	  if (node.skin > -1)
-	  {
-		  // ModelManager::update() で1フレームに1回だけ計算済みのジョイント行列があれば、
-		  // 描画パスごとに再計算せずそれをそのまま使う（deferred/shadow x2/directional/forward の
-		  // 5パス分の重複計算とXMMatrixInverseの重複呼び出しを回避する）
-		  const primitive_joint_constants* cached_data = nullptr;
-		  if (precomputed_joint_matrices)
-		  {
-			  auto cached_it = precomputed_joint_matrices->find(node_index);
-			  if (cached_it != precomputed_joint_matrices->end())
-			  {
-				  cached_data = &cached_it->second;
-			  }
-		  }
-
-		  if (cached_data)
-		  {
-			  immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, cached_data, 0, 0);
-			  immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
-		  }
-		  else
-		  {
-			  // キャッシュが無い場合のフォールバック（従来通りその場で計算）
-			  const skin& skin{ skins.at(node.skin) };
-			  primitive_joint_constants primitive_joint_data{};
-			  const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
-			  for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
-			  {
-				  XMStoreFloat4x4(&primitive_joint_data.matrices[joint_index],
-					  XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
-					  XMLoadFloat4x4(&nodes_ref.at(skin.joints.at(joint_index)).global_transform) *
-					  node_global_inverse
-				  );
-			  }
-			  immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, &primitive_joint_data, 0, 0);
-			  immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
-		  }
-		}
-		if (node.mesh > -1)
-		{
-		  const mesh& mesh{ meshes.at(node.mesh) };
-		  for (std::vector<mesh::primitive>::const_reference primitive : mesh.primitives)
-		  {
-			const material& material{ materials.at(primitive.material) };
-			if (!is_material_in_pass(material.data.alpha_mode, pass))
-			{
-				continue;
-			}
-			const int texture_indices[]
-			{
-			  material.data.pbr_metallic_roughness.basecolor_texture.index,
-			  material.data.pbr_metallic_roughness.metallic_roughness_texture.index,
-			  material.data.normal_texture.index,
-			  material.data.emissive_texture.index,
-			  material.data.occlusion_texture.index,
-			};
-			ID3D11ShaderResourceView* null_shader_resource_view{};
-			ID3D11ShaderResourceView* shader_resource_views[_countof(texture_indices)]{};
-			for (int texture_index = 0; texture_index < static_cast<int>(_countof(texture_indices)); ++texture_index)
-			{
-			  shader_resource_views[texture_index] = texture_indices[texture_index] > -1 ?
-				texture_resource_views.at(textures.at(texture_indices[texture_index]).source).Get() :
-				null_shader_resource_view;
-			}
-			immediate_context->PSSetShaderResources(1, static_cast<UINT>(_countof(shader_resource_views)), shader_resource_views);
-
-			ID3D11Buffer* vertex_buffers[]{
-			  primitive.vertex_buffer_views.at("POSITION").buffer.Get(),
-			  primitive.vertex_buffer_views.at("NORMAL").buffer.Get(),
-			  primitive.vertex_buffer_views.at("TANGENT").buffer.Get(),
-			  primitive.vertex_buffer_views.at("TEXCOORD_0").buffer.Get(),
-			  primitive.vertex_buffer_views.at("JOINTS_0").buffer.Get(),
-			  primitive.vertex_buffer_views.at("WEIGHTS_0").buffer.Get(),
-			};
-			UINT strides[]{
-			  static_cast<UINT>(primitive.vertex_buffer_views.at("POSITION").stride_in_bytes),
-			  static_cast<UINT>(primitive.vertex_buffer_views.at("NORMAL").stride_in_bytes),
-			  static_cast<UINT>(primitive.vertex_buffer_views.at("TANGENT").stride_in_bytes),
-			  static_cast<UINT>(primitive.vertex_buffer_views.at("TEXCOORD_0").stride_in_bytes),
-			  static_cast<UINT>(primitive.vertex_buffer_views.at("JOINTS_0").stride_in_bytes),
-			  static_cast<UINT>(primitive.vertex_buffer_views.at("WEIGHTS_0").stride_in_bytes),
-			};
-			UINT offsets[_countof(vertex_buffers)]{ 0 };
-			immediate_context->IASetVertexBuffers(0, _countof(vertex_buffers), vertex_buffers, strides, offsets);
-			immediate_context->IASetIndexBuffer(primitive.index_buffer_view.buffer.Get(),
-			  primitive.index_buffer_view.format, 0);
-
-			primitive_constants primitive_data{};
-			primitive_data.material = primitive.material;
-			primitive_data.has_tangent = primitive.vertex_buffer_views.at("TANGENT").buffer != NULL;
-			primitive_data.skin = node.skin;
-			XMStoreFloat4x4(&primitive_data.world,
-			  XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world));
-			immediate_context->UpdateSubresource(primitive_cbuffer.Get(), 0, 0, &primitive_data, 0, 0);
-			immediate_context->VSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
-			immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
-
-			immediate_context->DrawIndexed(static_cast<UINT>(primitive.index_buffer_view.count()), 0, 0);
-		  }
-		}
-		for (std::vector<int>::value_type child_index : node.children)
-		{
-		  traverse(child_index);
-		}
-	  } };
-
-	for (std::vector<int>::value_type node_index : scenes.at(0).nodes)
+	int last_bound_material = -1;
+	for (int node_index : scenes.at(0).nodes)
 	{
-		traverse(node_index);
+		render_node(immediate_context, node_index, *precomputed_nodes, world, pass, last_bound_material, precomputed_joint_matrices);
 	}
 }
-
 
 void Gltf_Model::animate(size_t animation_index, float time, std::vector<node>& animated_nodes)
 {
 	using namespace std;
 	using namespace DirectX;
 
-	function<size_t(const vector<float>&, float, float&)> indexof{
-	  [](const vector<float>& timelines, float time, float& interpolation_factor)->size_t {
-	  const size_t keyframe_count{ timelines.size() };
-	  if (time > timelines.at(keyframe_count - 1))
-	  {
-		  interpolation_factor = 1.0f;
-		  return keyframe_count - 2;
-	  }
-	  else if (time < timelines.at(0))
-	  {
-		interpolation_factor = 0.0f;
-		return 0;
-	  }
-	  size_t keyframe_index{ 0 };
-	  for (size_t time_index = 1; time_index < keyframe_count; ++time_index)
-	  {
-		if (time < timelines.at(time_index))
+	auto indexof = [](const vector<float>& timelines, float time, float& interpolation_factor)->size_t {
+		const size_t keyframe_count{ timelines.size() };
+		if (time > timelines.at(keyframe_count - 1))
 		{
-		  keyframe_index = max<size_t>(0LL, time_index - 1);
-		  break;
+			interpolation_factor = 1.0f;
+			return keyframe_count - 2;
 		}
-	  }
-	  interpolation_factor = (time - timelines.at(keyframe_index + 0)) /
-		(timelines.at(keyframe_index + 1) - timelines.at(keyframe_index + 0));
-	  return keyframe_index;
-	} };
+		else if (time < timelines.at(0))
+		{
+			interpolation_factor = 0.0f;
+			return 0;
+		}
+		size_t keyframe_index{ 0 };
+		for (size_t time_index = 1; time_index < keyframe_count; ++time_index)
+		{
+			if (time < timelines.at(time_index))
+			{
+				keyframe_index = max<size_t>(0LL, time_index - 1);
+				break;
+			}
+		}
+		interpolation_factor = (time - timelines.at(keyframe_index + 0)) /
+			(timelines.at(keyframe_index + 1) - timelines.at(keyframe_index + 0));
+		return keyframe_index;
+		};
 
 	if (animations.size() > 0)
 	{
@@ -1104,6 +987,7 @@ void Gltf_Model::animate(size_t animation_index, float time, std::vector<node>& 
 		cumulate_transforms(animated_nodes);
 	}
 }
+
 void Gltf_Model::compute_joint_matrices(
 	const std::vector<node>& animated_nodes,
 	std::unordered_map<int, primitive_joint_constants>& out_joint_matrices) const
@@ -1120,8 +1004,6 @@ void Gltf_Model::compute_joint_matrices(
 		const skin& skin{ skins.at(node.skin) };
 		primitive_joint_constants data{};
 
-		// ノードのグローバル変換の逆行列はジョイント数に関係なく同じ値なので、
-		// ループの外で1回だけ計算する
 		const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
 
 		for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
@@ -1142,49 +1024,43 @@ void Gltf_Model::animate_all(float time, std::vector<node>& animated_nodes)
 	using namespace std;
 	using namespace DirectX;
 
-	// keyframe検索ラムダ（animateと同じ）
-	function<size_t(const vector<float>&, float, float&)> indexof{
-	[](const vector<float>& timelines, float time, float& interpolation_factor)->size_t
-	{
-		const size_t keyframe_count{ timelines.size() };
+	auto indexof = [](const vector<float>& timelines, float time, float& interpolation_factor)->size_t
+		{
+			const size_t keyframe_count{ timelines.size() };
 
-		// ← 追加：キーフレームが1つ以下なら補間不可
-		if (keyframe_count <= 1)
-		{
-			interpolation_factor = 0.0f;
-			return 0;
-		}
-
-		if (time > timelines.at(keyframe_count - 1))
-		{
-			interpolation_factor = 1.0f;
-			return keyframe_count - 2; // 最後の区間
-		}
-		else if (time < timelines.at(0))
-		{
-			interpolation_factor = 0.0f;
-			return 0;
-		}
-		size_t keyframe_index{ 0 };
-		for (size_t time_index = 1; time_index < keyframe_count; ++time_index)
-		{
-			if (time < timelines.at(time_index))
+			if (keyframe_count <= 1)
 			{
-				keyframe_index = max<size_t>(0LL, time_index - 1);
-				break;
+				interpolation_factor = 0.0f;
+				return 0;
 			}
-		}
-		interpolation_factor =
-			(time - timelines.at(keyframe_index)) /
-			(timelines.at(keyframe_index + 1) - timelines.at(keyframe_index));
-		return keyframe_index;
-	}
-	};
 
-	// 全アニメーションのチャンネルを順番に適用
+			if (time > timelines.at(keyframe_count - 1))
+			{
+				interpolation_factor = 1.0f;
+				return keyframe_count - 2;
+			}
+			else if (time < timelines.at(0))
+			{
+				interpolation_factor = 0.0f;
+				return 0;
+			}
+			size_t keyframe_index{ 0 };
+			for (size_t time_index = 1; time_index < keyframe_count; ++time_index)
+			{
+				if (time < timelines.at(time_index))
+				{
+					keyframe_index = max<size_t>(0LL, time_index - 1);
+					break;
+				}
+			}
+			interpolation_factor =
+				(time - timelines.at(keyframe_index)) /
+				(timelines.at(keyframe_index + 1) - timelines.at(keyframe_index));
+			return keyframe_index;
+		};
+
 	for (const animation& animation : animations)
 	{
-		// このアニメーションのtimeをdurationでラップ
 		const float local_time = (animation.duration > 0.0f)
 			? fmodf(time, animation.duration)
 			: 0.0f;
@@ -1202,7 +1078,7 @@ void Gltf_Model::animate_all(float time, std::vector<node>& animated_nodes)
 			if (channel.target_path == "scale")
 			{
 				const vector<XMFLOAT3>& scales{ animation.scales.at(sampler.output) };
-				if (scales.size() < 2 || keyframe_index + 1 >= scales.size()) continue; // ← 追加
+				if (scales.size() < 2 || keyframe_index + 1 >= scales.size()) continue;
 				XMStoreFloat3(
 					&animated_nodes.at(channel.target_node).scale,
 					XMVectorLerp(
@@ -1213,7 +1089,7 @@ void Gltf_Model::animate_all(float time, std::vector<node>& animated_nodes)
 			else if (channel.target_path == "rotation")
 			{
 				const vector<XMFLOAT4>& rotations{ animation.rotations.at(sampler.output) };
-				if (rotations.size() < 2 || keyframe_index + 1 >= rotations.size()) continue; // ← 追加
+				if (rotations.size() < 2 || keyframe_index + 1 >= rotations.size()) continue;
 				XMStoreFloat4(
 					&animated_nodes.at(channel.target_node).rotation,
 					XMQuaternionNormalize(XMQuaternionSlerp(
@@ -1224,7 +1100,7 @@ void Gltf_Model::animate_all(float time, std::vector<node>& animated_nodes)
 			else if (channel.target_path == "translation")
 			{
 				const vector<XMFLOAT3>& translations{ animation.translations.at(sampler.output) };
-				if (translations.size() < 2 || keyframe_index + 1 >= translations.size()) continue; // ← 追加
+				if (translations.size() < 2 || keyframe_index + 1 >= translations.size()) continue;
 				XMStoreFloat3(
 					&animated_nodes.at(channel.target_node).translation,
 					XMVectorLerp(
@@ -1245,15 +1121,12 @@ void Gltf_Model::extract_collision_triangles(
 	using namespace DirectX;
 	XMMATRIX world = XMLoadFloat4x4(&world_matrix);
 
-	// ノードインデックス → グローバル変換のマップを構築
-	// nodes[i].global_transform はすでに cumulate_transforms で計算済み
 	for (size_t node_idx = 0; node_idx < nodes.size(); ++node_idx)
 	{
 		const auto& nd = nodes[node_idx];
 		if (nd.mesh < 0 || nd.mesh >= static_cast<int>(meshes.size()))
 			continue;
 
-		// ノードローカル→ワールド変換
 		XMMATRIX node_world = XMLoadFloat4x4(&nd.global_transform) * world;
 
 		const auto& msh = meshes[nd.mesh];
@@ -1263,7 +1136,6 @@ void Gltf_Model::extract_collision_triangles(
 			const auto& idx = prim.cpu_indices;
 			if (pos.empty() || idx.size() < 3) continue;
 
-			// 3インデックスで1三角形
 			for (size_t i = 0; i + 2 < idx.size(); i += 3)
 			{
 				uint32_t i0 = idx[i + 0];
@@ -1272,7 +1144,6 @@ void Gltf_Model::extract_collision_triangles(
 				if (i0 >= pos.size() || i1 >= pos.size() || i2 >= pos.size())
 					continue;
 
-				// モデルローカル座標をワールドへ変換
 				XMVECTOR v0 = XMVector3TransformCoord(XMLoadFloat3(&pos[i0]), node_world);
 				XMVECTOR v1 = XMVector3TransformCoord(XMLoadFloat3(&pos[i1]), node_world);
 				XMVECTOR v2 = XMVector3TransformCoord(XMLoadFloat3(&pos[i2]), node_world);

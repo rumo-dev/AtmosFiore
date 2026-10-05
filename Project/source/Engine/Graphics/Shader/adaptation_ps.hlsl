@@ -16,7 +16,7 @@ float4 main(VS_OUT pin) : SV_TARGET
 
     // 1x1 のテクスチャ中央から現在の露出値をサンプリング
     float exposure = exposure_texture.Sample(sampler_states[POINT_CLAMP], float2(0.5f, 0.5f)).r;
-    
+
     // 露出を適用して、人間の目が順応した状態の明るさに調整
     fragment_color *= exposure;
 

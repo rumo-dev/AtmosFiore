@@ -130,10 +130,10 @@ void Resource_Manager::load_models() {
 		"Error",
 		"./data/model/Error/Scene.gltf"
 	);
-	model_manager.load(
-		"DamagedHelmet",
-		"./data/model/glTF/DamagedHelmet/DamagedHelmet.gltf"
-	);
+	//model_manager.load(
+	//	"DamagedHelmet",
+	//	"./data/model/glTF/DamagedHelmet/DamagedHelmet.gltf"
+	//);
 	//model_manager.load(
 	//	"Sponza",
 	//	"./data/model/Sponza/Sponza.gltf"
@@ -156,18 +156,18 @@ void Resource_Manager::load_models() {
 		"Spider",
 		"./data/model/drone.glb"
 	);
-	model_manager.load(
-		"Spider1",
-		"./data/model/drone2.glb"
-	);
-	model_manager.load(
-		"Spider2",
-		"./data/model/drone3.glb"
-	);
-	model_manager.load(
-		"Spider3",
-		"./data/model/drone4.glb"
-	);
+	//model_manager.load(
+	//	"Spider1",
+	//	"./data/model/drone2.glb"
+	//);
+	//model_manager.load(
+	//	"Spider2",
+	//	"./data/model/drone3.glb"
+	//);
+	//model_manager.load(
+	//	"Spider3",
+	//	"./data/model/drone4.glb"
+	//);
 	//model_manager.load(
 	//	"Cafe",
 	//	"./data/model/cafe/scene.gltf"
@@ -176,10 +176,10 @@ void Resource_Manager::load_models() {
 	//	"Cafe_Anime",
 	//	"./data/model/cafe_anime/scene.gltf"
 	//);
-	model_manager.load(
-		"City",
-		"./data/model/City/scene.gltf"
-	);
+	//model_manager.load(
+	//	"City",
+	//	"./data/model/City/scene.gltf"
+	//);
 
 	//model_manager.load(
 	//	"Warehouse_FBX_Model_Free",

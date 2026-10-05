@@ -270,8 +270,9 @@ float4 main(VS_OUT pin) : SV_TARGET
         {
             continue;
         }
-
-        float attenuation = pow(max(0.0f, 1.0f - (dist / pointLights[i].radius)), 2.0f);
+        
+        float att = max(0.0f, 1.0f - (dist / pointLights[i].radius));
+        float attenuation = att * att;
         float3 pointLi = pointLights[i].color * pointLights[i].intensity * attenuation;
         float3 H = normalize(V + Lp);
         float NoH = max(0.0f, dot(N, H));

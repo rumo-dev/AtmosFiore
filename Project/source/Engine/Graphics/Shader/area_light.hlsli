@@ -54,9 +54,7 @@ float IntegrateEdge(float3 v1, float3 v2)
     float a = 0.8543985 + (0.4965155 + 0.0145206 * y) * y;
     float b = 3.4175940 + (4.1616724 + y) * y;
 
-    float theta = (x > 0)
-        ? (a / b)
-        : (0.5 * rsqrt(max(1.0 - x * x, 1e-6)) - a / b);
+    float theta = (x > 0) ? (a / b) : (0.5 * rsqrt(max(1.0 - x * x, 1e-6)) - a / b);
 
     return crossV.z * theta;
 }
@@ -99,7 +97,7 @@ void GenerateSphereVertices(float3 center, float radius, float3 P, out float3 p[
             p[i] = float3(0, 0, 0);
         return;
     }
-    
+
     float3 localZ = toLight / distToLight;
     float3 localX = abs(localZ.z) < 0.99 ? normalize(cross(float3(0, 0, 1), localZ)) : normalize(cross(float3(1, 0, 0), localZ));
     float3 localY = cross(localZ, localX);

@@ -5,6 +5,9 @@
 #include <directxmath.h>
 #include <cfloat>
 #include <unordered_map>
+#include <vector>
+#include <string>
+#include <map>
 
 #define TINYGLTF_NO_EXTERNAL_IMAGE
 #define TINYGLTF_NO_STB_IMAGE
@@ -14,7 +17,6 @@
 #include "Engine/Graphics/shader/shader.h"
 #include "Engine/Graphics/texture/texture.h"
 
-
 /**
  * @brief 描画パス種別
  */
@@ -23,39 +25,18 @@ enum class pass_mode
 	deferred_geometry,      ///< GBuffer書き込み
 	forward_opaque,         ///< 不透明フォワード描画
 	forward_transparency,   ///< 透明描画
-	directional_shadow,  ///< 平行光源シャドウマップ生成
+	directional_shadow,     ///< 平行光源シャドウマップ生成
 	shadow                  ///< シャドウマップ生成
 };
 
 /**
  * @brief glTFモデルクラス
- *
- * glTF 2.0モデルのロード・管理・描画・アニメーション再生を行う。
- *
- * @remark
- * - PBR (Metallic-Roughness) ワークフロー対応
- * - スキニング・アニメーション対応
- * - Deferred / Forward 両対応
- *
- * @warning
- * - SRVとして使用中のテクスチャをRTV/UAVとして同時バインドしてはならない（D3D11制約）
- * - glTFの座標系・行列順序（右手系 / 列優先）に注意
- *
- * @todo
- * - Tangent自動生成
- * - Morph Target対応
- * - GPUスキニング対応（現在はCPU寄り）
- * - インスタンシング対応
- * - Bindless的リソース管理
  */
 class Gltf_Model
 {
 	std::string filename;
 
 private:
-	/**
-	 * @brief シーン
-	 */
 	struct scene
 	{
 		std::string name;
@@ -64,9 +45,6 @@ private:
 	std::vector<scene> scenes;
 
 public:
-	/**
-	 * @brief ノード（階層構造）
-	 */
 	struct node
 	{
 		std::string name;
@@ -84,27 +62,19 @@ public:
 		DirectX::XMFLOAT4X4 global_transform{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 	};
 
-	// アニメーション再生モード
 	enum class animation_mode
 	{
 		single,   // 番号指定で1つ再生
 		all,      // 全アニメーション同時再生
 	};
 
-	// 既存メンバ変数
 	float time = 0.0f;
 	int current_animation_index = 0;
 	std::vector<node> nodes;
-	/**
-	 * @brief ノード情報を取得
-	 * @param Gltf_Model glTFモデル
-	 */
+
 	void fetch_nodes(const tinygltf::Model& Gltf_Model);
 
 private:
-	/**
-	 * @brief GPUバッファビュー
-	 */
 	struct buffer_view
 	{
 		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
@@ -116,9 +86,7 @@ private:
 			return size_in_bytes / stride_in_bytes;
 		}
 	};
-	/**
-	 * @brief メッシュ
-	 */
+
 	struct mesh
 	{
 		std::string name;
@@ -127,58 +95,43 @@ private:
 			int material;
 			std::map<std::string, buffer_view> vertex_buffer_views;
 			buffer_view index_buffer_view;
-			// CPU-side copy of POSITION attribute for dynamic bbox calculation
 			std::vector<DirectX::XMFLOAT3> cpu_positions;
-			// CPU-side copy of indices (uint32_t) for collision triangle extraction
 			std::vector<uint32_t> cpu_indices;
+
+			// 高速化用キャッシュ
+			std::vector<ID3D11Buffer*> cached_vertex_buffers;
+			std::vector<UINT>          cached_strides;
+			std::vector<UINT>          cached_offsets;
+			bool                       has_tangent{ false }; // 【追加】Tangent有無フラグ
 		};
 		std::vector<primitive> primitives;
 	};
 	std::vector<mesh> meshes;
-	/**
-	* @brief バッファビューを作成
-	* @param accessor アクセサ
-	* @return バッファビュー
-	*/
+
 	buffer_view make_buffer_view(const tinygltf::Accessor& accessor);
-	/**
-	 * @brief メッシュを取得
-	 * @param device デバイス
-	 * @param Gltf_Model glTFモデル
-	 */
 	void fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_Model);
 
-
 private:
-	/**
-	 * @brief テクスチャ情報
-	 */
 	struct texture_info
 	{
 		int index = -1;
 		int texcoord = 0;
 	};
-	/**
-	 * @brief 法線マップ情報
-	 */
+
 	struct normal_texture_info
 	{
 		int index = -1;
 		int texcoord = 0;
 		float scale = 1;
 	};
-	/**
-	 * @brief 隠蔽マップ情報
-	 */
+
 	struct occlusion_texture_info
 	{
 		int index = -1;
 		int texcoord = 0;
 		float strength = 1;
 	};
-	/**
-	 * @brief PBR Metallic-Roughness
-	 */
+
 	struct pbr_metallic_roughness
 	{
 		float basecolor_factor[4] = { 1, 1, 1, 1 };
@@ -187,9 +140,7 @@ private:
 		float roughness_factor = 1;
 		texture_info metallic_roughness_texture;
 	};
-	/**
-	 * @brief マテリアル
-	 */
+
 	struct material {
 		std::string name;
 		struct cbuffer
@@ -206,29 +157,23 @@ private:
 			texture_info emissive_texture;
 		};
 		cbuffer data;
+
+		// 【追加】描画用 SRV キャッシュ（ベースカラー、メタリックラフネス、法線、エミッシブ、オクルージョン）
+		ID3D11ShaderResourceView* cached_srvs[5]{ nullptr, nullptr, nullptr, nullptr, nullptr };
 	};
 	std::vector<material> materials;
-	/// マテリアル定数バッファ（SRVとしてまとめて参照）
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> material_resource_view;
-	/**
-	* @brief マテリアルを取得
-	* @param device デバイス
-	* @param Gltf_Model glTFモデル
-	*/
+
 	void fetch_materials(ID3D11Device* device, const tinygltf::Model& Gltf_Model);
 
-
-
 private:
-	/**
-	 * @brief テクスチャ
-	 */
 	struct texture
 	{
 		std::string name;
 		int source{ -1 };
 	};
 	std::vector<texture> textures;
+
 	struct image
 	{
 		std::string name;
@@ -244,20 +189,17 @@ private:
 	};
 	std::vector<image> images;
 	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> texture_resource_views;
+
 	void fetch_textures(ID3D11Device* device, const tinygltf::Model& Gltf_Model);
+
 private:
-	/**
-	 * @brief スキン（ボーン）
-	 */
 	struct skin
 	{
 		std::vector<DirectX::XMFLOAT4X4> inverse_bind_matrices;
 		std::vector<int> joints;
 	};
 	std::vector<skin> skins;
-	/**
-	 * @brief アニメーション
-	 */
+
 	struct animation
 	{
 		std::string name;
@@ -278,33 +220,28 @@ private:
 		};
 		std::vector<sampler> samplers;
 
-		std::unordered_map<int/*sampler.input*/, std::vector<float>> timelines;
-		std::unordered_map<int/*sampler.output*/, std::vector<DirectX::XMFLOAT3>> scales;
-		std::unordered_map<int/*sampler.output*/, std::vector<DirectX::XMFLOAT4>> rotations;
-		std::unordered_map<int/*sampler.output*/, std::vector<DirectX::XMFLOAT3>> translations;
+		std::unordered_map<int, std::vector<float>> timelines;
+		std::unordered_map<int, std::vector<DirectX::XMFLOAT3>> scales;
+		std::unordered_map<int, std::vector<DirectX::XMFLOAT4>> rotations;
+		std::unordered_map<int, std::vector<DirectX::XMFLOAT3>> translations;
 	};
+
 public:
 	std::vector<animation> animations;
-	// Axis-aligned bounding box in model-local space
 	DirectX::XMFLOAT3 bbox_min{ FLT_MAX, FLT_MAX, FLT_MAX };
 	DirectX::XMFLOAT3 bbox_max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 	bool has_bbox{ false };
-	/// 最大ボーン数（シェーダー制限）
+
 	static const size_t PRIMITIVE_MAX_JOINTS = 512;
-	/**
-	 * @brief スキニング用定数
-	 */
 	struct primitive_joint_constants
 	{
 		DirectX::XMFLOAT4X4 matrices[PRIMITIVE_MAX_JOINTS];
 	};
 	Microsoft::WRL::ComPtr<ID3D11Buffer> primitive_joint_cbuffer;
 
-
 	void fetch_animations(const tinygltf::Model& Gltf_Model);
 
 public:
-	// Compute instance world-space AABB, considering animation/skinning if applicable
 	void compute_instance_aabb(
 		const DirectX::XMFLOAT4X4& world,
 		bool is_animation,
@@ -315,27 +252,30 @@ public:
 		DirectX::XMFLOAT3& out_max
 	) const;
 
-	/**
-	 * @brief コリジョン用三角形データを取得
-	 *
-	 * モデルの全メッシュからワールド変換済みの三角形頂点リストを抽出する。
-	 * 静的コリジョンメッシュの構築に使用する。
-	 *
-	 * @param world_matrix インスタンスのワールド変換行列
-	 * @param out_vertices 出力：三角形頂点リスト（3頂点で1三角形）
-	 */
 	void extract_collision_triangles(
 		const DirectX::XMFLOAT4X4& world_matrix,
 		std::vector<DirectX::XMFLOAT3>& out_vertices
 	) const;
+
 private:
-	//util
 	void cumulate_transforms(std::vector<node>& nodes);
+
+	// 【追加】再帰処理用のヘルパー関数（std::function の作成オーバーヘッドを排除）
+	void render_node(
+		ID3D11DeviceContext* immediate_context,
+		int node_index,
+		const std::vector<node>& current_nodes,
+		const DirectX::XMFLOAT4X4& world,
+		pass_mode pass,
+		int& last_bound_material,
+		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr
+	);
 
 private:
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> vertex_shader;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> pixel_shader;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> input_layout;
+
 	struct primitive_constants
 	{
 		DirectX::XMFLOAT4X4 world;
@@ -346,31 +286,13 @@ private:
 	};
 	Microsoft::WRL::ComPtr<ID3D11Buffer> primitive_cbuffer;
 
+	// 【追加】アニメーション計算用の再利用ノードバッファ（毎フレームの vector 再確保を防止）
+	std::vector<node> animated_nodes_cache;
+
 public:
-	/**
-	 * @brief コンストラクタ
-	 *
-	 * @param device D3D11デバイス
-	 * @param filename glTFファイルパス
-	 */
 	Gltf_Model(ID3D11Device* device, const std::string& filename);
-	/// @brief デストラクタ
 	virtual ~Gltf_Model() = default;
 
-	/**
-	 * @brief モデル描画
-	 *
-	 * @param immediate_context デバイスコンテキスト
-	 * @param world ワールド行列
-	 * @param pass 描画パス
-	 * @param is_animation アニメーション使用
-	 * @param animation_index 使用アニメーション
-	 * @param _time 再生時間
-	 *
-	 * @pre
-	 * - アニメーション使用時、事前にanimate()を呼び出すこと
-	 */
-	 // 関数宣言変更
 	void render(
 		ID3D11DeviceContext* immediate_context,
 		const DirectX::XMFLOAT4X4& world,
@@ -381,17 +303,6 @@ public:
 		int animation_index = 0
 	);
 
-	/**
-	 * @brief モデル描画（計算済みアニメーションノード使用）
-	 *
-	 * update() で事前計算した animated_nodes を受け取り、描画パスごとの
-	 * アニメーション再計算を省略する高速版。
-	 *
-	 * @param immediate_context デバイスコンテキスト
-	 * @param world ワールド行列
-	 * @param pass 描画パス
-	 * @param precomputed_nodes update() で計算済みのノード配列（nullptr で通常版にフォールバック）
-	 */
 	void render_with_nodes(
 		ID3D11DeviceContext* immediate_context,
 		const DirectX::XMFLOAT4X4& world,
@@ -400,60 +311,27 @@ public:
 		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr
 	);
 
-	// 全アニメーション同時適用
 	void animate_all(float time, std::vector<node>& animated_nodes);
-
-	/**
-	 * @brief アニメーション更新
-	 *
-	 * @param animation_index 使用アニメーション
-	 * @param time 再生時間
-	 * @param animated_nodes アニメーション適用先ノード配列
-	 */
 	void animate(size_t animation_index, float time, std::vector<node>& animated_nodes);
 
-	/**
-	 * @brief スキン行列（ジョイント行列）を事前計算
-	 *
-	 * @details
-	 * render() / render_with_nodes() では、スキンを持つノードごとに
-	 * 「ノードのグローバル変換の逆行列」を関節数ぶん重複して計算していたため、
-	 * 描画パス（deferred / shadow x2 / directional_shadow / forward）の回数だけ
-	 * 同じ計算を無駄に繰り返していた。
-	 *
-	 * この関数を ModelManager::update() から1フレームに1回だけ呼び出し、
-	 * 結果をノードインデックスをキーにキャッシュしておくことで、
-	 * 各描画パスでは再計算せずに使い回せるようにする。
-	 *
-	 * @param animated_nodes 事前計算済みのノード配列（アニメーション適用後）
-	 * @param out_joint_matrices [出力] ノードインデックス→ジョイント行列群
-	 */
 	void compute_joint_matrices(
 		const std::vector<node>& animated_nodes,
 		std::unordered_map<int, primitive_joint_constants>& out_joint_matrices) const;
 
-	/**
-	 * @brief マテリアルがパスに含まれるか判定
-	 *
-	 * @param alpha_mode アルファモード
-	 * @param pass 描画パス
-	 * @return マテリアルがパスに含まれるか
-	 */
 	bool is_material_in_pass(int alpha_mode, pass_mode pass)
 	{
 		switch (pass)
 		{
 		case pass_mode::deferred_geometry:
 		case pass_mode::forward_opaque:
-			return alpha_mode == 0/*OPAQUE*/ || alpha_mode == 1/*MASK*/;
+			return alpha_mode == 0 || alpha_mode == 1;
 		case pass_mode::forward_transparency:
-			return alpha_mode == 2/*BLEND*/;
+			return alpha_mode == 2;
 		case pass_mode::directional_shadow:
 		case pass_mode::shadow:
-			return  alpha_mode == 0; // TODO
+			return alpha_mode == 0;
 		default:
 			return false;
 		}
 	}
-
 };

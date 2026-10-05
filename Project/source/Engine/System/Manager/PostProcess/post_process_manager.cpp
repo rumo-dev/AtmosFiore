@@ -115,85 +115,69 @@ void Post_Process_Manager::draw()
 {
 	auto* ctx = Graphics_Core::instance().get_device_context();
 
-	// 1. Sky
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Sky Pass");
 		skyer->make(ctx, fsquad.GetColorMap());
 	}
 
-	// ★ 2. VolumetricFog（Sky 直後 ＝ HDR 生輝度に対してフォグを乗せる）
-	//       シェーダー側で GBuffer2(position) を t1 として読む。
-	//       事前にバインドしておく必要がある場合はここで行うこと。
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"VolumetricFog");
-		vol_fog->make(ctx, skyer->get_color_map());
-	}
-
-	// ★ 3. HeightFog
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"HeightFog");
-		hgt_fog->make(ctx, vol_fog->get_color_map());
-	}
-
-	// ★ 4. DistanceFog
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DistanceFog");
-		dst_fog->make(ctx, hgt_fog->get_color_map());
-	}
-
-	// ★ 5. ExponentialFog
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ExponentialFog");
-		exp_fog->make(ctx, dst_fog->get_color_map());
-	}
-
-	// 6. DoF（フォグ後に被写界深度を適用することでボケ端にフォグが馴染む）
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DoF");
-		dofer->make(ctx, exp_fog->get_color_map());
-	}
-
-	// 7. Exposure
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Exposure");
-		exposurer->make(ctx, dofer->GetColorMap());
-	}
-	//exposurer->make(ctx, exp_fog->get_color_map());
-
-	// 8. ChromaticAberration
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ChromaticAberration");
-		ca_effect->make(ctx, exposurer->GetColorMap());
-	}
-
-	// 9. LensDistortion
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"LensDistortion");
-		lens_distortion->make(ctx, ca_effect->GetColorMap());
-	}
-
-	// 10. Vignetting
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Vignetting");
-		vignetting->make(ctx, lens_distortion->GetColorMap());
-	}
-
-	// 11. Bloom
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Bloom");
-		bloomer->make(ctx, vignetting->GetColorMap());
+		bloomer->make(ctx, skyer->get_color_map());
 	}
 
-	// 12. Adaptation（自動露出）
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Adaptation");
 		adaptation->make(ctx, bloomer->getColorMap());
 	}
 
-	// 13. ToneMapping
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"VolumetricFog");
+		vol_fog->make(ctx, adaptation->get_color_map());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"HeightFog");
+		hgt_fog->make(ctx, vol_fog->get_color_map());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DistanceFog");
+		dst_fog->make(ctx, hgt_fog->get_color_map());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ExponentialFog");
+		exp_fog->make(ctx, dst_fog->get_color_map());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DoF");
+		dofer->make(ctx, exp_fog->get_color_map());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Exposure");
+		exposurer->make(ctx, dofer->GetColorMap());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ChromaticAberration");
+		ca_effect->make(ctx, exposurer->GetColorMap());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"LensDistortion");
+		lens_distortion->make(ctx, ca_effect->GetColorMap());
+	}
+
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Vignetting");
+		vignetting->make(ctx, lens_distortion->GetColorMap());
+	}
+
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ToneMapping");
-		tone_mapper->make(ctx, adaptation->get_color_map());
+		tone_mapper->make(ctx, lens_distortion->GetColorMap());
 	}
 }
 

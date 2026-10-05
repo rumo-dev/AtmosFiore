@@ -6,9 +6,12 @@
 #include "Engine/System/Manager/Light/point_light_manager.h"
 #include "Engine/System/Manager/Light/spot_light_manager.h"
 #include <cassert>
+#include "tracy_util.h"
 
 VolumetricFog::VolumetricFog(ID3D11Device* device, uint32_t width, uint32_t height)
 {
+	TRACY_CPU_ZONE_C("VolumetricFog::VolumetricFog", TracyCategory::System);
+
 	blit_ = std::make_unique<FullscreenQuad>(device);
 	target_ = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, false);
 
@@ -60,8 +63,13 @@ VolumetricFog::VolumetricFog(ID3D11Device* device, uint32_t width, uint32_t heig
 
 void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src_srv)
 {
+	TRACY_CPU_ZONE_C("VolumetricFog::make", TracyCategory::PostProcess);
+	TRACY_GPU_ZONE_C("VolumetricFog::make", TracyCategory::PostProcess);
+
 	if (!is_enabled)
 	{
+		TRACY_CPU_ZONE_N("VolumetricFog::make::DisabledPassthrough");
+
 		// 無効化されている場合は前段をクリアして直接 Blit するか何もしない
 		// ここでは単に前段のテクスチャをそのままターゲットへ Blit して終了
 		target_->Clear(ctx, 0, 0, 0, 1);
@@ -74,92 +82,113 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 	}
 
 	// 定数バッファの更新
-	config.is_enabled = is_enabled ? 1 : 0;
-	ctx->UpdateSubresource(cb_.Get(), 0, nullptr, &config, 0, 0);
+	{
+		TRACY_CB_ZONE("VolumetricFog::make::UpdateConfigCB");
+
+		config.is_enabled = is_enabled ? 1 : 0;
+		ctx->UpdateSubresource(cb_.Get(), 0, nullptr, &config, 0, 0);
+	}
 
 	// ── パス1: ライト注入 (Compute Shader) ─────────────────────────
-	ctx->CSSetShader(cs_injection_.Get(), nullptr, 0);
+	{
+		TRACY_CPU_ZONE_N("VolumetricFog::make::LightInjectionCS");
+		TRACY_GPU_ZONE("VolumetricFog::LightInjectionCS");
 
-	// 定数バッファのバインド
-	auto camera_cb = Graphics_Core::instance().get_constant_buffer(Graphics_Core::Conastant_Buffer_Type::Camera);
-	auto light_cb = Graphics_Core::instance().get_constant_buffer(Graphics_Core::Conastant_Buffer_Type::Light);
-	auto point_count_cb = Graphics_Core::instance().get_point_light_manager().get_cb();
-	auto spot_count_cb = Graphics_Core::instance().get_spot_light_manager().get_cb();
+		ctx->CSSetShader(cs_injection_.Get(), nullptr, 0);
 
-	ctx->CSSetConstantBuffers(1, 1, &camera_cb);
-	ctx->CSSetConstantBuffers(2, 1, &light_cb);
-	ctx->CSSetConstantBuffers(4, 1, &point_count_cb);
-	ctx->CSSetConstantBuffers(6, 1, &spot_count_cb);
-	ctx->CSSetConstantBuffers(8, 1, cb_.GetAddressOf());
+		// 定数バッファのバインド
+		auto camera_cb = Graphics_Core::instance().get_constant_buffer(Graphics_Core::Conastant_Buffer_Type::Camera);
+		auto light_cb = Graphics_Core::instance().get_constant_buffer(Graphics_Core::Conastant_Buffer_Type::Light);
+		auto point_count_cb = Graphics_Core::instance().get_point_light_manager().get_cb();
+		auto spot_count_cb = Graphics_Core::instance().get_spot_light_manager().get_cb();
 
-	// SRV のバインド
-	auto ps_front = Graphics_Core::instance().post_procss.GetShadow().get_point_shadow_front_map();
-	auto ps_back = Graphics_Core::instance().post_procss.GetShadow().get_point_shadow_back_map();
-	auto dir_shadow = Graphics_Core::instance().post_procss.GetShadow().get_directional_shadow_map();
-	auto point_srv = Graphics_Core::instance().get_point_light_manager().get_srv();
-	auto spot_srv = Graphics_Core::instance().get_spot_light_manager().get_srv();
+		ctx->CSSetConstantBuffers(1, 1, &camera_cb);
+		ctx->CSSetConstantBuffers(2, 1, &light_cb);
+		ctx->CSSetConstantBuffers(4, 1, &point_count_cb);
+		ctx->CSSetConstantBuffers(6, 1, &spot_count_cb);
+		ctx->CSSetConstantBuffers(8, 1, cb_.GetAddressOf());
 
-	ctx->CSSetShaderResources(5, 1, &ps_front);
-	ctx->CSSetShaderResources(6, 1, &ps_back);
-	ctx->CSSetShaderResources(7, 1, &dir_shadow);
-	ctx->CSSetShaderResources(8, 1, &point_srv);
-	ctx->CSSetShaderResources(9, 1, &spot_srv);
+		// SRV のバインド
+		auto ps_front = Graphics_Core::instance().post_procss.GetShadow().get_point_shadow_front_map();
+		auto ps_back = Graphics_Core::instance().post_procss.GetShadow().get_point_shadow_back_map();
+		auto dir_shadow = Graphics_Core::instance().post_procss.GetShadow().get_directional_shadow_map();
+		auto point_srv = Graphics_Core::instance().get_point_light_manager().get_srv();
+		auto spot_srv = Graphics_Core::instance().get_spot_light_manager().get_srv();
 
-	// サンプラーのバインド
-	Render_State::instance().set_cs_sampler_state(ctx);
+		ctx->CSSetShaderResources(5, 1, &ps_front);
+		ctx->CSSetShaderResources(6, 1, &ps_back);
+		ctx->CSSetShaderResources(7, 1, &dir_shadow);
+		ctx->CSSetShaderResources(8, 1, &point_srv);
+		ctx->CSSetShaderResources(9, 1, &spot_srv);
 
-	// 出力 UAV のバインド
-	ctx->CSSetUnorderedAccessViews(0, 1, light_volume_uav_.GetAddressOf(), nullptr);
+		// サンプラーのバインド
+		Render_State::instance().set_cs_sampler_state(ctx);
 
-	// スレッドグループのディスパッチ
-	// グループサイズ (8, 8, 4) に対するグリッドディスパッチ
-	ctx->Dispatch(20, 12, config.grid_depth / 4);
+		// 出力 UAV のバインド
+		ctx->CSSetUnorderedAccessViews(0, 1, light_volume_uav_.GetAddressOf(), nullptr);
 
-	// UAV と SRV のアンバインド (D3D 警告防止)
-	ID3D11UnorderedAccessView* null_uav = nullptr;
-	ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
-	ID3D11ShaderResourceView* null_srvs[10]{};
-	ctx->CSSetShaderResources(5, 5, null_srvs);
+		// スレッドグループのディスパッチ
+		// グループサイズ (8, 8, 4) に対するグリッドディスパッチ
+		ctx->Dispatch(20, 12, config.grid_depth / 4);
+
+		// UAV と SRV のアンバインド (D3D 警告防止)
+		ID3D11UnorderedAccessView* null_uav = nullptr;
+		ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
+		ID3D11ShaderResourceView* null_srvs[10]{};
+		ctx->CSSetShaderResources(5, 5, null_srvs);
+	}
 
 	// ── パス2: Z軸累積 (Compute Shader) ───────────────────────────
-	ctx->CSSetShader(cs_accumulation_.Get(), nullptr, 0);
+	{
+		TRACY_CPU_ZONE_N("VolumetricFog::make::AccumulationCS");
+		TRACY_GPU_ZONE("VolumetricFog::AccumulationCS");
 
-	// 入力と出力のバインド
-	ctx->CSSetShaderResources(0, 1, light_volume_srv_.GetAddressOf());
-	ctx->CSSetUnorderedAccessViews(0, 1, accum_volume_uav_.GetAddressOf(), nullptr);
+		ctx->CSSetShader(cs_accumulation_.Get(), nullptr, 0);
 
-	// ディスパッチ (8, 8, 1) スレッドグループ
-	ctx->Dispatch(20, 12, 1);
+		// 入力と出力のバインド
+		ctx->CSSetShaderResources(0, 1, light_volume_srv_.GetAddressOf());
+		ctx->CSSetUnorderedAccessViews(0, 1, accum_volume_uav_.GetAddressOf(), nullptr);
 
-	// アンバインド
-	ctx->CSSetShaderResources(0, 1, null_srvs);
-	ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
-	ctx->CSSetShader(nullptr, nullptr, 0);
+		// ディスパッチ (8, 8, 1) スレッドグループ
+		ctx->Dispatch(20, 12, 1);
+
+		// アンバインド
+		ID3D11UnorderedAccessView* null_uav = nullptr;
+		ID3D11ShaderResourceView* null_srvs[10]{};
+		ctx->CSSetShaderResources(0, 1, null_srvs);
+		ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
+		ctx->CSSetShader(nullptr, nullptr, 0);
+	}
 
 	// ── パス3: 最終合成 (Pixel Shader / Fullscreen Quad) ───────────
-	Render_State::instance().set_2d_render_states(ctx);
-
-	// ピクセルシェーダー定数バッファのバインド
-	ctx->PSSetConstantBuffers(8, 1, cb_.GetAddressOf());
-
-	// SRV の作成とバインド
-	ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 1]{};
-	Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
-	srvs[GBUFFER_COUNT + 0] = src_srv;
-
-	// 3D 累積テクスチャを t10 にバインド
-	ctx->PSSetShaderResources(10, 1, accum_volume_srv_.GetAddressOf());
-
-	target_->Clear(ctx, 0, 0, 0, 1);
-	target_->Activate(ctx);
 	{
-		blit_->Blit(ctx, srvs, 0, (GBUFFER_COUNT + 1), ps_.Get());
-	}
-	target_->Deactivate(ctx);
+		TRACY_CPU_ZONE_N("VolumetricFog::make::CompositePS");
+		TRACY_GPU_ZONE("VolumetricFog::CompositePS");
 
-	// 後始末
-	ID3D11ShaderResourceView* null_ps_srv = nullptr;
-	ctx->PSSetShaderResources(10, 1, &null_ps_srv);
+		Render_State::instance().set_2d_render_states(ctx);
+
+		// ピクセルシェーダー定数バッファのバインド
+		ctx->PSSetConstantBuffers(8, 1, cb_.GetAddressOf());
+
+		// SRV の作成とバインド
+		ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 1]{};
+		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
+		srvs[GBUFFER_COUNT + 0] = src_srv;
+
+		// 3D 累積テクスチャを t10 にバインド
+		ctx->PSSetShaderResources(10, 1, accum_volume_srv_.GetAddressOf());
+
+		target_->Clear(ctx, 0, 0, 0, 1);
+		target_->Activate(ctx);
+		{
+			blit_->Blit(ctx, srvs, 0, (GBUFFER_COUNT + 1), ps_.Get());
+		}
+		target_->Deactivate(ctx);
+
+		// 後始末
+		ID3D11ShaderResourceView* null_ps_srv = nullptr;
+		ctx->PSSetShaderResources(10, 1, &null_ps_srv);
+	}
 }
 
 ID3D11ShaderResourceView* VolumetricFog::get_color_map() const
@@ -174,6 +203,8 @@ ID3D11ShaderResourceView** VolumetricFog::get_color_map_address() const
 
 void VolumetricFog::DrawDebugUI()
 {
+	TRACY_CPU_ZONE_C("VolumetricFog::DrawDebugUI", TracyCategory::UI);
+
 	ImGui::Checkbox("Enable##VolFog", &is_enabled);
 	if (!is_enabled) return;
 

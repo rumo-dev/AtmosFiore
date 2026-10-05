@@ -46,31 +46,14 @@ float SamplePointLightShadow(Texture2D<float> frontshadow_map, Texture2D<float> 
 }
 
 // スクリーンスペースシャドウ（ライトごとのループ内で呼び出す）
-float CalculateDeferredWorldContactShadow(
-    float2 uv,
-    float3 lightPos,
-    float lightRadius,
-    Texture2D<float4> GBufferPositionTex,
-    Texture2D<float4> GBufferNormalTex)
+float CalculateDeferredWorldContactShadow(float2 uv, float3 lightPos, float lightRadius, Texture2D<float4> GBufferPositionTex, Texture2D<float4> GBufferNormalTex)
 {
-    float3 P =
-        GBufferPositionTex.SampleLevel(
-            sampler_states[POINT_CLAMP],
-            uv,
-            0).xyz;
+    float3 P = GBufferPositionTex.SampleLevel(sampler_states[POINT_CLAMP], uv, 0).xyz;
+    float3 N = normalize(GBufferNormalTex.SampleLevel(sampler_states[POINT_CLAMP], uv, 0).xyz);
 
-    float3 N =
-        normalize(
-            GBufferNormalTex.SampleLevel(
-                sampler_states[POINT_CLAMP],
-                uv,
-                0).xyz);
+    float3 toLight = lightPos - P;
 
-    float3 toLight =
-        lightPos - P;
-
-    float lightDist =
-        length(toLight);
+    float lightDist = length(toLight);
 
     if (lightDist < 0.001f)
         return 1.0f;
@@ -78,94 +61,50 @@ float CalculateDeferredWorldContactShadow(
     if (lightDist > lightRadius)
         return 1.0f;
 
-    float3 L =
-        normalize(toLight);
+    float3 L = normalize(toLight);
 
     if (dot(N, L) <= 0.0f)
         return 1.0f;
 
     const int MAX_STEPS = 48;
 
-    float maxDistance =
-        min(lightDist, 0.8f);
+    float maxDistance = min(lightDist, 0.8f);
 
-    float step =
-        maxDistance /
-        MAX_STEPS;
+    float step = maxDistance / MAX_STEPS;
 
     const float normalBias = 0.015f;
     const float lightBias = 0.005f;
 
     const float thickness = 0.05f;
 
-    float3 start =
-        P +
-        N * normalBias +
-        L * lightBias;
+    float3 start = P + N * normalBias + L * lightBias;
 
-    for (int i = 1;
-         i <= MAX_STEPS;
-         ++i)
+    for (int i = 1; i <= MAX_STEPS; ++i)
     {
-        float3 rayPos =
-            start +
-            L *
-            (i * step);
+        float3 rayPos = start + L * (i * step);
 
-        float4 clip =
-            mul(
-                float4(
-                    rayPos,
-                    1),
-                view_projection);
+        float4 clip = mul(float4(rayPos, 1), view_projection);
 
         if (clip.w <= 0)
             break;
 
-        float2 rayUV =
-            clip.xy /
-            clip.w;
+        float2 rayUV = clip.xy / clip.w;
 
-        rayUV =
-            rayUV *
-            float2(
-                0.5,
-                -0.5)
-            + 0.5;
+        rayUV = rayUV * float2(0.5, -0.5) + 0.5;
 
-        if (
-            any(rayUV < 0) ||
-            any(rayUV > 1))
+        if (any(rayUV < 0) || any(rayUV > 1))
             break;
 
-        float3 scenePos =
-            GBufferPositionTex
-            .SampleLevel(
-                sampler_states[POINT_CLAMP],
-                rayUV,
-                0)
-            .xyz;
+        float3 scenePos = GBufferPositionTex.SampleLevel(sampler_states[POINT_CLAMP], rayUV, 0).xyz;
 
         if (all(scenePos == 0))
             continue;
+        float3 d = scenePos - rayPos;
 
-        float3 d =
-            scenePos -
-            rayPos;
+        float along = dot(d, L);
+        float lateral = length(d - along * L);
 
-        float along =
-            dot(d, L);
-
-        float lateral =
-            length(
-                d -
-                along * L);
-
-        if (
-            abs(along) <
-            thickness &&
-            lateral <
-            thickness * 3)
+        if (abs(along) < thickness && lateral < thickness * 3)
         {
             return 0.0f;
         }

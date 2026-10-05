@@ -5,7 +5,8 @@
 #include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 #include "Engine/Extentions/Tracy/tracy/Tracy.hpp"
 Frame_Work::Frame_Work(HWND hwnd) : hwnd(hwnd)
-{}
+{
+}
 
 bool Frame_Work::initialize()
 
@@ -88,10 +89,10 @@ void Frame_Work::render(float elapsed_time) {
 		ImGui::Render();
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+		if (ImGui::GetIO().ConfigFlags /*& ImGuiConfigFlags_ViewportsEnable*/) {
 			// 別ウィンドウの描画
-			ImGui::UpdatePlatformWindows();
-			ImGui::RenderPlatformWindowsDefault();
+	/*		ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();*/
 
 			// --- 修正の鍵 ---
 			// 別ウィンドウの描画完了後に、デバイスコンテキストをメインに戻す

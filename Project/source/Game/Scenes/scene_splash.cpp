@@ -1,9 +1,12 @@
 #include "scene_splash.h"
 #include <windows.h>
+#include "tracy_util.h"
 
 // 初期化
 void Scene_Splash::initialize()
 {
+	TRACY_CPU_ZONE_C("Scene_Splash::initialize", TracyCategory::System);
+
 	log_printf("スプラッシュ画面開始\n", LogLevel::Info);
 	_timer = 0.0f;
 	_is_skipped = false;
@@ -13,12 +16,16 @@ void Scene_Splash::initialize()
 // 終了化
 void Scene_Splash::finalize()
 {
+	TRACY_CPU_ZONE_C("Scene_Splash::finalize", TracyCategory::System);
+
 	log_printf("スプラッシュ画面終了\n", LogLevel::Info);
 }
 
 // 更新処理
 void Scene_Splash::update(float elapsedTime)
 {
+	TRACY_CPU_ZONE_C("Scene_Splash::update", TracyCategory::Update);
+
 	_timer += elapsedTime;
 
 	// スキップキー（SPACE または ENTER）が押された場合の処理
@@ -50,6 +57,8 @@ void Scene_Splash::update(float elapsedTime)
 // 描画処理
 void Scene_Splash::render(float elapsedTime)
 {
+	TRACY_CPU_ZONE_C("Scene_Splash::render", TracyCategory::RenderPass);
+
 	// 経過時間に基づいて全体の透明度 (alpha) を計算
 	float alpha = 0.0f;
 	if (_timer < 1.0f)
@@ -76,17 +85,21 @@ void Scene_Splash::render(float elapsedTime)
 	Graphics_Core::instance().clear(Color_Utils::from_hex("#09080F"));
 
 	// 2. メインロゴ「AtmosFiore」の描画
-	Text::text_data.font = Text::text->get_font_name(Font_Name::Font_karakaze_R);
-	Text::text_data.fontSize = 80;
-	Text::text_data.Color = D2D1::ColorF(0.85f, 0.70f, 1.0f, alpha);
-	Text::text_data.shadowColor = D2D1::ColorF(0.0f, 0.0f, 0.0f, alpha * 0.5f);
-	Text::text_data.shadowOffset = D2D1::Point2F(4.0f, -4.0f);
-	Text::text_data.textAlignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-	Text::text_data.textParagraphAlignment = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
-	Text::text->set_font(Text::text_data);
+	{
+		TRACY_CPU_ZONE_N("Scene_Splash::render::MainLogo");
 
-	// 中央からやや上寄りに描画
-	Text::draw(L"AtmosFiore", D2D1::RectF(0, 0, 1280, 600), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+		Text::text_data.font = Text::text->get_font_name(Font_Name::Font_karakaze_R);
+		Text::text_data.fontSize = 80;
+		Text::text_data.Color = D2D1::ColorF(0.85f, 0.70f, 1.0f, alpha);
+		Text::text_data.shadowColor = D2D1::ColorF(0.0f, 0.0f, 0.0f, alpha * 0.5f);
+		Text::text_data.shadowOffset = D2D1::Point2F(4.0f, -4.0f);
+		Text::text_data.textAlignment = DWRITE_TEXT_ALIGNMENT_CENTER;
+		Text::text_data.textParagraphAlignment = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
+		Text::text->set_font(Text::text_data);
+
+		// 中央からやや上寄りに描画
+		Text::draw(L"AtmosFiore", D2D1::RectF(0, 0, 1280, 600), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+	}
 
 	// 3. サブタイトル「A Game of Light & Shadow」の描画（少し遅れてフェードイン）
 	float sub_alpha = 0.0f;
@@ -105,6 +118,8 @@ void Scene_Splash::render(float elapsedTime)
 
 	if (sub_alpha > 0.01f)
 	{
+		TRACY_CPU_ZONE_N("Scene_Splash::render::SubTitle");
+
 		Text::text_data.font = Text::text->get_font_name(Font_Name::Font_LightNovelPOPv2);
 		Text::text_data.fontSize = 24;
 		Text::text_data.Color = D2D1::ColorF(0.6f, 0.55f, 0.8f, sub_alpha);
@@ -127,6 +142,8 @@ void Scene_Splash::render(float elapsedTime)
 
 	if (prompt_alpha > 0.01f)
 	{
+		TRACY_CPU_ZONE_N("Scene_Splash::render::SkipPrompt");
+
 		Text::text_data.font = Text::text->get_font_name(Font_Name::Font_rounded_x_mgenplus_1c_regular);
 		Text::text_data.fontSize = 16;
 		Text::text_data.Color = D2D1::ColorF(0.5f, 0.5f, 0.6f, prompt_alpha);
@@ -142,4 +159,6 @@ void Scene_Splash::render(float elapsedTime)
 
 // GUI描画
 void Scene_Splash::draw_gui()
-{}
+{
+	TRACY_CPU_ZONE_C("Scene_Splash::draw_gui", TracyCategory::UI);
+}

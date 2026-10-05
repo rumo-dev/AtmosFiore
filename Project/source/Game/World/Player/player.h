@@ -10,6 +10,7 @@
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 #include "Engine/System/Manager/resource_manager.h"
 #include "Engine/system/graphics_core.h"
+#include "tracy_util.h"
 
 namespace dx = DirectX;
 
@@ -30,6 +31,8 @@ public:
 	void initialize(HWND hwnd,
 		dx::XMVECTOR start_pos = dx::XMVectorSet(0.0f, 5.0f, 0.0f, 1.0f))
 	{
+		TRACY_CPU_ZONE_C("Player::initialize", TracyCategory::System);
+
 		hwnd_ = hwnd;
 		position_ = start_pos;
 
@@ -66,6 +69,8 @@ public:
 	bool setup_collision(const std::string& model_key,
 		const DirectX::XMFLOAT4X4& world_transform)
 	{
+		TRACY_CPU_ZONE_C("Player::setup_collision", TracyCategory::System);
+
 		auto& mgr = Resource_Manager::instance().model_manager;
 		Gltf_Model* model = mgr.get_model(model_key);
 		if (!model) return false;
@@ -85,6 +90,8 @@ public:
 	 */
 	void setup_spotlight()
 	{
+		TRACY_CPU_ZONE_C("Player::setup_spotlight", TracyCategory::System);
+
 		auto& spot_mgr = Graphics_Core::instance().get_spot_light_manager();
 		spotlight_index_ = static_cast<int>(spot_mgr.get_lights().size());
 		spot_mgr.add_light(
@@ -108,6 +115,8 @@ public:
 	 */
 	void setup_model_instance(const std::string& instance_key = "Player")
 	{
+		TRACY_CPU_ZONE_C("Player::setup_model_instance", TracyCategory::System);
+
 		instance_key_ = instance_key;
 		last_model_name_ = model_name_;
 
@@ -130,6 +139,8 @@ public:
 
 	void update(float elapsed_time, float camera_yaw_deg, float camera_pitch_deg = 0.0f)
 	{
+		TRACY_CPU_ZONE_C("Player::update", TracyCategory::Update);
+
 		yaw_ = camera_yaw_deg;
 		pitch_ = camera_pitch_deg;
 
@@ -149,17 +160,19 @@ public:
 
 	void sync_spotlight()
 	{
+		TRACY_CPU_ZONE_C("Player::sync_spotlight", TracyCategory::Update);
+
 		if (spotlight_index_ < 0) return;
 		auto& spot_lights = Graphics_Core::instance().get_spot_light_manager().get_lights();
 		if (spotlight_index_ >= static_cast<int>(spot_lights.size())) return;
 
 		auto& pl = spot_lights[spotlight_index_];
-		pl.position    = get_light_position();
-		pl.direction   = get_light_direction();
-		pl.radius      = light_radius_;
-		pl.intensity   = light_intensity_;
-		pl.innerAngle  = light_inner_angle_;
-		pl.outerAngle  = light_outer_angle_;
+		pl.position = get_light_position();
+		pl.direction = get_light_direction();
+		pl.radius = light_radius_;
+		pl.intensity = light_intensity_;
+		pl.innerAngle = light_inner_angle_;
+		pl.outerAngle = light_outer_angle_;
 		pl.diffuseColor = light_color_;
 	}
 
@@ -169,6 +182,8 @@ public:
 
 	void sync_model_instance(const std::string& active_camera_name = "")
 	{
+		TRACY_CPU_ZONE_C("Player::sync_model_instance", TracyCategory::Update);
+
 		auto& mgr = Resource_Manager::instance().model_manager;
 
 		// モデル名が変更されたら再登録
@@ -235,6 +250,8 @@ public:
 
 	dx::XMFLOAT4X4 get_world_transform() const
 	{
+		TRACY_CPU_ZONE_C("Player::get_world_transform", TracyCategory::Geometry);
+
 		dx::XMVECTOR U = dx::XMVector3Normalize(up_vector_);
 		dx::XMVECTOR F = dx::XMVector3Normalize(forward_vector_);
 		dx::XMVECTOR R = dx::XMVector3Normalize(dx::XMVector3Cross(U, F));
@@ -296,6 +313,8 @@ public:
 
 	void draw_imgui()
 	{
+		TRACY_CPU_ZONE_C("Player::draw_imgui", TracyCategory::UI);
+
 		ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "--- Drone Settings ---");
 
 		// モデル名の入力
@@ -439,6 +458,8 @@ private:
 	 */
 	void ConvertTiltByAxis_(float& _pitch_tilt, float& _roll) const
 	{
+		TRACY_CPU_ZONE_N("Player::ConvertTiltByAxis_");
+
 		float orig_pitch = _pitch_tilt;
 		float orig_roll = _roll;
 
@@ -467,6 +488,8 @@ private:
 
 	void HandleMovement_(float _elapsed_time)
 	{
+		TRACY_CPU_ZONE_C("Player::HandleMovement_", TracyCategory::Update);
+
 		if (is_dead_)
 		{
 			animation_index_ = 3;
@@ -536,6 +559,8 @@ private:
 		dx::XMVECTOR corrected_delta = move_delta;
 		if (enable_collision_ && !collision_grid_.empty() && Length(move_delta) > 0.001f)
 		{
+			TRACY_CPU_ZONE_N("Player::HandleMovement_::Collision");
+
 			// プレイヤー周辺の三角形だけを抽出
 			dx::XMFLOAT3 pos_f;
 			dx::XMStoreFloat3(&pos_f, position_);

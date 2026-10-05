@@ -123,6 +123,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -207,7 +210,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;_DEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;.\source\Engine\Utilities;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -239,7 +242,7 @@ if exist export rmdir /s /q export</Command>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;_DEBUG;_CONSOLE;USE_IMGUI;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;.\source\Engine\Utilities;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -257,8 +260,8 @@ if exist export rmdir /s /q export</Command>
       <AssemblerOutputFile>.\assembler_output\shaders\cod%(Filename).cod</AssemblerOutputFile>
     </FxCompile>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>cd /d "$(SolutionDir).."
+start tracy-profiler.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>
@@ -271,7 +274,7 @@ if exist export rmdir /s /q export</Command>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;_DEBUG;_CONSOLE;USE_IMGUI;DISABLE_DWRITE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;.\source\Engine\Utilities;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -305,7 +308,7 @@ if exist export rmdir /s /q export</Command>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>XAUDIO2_HELPER_FUNCTIONS;NDEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\source\extentions;.\source;.\extentions\DirectXTK-main\Inc;.\source\Engine\Utilities;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -415,6 +418,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Utilities\JsonDataManager.h" />
     <ClInclude Include="source\Engine\Utilities\math_util.h" />
     <ClInclude Include="source\Engine\Utilities\render_marker_util.h" />
+    <ClInclude Include="source\Engine\Utilities\tracy_util.h" />
     <ClInclude Include="source\Game\Effect\adaptation\adaptation.h" />
     <ClInclude Include="source\Game\Effect\ChromaticAberration\ChromaticAberration.h" />
     <ClInclude Include="source\Game\Effect\dof\depth_of_field.h" />

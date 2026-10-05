@@ -1,6 +1,7 @@
 #include "graphics_core.h"
 #include "Engine/utilities/misc.h"
 #include "Engine/utilities/color_util.h"
+#include "tracy_util.h"
 
 void Graphics_Core::initialize(HWND hwnd) {
 	log_printf("グラフィックスコアの初期化開始\n", LogLevel::Info);
@@ -54,6 +55,8 @@ void Graphics_Core::set_render_targets() {
 	//log_printf("レンダーターゲットの設定終了\n", LogLevel::Info);
 }
 void Graphics_Core::present(UINT sync_interval) {
+	TRACY_CPU_ZONE_C("Presents", TracyCategory::System);
+	TRACY_GPU_ZONE("Presents", TracyCategory::System);
 	//log_printf("画面の表示開始\n", LogLevel::Info);
 	//HRESULT hr = _swapchain.Get()->Present(sync_interval, static_cast<UINT>(graphics_constants::PresentFlags::None));
 	HRESULT hr = _swapchain.Get()->Present(0, 0);
@@ -63,6 +66,7 @@ void Graphics_Core::present(UINT sync_interval) {
 	else {
 		//log_printf("画面の表示 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
 	}
+	TracyManager::instance().collect();
 }
 
 bool Graphics_Core::create_device() {
@@ -245,12 +249,13 @@ void Graphics_Core::set_viewport() {
 }
 void Graphics_Core::update_scene_constants(Camera& camera)
 {
+	TRACY_CB_ZONE("Graphics_Core::update_scene_constants");
+
 	using namespace DirectX;
 	D3D11_VIEWPORT viewport;
 	UINT num_viewports{ 1 };
 	_immediate_context->RSGetViewports(&num_viewports, &viewport);
 	Camera_Constants data{};
-
 	//float aspect_ratio = viewport.Width / viewport.Height;
 	//{
 	//	dx::XMFLOAT4 light_view_focus = post_procss.GetShadow().get_light_view_focus();
@@ -263,16 +268,11 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	//	dx::XMVECTOR U{ dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f) };
 	//	XMMATRIX V{ XMMatrixLookAtLH(E, F, U) };
 	//	XMMATRIX P{ XMMatrixOrthographicLH(light_view_size * 1, light_view_size, light_view_near_z, light_view_far_z) };
-
 	//	DirectX::XMStoreFloat4x4(&data.light_view_projection, V * P);
 	//}
-
-
-
 	//dx::XMMATRIX V = camera.view;
 	//dx::XMMATRIX P = camera.projection;
 	XMStoreFloat4(&data.camera_position, camera.position);
-
 	dx::XMStoreFloat4x4(&data.view_projection, camera.view * camera.projection);
 	dx::XMStoreFloat4x4(&data.inv_view_projection, camera.inv_view * camera.inv_projection);
 	dx::XMStoreFloat4x4(&data.view, camera.view);
@@ -283,34 +283,34 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	data.fov = camera.fov;
 	data.near_z = camera.near_z;
 	data.far_z = camera.far_z;
-
 	data.FNumber = camera.FNumber;
 	data.FocalLength = camera.FocalLength;
 	data.SensorSize = camera.SensorSize;
 	data.FocusDist = camera.FocusDist;
 	data.MaxBlurRadius = camera.MaxBlurRadius;
-
 	data.TStop = camera.TStop;
 	data.ShutterSpeed = camera.ShutterSpeed;
 	data.ISO = camera.ISO;
 	data.EV_Compensation = camera.EV_Compensation;
 	data.isReserved = static_cast<int>(camera.isReversed_Z);
 
+	{
+		TRACY_CPU_ZONE_N("Graphics_Core::update_scene_constants::UpdateCameraCB");
+		_immediate_context->UpdateSubresource(_constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].Get(), 0, nullptr, &data, 0, 0);
+		_immediate_context->VSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
+		_immediate_context->PSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
+		_immediate_context->CSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
+	}
 
-
-	_immediate_context->UpdateSubresource(_constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].Get(), 0, nullptr, &data, 0, 0);
-
-	_immediate_context->VSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
-	_immediate_context->PSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
-	_immediate_context->CSSetConstantBuffers(1, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Camera)].GetAddressOf());
 	Light_Constants lights{};
 	lights.ambient_color = ambient_color;
 	lights.directional_light_direction = directional_light_direction;
 	lights.directional_light_color = directional_light_color;
-	_immediate_context->UpdateSubresource(_constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].Get(), 0, 0, &lights, 0, 0);
-	_immediate_context->VSSetConstantBuffers(2, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].GetAddressOf());
-	_immediate_context->PSSetConstantBuffers(2, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].GetAddressOf());
 
-
-
+	{
+		TRACY_CPU_ZONE_N("Graphics_Core::update_scene_constants::UpdateLightCB");
+		_immediate_context->UpdateSubresource(_constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].Get(), 0, 0, &lights, 0, 0);
+		_immediate_context->VSSetConstantBuffers(2, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].GetAddressOf());
+		_immediate_context->PSSetConstantBuffers(2, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].GetAddressOf());
+	}
 }

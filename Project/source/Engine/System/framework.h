@@ -28,6 +28,9 @@
 #include "Engine/Graphics/UI/ImGui/imgui_impl_win32.h"
 
 
+#include "Engine/Extentions/Tracy/tracy/TracyD3D11.hpp"
+
+
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 extern ImWchar glyphRangesJapanese[];
 #endif
@@ -123,7 +126,7 @@ public:
 		ImPlot::CreateContext();
 
 		ImGuiIO& io = ImGui::GetIO();
-
+		ImNodes::CreateContext();
 
 
 		const ImWchar* ranges = io.Fonts->GetGlyphRangesJapanese();
@@ -145,9 +148,9 @@ public:
 		icons_config.DstFont = base_font;
 		io.Fonts->AddFontFromFileTTF("./data/fonts/imfont.ttf", 20.0f, &icons_config, icons_ranges);
 
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		/*io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 		io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;
-		io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;
+		io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;*/
 		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplDX11_Init(
 			Graphics_Core::instance().get_device(),
@@ -159,6 +162,7 @@ public:
 		//----------------------
 // imnodes のサイズ調整
 //----------------------
+	ImNodes:
 		ImNodesStyle& ns = ImNodes::GetStyle();
 
 		//ns.NodePadding = ImVec4(4, 4, 4, 4);
@@ -281,6 +285,7 @@ private:
 
 	bool _hide_imgui{ false };     ///< ImGui表示フラグ
 	bool g_prevHome{ false };      ///< ホットキー状態保持
+
 
 	/**
 	 * @brief FPS計算とウィンドウタイトル更新

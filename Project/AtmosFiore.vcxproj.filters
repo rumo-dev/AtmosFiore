@@ -601,6 +601,7 @@
     <ClInclude Include="source\Game\World\Player\player.h" />
     <ClInclude Include="source\Engine\Utilities\collision_util.h" />
     <ClInclude Include="source\Engine\Utilities\render_marker_util.h" />
+    <ClInclude Include="source\Engine\Utilities\tracy_util.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source\Engine\Graphics\Shader\area_light.hlsli">
