@@ -1,0 +1,135 @@
+{
+  "adaptation": {
+    "speed_to_dark": 1.0,
+    "speed_to_light": 2.0,
+    "target_lum": 0.18000000715255737
+  },
+  "bloom": {
+    "enabled": 1,
+    "intensity": 0.6729999780654907,
+    "threshold": 1.0
+  },
+  "chromatic_aberration": {
+    "enabled": true,
+    "intensity": 1.0,
+    "physical_link": true
+  },
+  "distance_fog": {
+    "color": [
+      0.699999988079071,
+      0.800000011920929,
+      0.8999999761581421
+    ],
+    "density": 1.0,
+    "enabled": 1,
+    "end": 1000.0,
+    "intensity": 1.0,
+    "start": 10.0
+  },
+  "dof": {
+    "enabled": 1
+  },
+  "enabled": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "exponential_fog": {
+    "color": [
+      0.699999988079071,
+      0.800000011920929,
+      0.8999999761581421
+    ],
+    "density": 0.0026000000070780516,
+    "enabled": 1,
+    "intensity": 1.0,
+    "mode": 1
+  },
+  "exposure": {
+    "enabled": true
+  },
+  "height_fog": {
+    "base_height": 0.0,
+    "color": [
+      0.699999988079071,
+      0.800000011920929,
+      0.8999999761581421
+    ],
+    "density": 0.800000011920929,
+    "enabled": 1,
+    "falloff": 1.5490000247955322,
+    "intensity": 0.02199999988079071,
+    "noise_scale": 0.6305000185966492,
+    "noise_strength": 2.7850000858306885,
+    "wind_velocity": [
+      0.4729999899864197,
+      0.0,
+      0.0
+    ]
+  },
+  "lens_distortion": {
+    "enabled": true,
+    "physical_link": true,
+    "scale": 1.0
+  },
+  "order": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    2,
+    12
+  ],
+  "tone_mapping": {
+    "enabled": 1,
+    "exposure": 1.0,
+    "gamma": 2.200000047683716,
+    "gt_param": 0.2199999988079071,
+    "linear_angle": 0.10000000149011612,
+    "linear_strength": 0.30000001192092896,
+    "mapping_type": 7,
+    "max_white": 10.0,
+    "shoulder": 0.2199999988079071,
+    "toe_strength": 0.20000000298023224
+  },
+  "version": 1,
+  "vignetting": {
+    "enabled": true,
+    "inner_radius": 0.3499999940395355,
+    "intensity": 1.0,
+    "outer_radius": 0.75,
+    "physical_link": true,
+    "smoothness": 2.0
+  },
+  "volumetric_fog": {
+    "absorption": 0.0020000000949949026,
+    "anisotropy": 0.6499999761581421,
+    "density": 0.019999999552965164,
+    "enabled": 1,
+    "fog_far": 60.0,
+    "fog_near": 0.10000000149011612,
+    "grid_depth": 128,
+    "grid_height": 90,
+    "grid_width": 160,
+    "intensity": 1.0,
+    "noise_scale": 0.0,
+    "scattering": 0.800000011920929
+  }
+}

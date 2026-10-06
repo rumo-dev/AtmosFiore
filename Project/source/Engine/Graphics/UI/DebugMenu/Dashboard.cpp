@@ -240,6 +240,7 @@ void Dashboard::InitializeUI() {
 	} });
 
 	dash.RegisterModule({ "Rendering", {
+		{"Post-Process Pipeline", "Enable effects and change their execution order", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawPipelineGUI(); }},
 		{"Bloom",       "Adjust bloom settings", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawBloomGUI(); }},
 		{"Adaptation",  "Adjust eye adaptation parameters", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawAdaptationGUI(); }},
 		{"Tone Mapping","Adjust tone mapping curves", [](SharedMetricsData& d) { Graphics_Core::instance().post_procss.drawToneMappingGUI(); }},

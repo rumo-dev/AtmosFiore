@@ -5,9 +5,19 @@
 #include "Game/Effect/ChromaticAberration/ChromaticAberration.h"
 #include "Game/Effect/lensDistortion/LensDistortion.h"
 #include "Game/Effect/vignetting/Vignetting.h"
+#include "Engine/Graphics/Model/Tiny/Json.hpp"
+#include <fstream>
 
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
+Framebuffer                  Post_Process_Manager::adaptation_input;
+ID3D11ShaderResourceView*    Post_Process_Manager::final_color_map = nullptr;
+std::array<Post_Process_Manager::EffectId, 13> Post_Process_Manager::effect_order = {
+	EffectId::Sky, EffectId::VolumetricFog, EffectId::HeightFog, EffectId::DistanceFog,
+	EffectId::ExponentialFog, EffectId::DoF, EffectId::Exposure, EffectId::ChromaticAberration,
+	EffectId::LensDistortion, EffectId::Vignetting, EffectId::Bloom, EffectId::Adaptation, EffectId::ToneMapping
+};
+std::array<bool, 13> Post_Process_Manager::effect_enabled{};
 std::unique_ptr<bloom>       Post_Process_Manager::bloomer = nullptr;
 std::unique_ptr<Fog>         Post_Process_Manager::fogger = nullptr;
 std::unique_ptr<shadow>      Post_Process_Manager::shadower = nullptr;
@@ -34,6 +44,8 @@ void Post_Process_Manager::initialize()
 	auto  h = static_cast<uint32_t>(Graphics_Core::instance().get_screen_height());
 
 	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, false, false);
+	adaptation_input = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, false, false);
+	effect_enabled.fill(true);
 
 	bloomer = std::make_unique<bloom>(device, w, h);
 	fogger = std::make_unique<Fog>(device, w, h);
@@ -52,6 +64,9 @@ void Post_Process_Manager::initialize()
 	hgt_fog = std::make_unique<HeightFog>(device, w, h);
 	dst_fog = std::make_unique<DistanceFog>(device, w, h);
 	exp_fog = std::make_unique<ExponentialFog>(device, w, h);
+
+	// 保存済みのパイプライン設定があれば、エフェクト生成後に起動設定として適用する。
+	Post_Process_Manager{}.loadPipelineSettings();
 }
 
 // ─── 更新 ─────────────────────────────────────────────────────────
@@ -114,70 +129,37 @@ void Post_Process_Manager::end()
 void Post_Process_Manager::draw()
 {
 	auto* ctx = Graphics_Core::instance().get_device_context();
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Sky Pass");
-		skyer->make(ctx, fsquad.GetColorMap());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Bloom");
-		bloomer->make(ctx, skyer->get_color_map());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Adaptation");
-		adaptation->make(ctx, bloomer->getColorMap());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"VolumetricFog");
-		vol_fog->make(ctx, adaptation->get_color_map());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"HeightFog");
-		hgt_fog->make(ctx, vol_fog->get_color_map());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DistanceFog");
-		dst_fog->make(ctx, hgt_fog->get_color_map());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ExponentialFog");
-		exp_fog->make(ctx, dst_fog->get_color_map());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"DoF");
-		dofer->make(ctx, exp_fog->get_color_map());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Exposure");
-		exposurer->make(ctx, dofer->GetColorMap());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ChromaticAberration");
-		ca_effect->make(ctx, exposurer->GetColorMap());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"LensDistortion");
-		lens_distortion->make(ctx, ca_effect->GetColorMap());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Vignetting");
-		vignetting->make(ctx, lens_distortion->GetColorMap());
-	}
-
-	{
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"ToneMapping");
-		tone_mapper->make(ctx, lens_distortion->GetColorMap());
+	ID3D11ShaderResourceView* current = fsquad.GetColorMap();
+	final_color_map = current;
+	for (size_t i = 0; i < effect_order.size(); ++i) {
+		const size_t effect_index = static_cast<size_t>(effect_order[i]);
+		if (!effect_enabled[effect_index]) continue;
+		if (effect_order[i] == EffectId::Adaptation) {
+			adaptation_input.Clear(ctx);
+			adaptation_input.Activate(ctx);
+			Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, &current, 0, 1);
+			adaptation_input.Deactivate(ctx);
+			adaptation_input.GenerateMips(ctx);
+			adaptation->make(ctx, adaptation_input.GetColorMap());
+			current = adaptation->get_color_map();
+			continue;
+		}
+		switch (effect_order[i]) {
+		case EffectId::Sky: skyer->make(ctx, current); current = skyer->get_color_map(); break;
+		case EffectId::Bloom: bloomer->make(ctx, current); current = bloomer->getColorMap(); break;
+		case EffectId::VolumetricFog: vol_fog->make(ctx, current); current = vol_fog->get_color_map(); break;
+		case EffectId::HeightFog: hgt_fog->make(ctx, current); current = hgt_fog->get_color_map(); break;
+		case EffectId::DistanceFog: dst_fog->make(ctx, current); current = dst_fog->get_color_map(); break;
+		case EffectId::ExponentialFog: exp_fog->make(ctx, current); current = exp_fog->get_color_map(); break;
+		case EffectId::DoF: dofer->make(ctx, current); current = dofer->GetColorMap(); break;
+		case EffectId::Exposure: exposurer->make(ctx, current); current = exposurer->GetColorMap(); break;
+		case EffectId::ChromaticAberration: ca_effect->make(ctx, current); current = ca_effect->GetColorMap(); break;
+		case EffectId::LensDistortion: lens_distortion->make(ctx, current); current = lens_distortion->GetColorMap(); break;
+		case EffectId::Vignetting: vignetting->make(ctx, current); current = vignetting->GetColorMap(); break;
+		case EffectId::ToneMapping: tone_mapper->make(ctx, current); current = tone_mapper->get_color_map(); break;
+		case EffectId::Adaptation: break;
+		}
+		final_color_map = current;
 	}
 }
 
@@ -188,7 +170,7 @@ void Post_Process_Manager::render()
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Final");
 		Graphics_Core::instance().get_fullscreen_quad()->Blit(
 			Graphics_Core::instance().get_device_context(),
-			tone_mapper->get_color_map_address(), 0, 1
+			&final_color_map, 0, 1
 		);
 	}
 }
@@ -286,6 +268,84 @@ void Post_Process_Manager::drawFogGUI()
 }
 
 // ─── 既存 GUI（変更なし）────────────────────────────────────────
+void Post_Process_Manager::drawPipelineGUI()
+{
+	static const char* names[] = { "Sky", "Bloom", "Adaptation", "Volumetric Fog", "Height Fog", "Distance Fog", "Exponential Fog", "DoF", "Exposure", "Chromatic Aberration", "Lens Distortion", "Vignetting", "Tone Mapping" };
+	ImGui::TextDisabled("The order below is the execution order.");
+	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Saved to data/post_process_settings.json" : "Could not save settings.");
+	ImGui::SameLine();
+	if (ImGui::Button("Load Settings")) ImGui::SetTooltip(loadPipelineSettings() ? "Settings loaded." : "Could not load settings.");
+	for (size_t i = 0; i < effect_order.size(); ++i) {
+		const size_t effect = static_cast<size_t>(effect_order[i]);
+		ImGui::PushID(static_cast<int>(i));
+		ImGui::Checkbox("##enabled", &effect_enabled[effect]); ImGui::SameLine();
+		ImGui::Text("%zu. %s", i + 1, names[effect]); ImGui::SameLine();
+		if (ImGui::ArrowButton("##up", ImGuiDir_Up) && i > 0) std::swap(effect_order[i], effect_order[i - 1]);
+		ImGui::SameLine();
+		if (ImGui::ArrowButton("##down", ImGuiDir_Down) && i + 1 < effect_order.size()) std::swap(effect_order[i], effect_order[i + 1]);
+		ImGui::PopID();
+	}
+}
+
+bool Post_Process_Manager::savePipelineSettings() const
+{
+	using nlohmann::json;
+	json j;
+	j["version"] = 1;
+	j["order"] = json::array();
+	j["enabled"] = json::array();
+	for (auto id : effect_order) j["order"].push_back(static_cast<int>(id));
+	for (bool enabled : effect_enabled) j["enabled"].push_back(enabled);
+	#define SAVE_PARAM(group, field, value) j[group][field] = value
+	SAVE_PARAM("bloom", "enabled", bloomer->is_bloom); SAVE_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); SAVE_PARAM("bloom", "intensity", bloomer->bloom_intensity);
+	SAVE_PARAM("adaptation", "target_lum", adaptation->target_lum); SAVE_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); SAVE_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
+	SAVE_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); SAVE_PARAM("tone_mapping", "mapping_type", static_cast<int>(tone_mapper->mapping_type)); SAVE_PARAM("tone_mapping", "exposure", tone_mapper->exposure); SAVE_PARAM("tone_mapping", "gamma", tone_mapper->gamma); SAVE_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); SAVE_PARAM("tone_mapping", "max_white", tone_mapper->max_white); SAVE_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); SAVE_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); SAVE_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); SAVE_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
+	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled);
+	SAVE_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); SAVE_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); SAVE_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
+	SAVE_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); SAVE_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); SAVE_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
+	SAVE_PARAM("vignetting", "enabled", vignetting->is_enabled); SAVE_PARAM("vignetting", "physical_link", vignetting->physical_link); SAVE_PARAM("vignetting", "intensity", vignetting->intensity); SAVE_PARAM("vignetting", "inner_radius", vignetting->inner_radius); SAVE_PARAM("vignetting", "outer_radius", vignetting->outer_radius); SAVE_PARAM("vignetting", "smoothness", vignetting->smoothness);
+	SAVE_PARAM("volumetric_fog", "enabled", vol_fog->config.is_enabled); SAVE_PARAM("volumetric_fog", "density", vol_fog->config.density_base); SAVE_PARAM("volumetric_fog", "scattering", vol_fog->config.scattering); SAVE_PARAM("volumetric_fog", "absorption", vol_fog->config.absorption); SAVE_PARAM("volumetric_fog", "anisotropy", vol_fog->config.anisotropy); SAVE_PARAM("volumetric_fog", "noise_scale", vol_fog->config.noise_scale); SAVE_PARAM("volumetric_fog", "intensity", vol_fog->config.intensity); SAVE_PARAM("volumetric_fog", "fog_near", vol_fog->config.fog_near); SAVE_PARAM("volumetric_fog", "fog_far", vol_fog->config.fog_far);
+	SAVE_PARAM("volumetric_fog", "grid_width", vol_fog->config.grid_width); SAVE_PARAM("volumetric_fog", "grid_height", vol_fog->config.grid_height); SAVE_PARAM("volumetric_fog", "grid_depth", vol_fog->config.grid_depth);
+	SAVE_PARAM("height_fog", "enabled", hgt_fog->config.is_enabled); SAVE_PARAM("height_fog", "base_height", hgt_fog->config.base_height); SAVE_PARAM("height_fog", "falloff", hgt_fog->config.falloff); SAVE_PARAM("height_fog", "density", hgt_fog->config.density_max); SAVE_PARAM("height_fog", "intensity", hgt_fog->config.intensity); SAVE_PARAM("height_fog", "noise_scale", hgt_fog->config.noise_scale); SAVE_PARAM("height_fog", "noise_strength", hgt_fog->config.noise_strength); SAVE_PARAM("height_fog", "wind_velocity", json::array({hgt_fog->config.wind_velocity.x, hgt_fog->config.wind_velocity.y, hgt_fog->config.wind_velocity.z})); SAVE_PARAM("height_fog", "color", json::array({hgt_fog->config.fog_color.x, hgt_fog->config.fog_color.y, hgt_fog->config.fog_color.z}));
+	SAVE_PARAM("distance_fog", "enabled", dst_fog->config.is_enabled); SAVE_PARAM("distance_fog", "start", dst_fog->config.fog_start); SAVE_PARAM("distance_fog", "end", dst_fog->config.fog_end); SAVE_PARAM("distance_fog", "density", dst_fog->config.density); SAVE_PARAM("distance_fog", "intensity", dst_fog->config.intensity); SAVE_PARAM("distance_fog", "color", json::array({dst_fog->config.fog_color[0], dst_fog->config.fog_color[1], dst_fog->config.fog_color[2]}));
+	SAVE_PARAM("exponential_fog", "enabled", exp_fog->config.is_enabled); SAVE_PARAM("exponential_fog", "density", exp_fog->config.density); SAVE_PARAM("exponential_fog", "intensity", exp_fog->config.intensity); SAVE_PARAM("exponential_fog", "mode", exp_fog->config.mode); SAVE_PARAM("exponential_fog", "color", json::array({exp_fog->config.fog_color[0], exp_fog->config.fog_color[1], exp_fog->config.fog_color[2]}));
+	#undef SAVE_PARAM
+	std::ofstream file("data/post_process_settings.json");
+	if (!file) return false;
+	file << j.dump(2);
+	return file.good();
+}
+
+bool Post_Process_Manager::loadPipelineSettings()
+{
+	using nlohmann::json;
+	std::ifstream file("data/post_process_settings.json");
+	if (!file) return false;
+	json j;
+	try { file >> j; } catch (...) { return false; }
+	if (!j.is_object() || j.value("version", 0) != 1) return false;
+	if (j.contains("order") && j["order"].is_array() && j["order"].size() == effect_order.size()) {
+		std::array<bool, 13> seen{}; bool valid = true;
+		for (size_t i = 0; i < effect_order.size(); ++i) { int id = j["order"][i].get<int>(); if (id < 0 || id >= 13 || seen[id]) { valid = false; break; } seen[id] = true; effect_order[i] = static_cast<EffectId>(id); }
+		if (!valid) return false;
+	}
+	if (j.contains("enabled") && j["enabled"].is_array() && j["enabled"].size() == effect_enabled.size()) for (size_t i = 0; i < effect_enabled.size(); ++i) effect_enabled[i] = j["enabled"][i].get<bool>();
+	#define LOAD_PARAM(group, field, target) do { if (j.contains(group) && j[group].is_object()) target = j[group].value(field, target); } while (false)
+	LOAD_PARAM("bloom", "enabled", bloomer->is_bloom); LOAD_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); LOAD_PARAM("bloom", "intensity", bloomer->bloom_intensity);
+	LOAD_PARAM("adaptation", "target_lum", adaptation->target_lum); LOAD_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); LOAD_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
+	LOAD_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); { int type = static_cast<int>(tone_mapper->mapping_type); LOAD_PARAM("tone_mapping", "mapping_type", type); if (type >= 0 && type < 34) tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(type); } LOAD_PARAM("tone_mapping", "exposure", tone_mapper->exposure); LOAD_PARAM("tone_mapping", "gamma", tone_mapper->gamma); LOAD_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); LOAD_PARAM("tone_mapping", "max_white", tone_mapper->max_white); LOAD_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); LOAD_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); LOAD_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); LOAD_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
+	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled);
+	LOAD_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); LOAD_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); LOAD_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
+	LOAD_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); LOAD_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); LOAD_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
+	LOAD_PARAM("vignetting", "enabled", vignetting->is_enabled); LOAD_PARAM("vignetting", "physical_link", vignetting->physical_link); LOAD_PARAM("vignetting", "intensity", vignetting->intensity); LOAD_PARAM("vignetting", "inner_radius", vignetting->inner_radius); LOAD_PARAM("vignetting", "outer_radius", vignetting->outer_radius); LOAD_PARAM("vignetting", "smoothness", vignetting->smoothness);
+	LOAD_PARAM("volumetric_fog", "enabled", vol_fog->config.is_enabled); LOAD_PARAM("volumetric_fog", "density", vol_fog->config.density_base); LOAD_PARAM("volumetric_fog", "scattering", vol_fog->config.scattering); LOAD_PARAM("volumetric_fog", "absorption", vol_fog->config.absorption); LOAD_PARAM("volumetric_fog", "anisotropy", vol_fog->config.anisotropy); LOAD_PARAM("volumetric_fog", "noise_scale", vol_fog->config.noise_scale); LOAD_PARAM("volumetric_fog", "intensity", vol_fog->config.intensity); LOAD_PARAM("volumetric_fog", "fog_near", vol_fog->config.fog_near); LOAD_PARAM("volumetric_fog", "fog_far", vol_fog->config.fog_far); LOAD_PARAM("volumetric_fog", "grid_width", vol_fog->config.grid_width); LOAD_PARAM("volumetric_fog", "grid_height", vol_fog->config.grid_height); LOAD_PARAM("volumetric_fog", "grid_depth", vol_fog->config.grid_depth);
+	LOAD_PARAM("height_fog", "enabled", hgt_fog->config.is_enabled); LOAD_PARAM("height_fog", "base_height", hgt_fog->config.base_height); LOAD_PARAM("height_fog", "falloff", hgt_fog->config.falloff); LOAD_PARAM("height_fog", "density", hgt_fog->config.density_max); LOAD_PARAM("height_fog", "intensity", hgt_fog->config.intensity); LOAD_PARAM("height_fog", "noise_scale", hgt_fog->config.noise_scale); LOAD_PARAM("height_fog", "noise_strength", hgt_fog->config.noise_strength); { auto color = j.value("height_fog", json::object()).value("color", json::array()); if (color.is_array() && color.size() == 3) hgt_fog->config.fog_color = DirectX::XMFLOAT3(color[0].get<float>(), color[1].get<float>(), color[2].get<float>()); auto wind = j.value("height_fog", json::object()).value("wind_velocity", json::array()); if (wind.is_array() && wind.size() == 3) hgt_fog->config.wind_velocity = DirectX::XMFLOAT3(wind[0].get<float>(), wind[1].get<float>(), wind[2].get<float>()); }
+	LOAD_PARAM("distance_fog", "enabled", dst_fog->config.is_enabled); LOAD_PARAM("distance_fog", "start", dst_fog->config.fog_start); LOAD_PARAM("distance_fog", "end", dst_fog->config.fog_end); LOAD_PARAM("distance_fog", "density", dst_fog->config.density); LOAD_PARAM("distance_fog", "intensity", dst_fog->config.intensity); { auto color = j.value("distance_fog", json::object()).value("color", json::array()); if (color.is_array() && color.size() == 3) for (int i = 0; i < 3; ++i) dst_fog->config.fog_color[i] = color[i].get<float>(); }
+	LOAD_PARAM("exponential_fog", "enabled", exp_fog->config.is_enabled); LOAD_PARAM("exponential_fog", "density", exp_fog->config.density); LOAD_PARAM("exponential_fog", "intensity", exp_fog->config.intensity); LOAD_PARAM("exponential_fog", "mode", exp_fog->config.mode); { auto color = j.value("exponential_fog", json::object()).value("color", json::array()); if (color.is_array() && color.size() == 3) for (int i = 0; i < 3; ++i) exp_fog->config.fog_color[i] = color[i].get<float>(); }
+	#undef LOAD_PARAM
+	return true;
+}
+
 void Post_Process_Manager::drawDebugView()
 {
 	const float available_w = ImGui::GetContentRegionAvail().x;

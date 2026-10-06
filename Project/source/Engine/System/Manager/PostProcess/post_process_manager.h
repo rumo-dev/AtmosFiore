@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include "Engine/Graphics/FrameBuffer/frame_buffer.h"
 #include "Engine/Graphics/Shader/shader.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
@@ -57,6 +58,9 @@ public:
 	static void draw();
 	static void render();
 	static void renderGUI();
+	void drawPipelineGUI();
+	bool savePipelineSettings() const;
+	bool loadPipelineSettings();
 
 public:
 	// ── 既存アクセサ ─────────────────────────────────────────────
@@ -88,6 +92,11 @@ public:
 	void drawDOFGUI();
 
 private:
+	enum class EffectId { Sky, Bloom, Adaptation, VolumetricFog, HeightFog, DistanceFog, ExponentialFog, DoF, Exposure, ChromaticAberration, LensDistortion, Vignetting, ToneMapping };
+	static std::array<EffectId, 13> effect_order;
+	static std::array<bool, 13> effect_enabled;
+	static Framebuffer adaptation_input;
+	static ID3D11ShaderResourceView* final_color_map;
 	static Framebuffer fsquad;
 
 	// ── 既存エフェクト ────────────────────────────────────────────
