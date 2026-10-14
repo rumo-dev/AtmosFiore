@@ -78,7 +78,8 @@ float HGPhase(float cosTheta, float g)
 {
     float g2 = g * g;
     float denom = 1.0 + g2 - 2.0 * g * cosTheta;
-    return (1.0 - g2) / (4.0 * 3.14159265 * pow(max(denom, 0.0001), 1.5));
+    denom = max(denom, 0.0001);
+    return (1.0 - g2) / (4.0 * 3.14159265 * denom * sqrt(denom));
 }
 
 [numthreads(8, 8, 4)]
@@ -91,7 +92,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3 uvw = (float3(DTid) + 0.5) / float3(grid_width, grid_height, grid_depth);
 
     // 2. 二次関数マッピングによるビュー空間深度の算出 (中距離の解像度を確保)
-    float z_view = fog_near + (fog_far - fog_near) * pow(uvw.z, 2.0);
+    float z_view = fog_near + (fog_far - fog_near) * (uvw.z * uvw.z);
 
     // 3. ビュー空間の XY 座標を復元
     float ndc_x = uvw.x * 2.0 - 1.0;
@@ -143,7 +144,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
             continue;
 
         float3 L = lv / max(dist, 0.0001);
-        float cutoff = pow(saturate(1.0 - pow(dist / pointLights[p].radius, 4.0)), 2.0);
+        float dist_ratio = dist / pointLights[p].radius;
+        float dist_ratio_sq = dist_ratio * dist_ratio;
+        float attenuation = saturate(1.0 - dist_ratio_sq * dist_ratio_sq);
+        float cutoff = attenuation * attenuation;
         // Froxels are coarse near local emitters. A 1 m effective source radius avoids a bright voxel popping as the camera moves.
         float att = cutoff / (683.0 * (dist * dist + 1.0));
         
@@ -171,7 +175,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (spot <= 0)
             continue;
 
-        float dist_cutoff = pow(saturate(1.0 - pow(dist / spotLights[s].radius, 4.0)), 2.0);
+        float dist_ratio = dist / spotLights[s].radius;
+        float dist_ratio_sq = dist_ratio * dist_ratio;
+        float attenuation = saturate(1.0 - dist_ratio_sq * dist_ratio_sq);
+        float dist_cutoff = attenuation * attenuation;
         float dist_att = dist_cutoff / (683.0 * (dist * dist + 1.0));
         
         float cos_theta = dot(ray_dir, L);
