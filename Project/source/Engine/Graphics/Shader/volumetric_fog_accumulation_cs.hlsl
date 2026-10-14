@@ -51,8 +51,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
         uint3 pos = uint3(DTid.x, DTid.y, z);
 
         // 二次関数マッピングにおけるスライスの前後境界デプスを計算
-        float z_prev = (z == 0) ? fog_near : fog_near + (fog_far - fog_near) * pow((float)z / (float)grid_depth, 2.0);
-        float z_next = fog_near + (fog_far - fog_near) * pow((float)(z + 1) / (float)grid_depth, 2.0);
+        float z_prev_t = (float)z / (float)grid_depth;
+        float z_next_t = (float)(z + 1) / (float)grid_depth;
+        float z_prev = (z == 0) ? fog_near : fog_near + (fog_far - fog_near) * (z_prev_t * z_prev_t);
+        float z_next = fog_near + (fog_far - fog_near) * (z_next_t * z_next_t);
 
         // 実際のレイに沿ったステップサイズ
         float step_length = (z_next - z_prev) * ray_length_scale;
