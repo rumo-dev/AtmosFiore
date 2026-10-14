@@ -21,8 +21,9 @@ public:
 	// ── HLSL 側定数バッファ (b0) と 1:1 対応 ──────────────────────
 	struct alignas(16) Config
 	{
-		int   grid_width = 160;
-		int   grid_height = 90;
+		// Froxel計算は低解像度で行い、合成時に補間する。
+		int   grid_width = 80;
+		int   grid_height = 48;
 		int   grid_depth = 128;
 		int   pad_grid = 0;
 
@@ -56,6 +57,9 @@ public:
 	Config config{};
 
 private:
+	int allocated_grid_width_ = 80;
+	int allocated_grid_height_ = 48;
+	int allocated_grid_depth_ = 128;
 	std::unique_ptr<FullscreenQuad> blit_;
 	std::unique_ptr<Framebuffer>    target_;
 

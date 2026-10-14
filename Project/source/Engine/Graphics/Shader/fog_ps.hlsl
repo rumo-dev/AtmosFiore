@@ -110,7 +110,7 @@ float4 main(VS_OUT input) : SV_Target
     float phase = saturate(dot(viewDir, lightDir));
     float scatter = pow(phase, 8.0) * LightScatter * fogFactor;
 
-    fogColor += directional_light_color.rgb * scatter;
+    fogColor += directional_light_color.rgb * (directional_light_color.w / 683.0) * scatter;
     fogColor += ambient_color.rgb * fogFactor;
 
     // 合成

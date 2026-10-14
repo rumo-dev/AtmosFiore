@@ -67,13 +67,14 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 ambient = ambient_color.rgb * ka.rgb;
 
     // 拡散反射（Half-Lambert）
-    float3 directional_diffuse = ClacHalfLambert(N, L, directional_light_color.rgb, kd.rgb);
+    float3 directional_irradiance = directional_light_color.rgb * (directional_light_color.w / 683.0);
+    float3 directional_diffuse = ClacHalfLambert(N, L, directional_irradiance, kd.rgb);
 
     // 鏡面反射（Phong）
-    float3 directional_specular = CalcPhongSpecular(N, L, E, directional_light_color.rgb, ks.rgb);
+    float3 directional_specular = CalcPhongSpecular(N, L, E, directional_irradiance, ks.rgb);
 
     // リムライト
-    float3 rim_color = CalcRimLight(N, E, L, directional_light_color.rgb);
+    float3 rim_color = CalcRimLight(N, E, L, directional_irradiance);
 
     // 合成
     float4 color = float4(diffuse_color.rgb * (ambient + directional_diffuse), diffuse_color.a);

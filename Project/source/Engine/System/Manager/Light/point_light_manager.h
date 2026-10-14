@@ -74,7 +74,7 @@ public:
 	 */
 	void add_light(dx::XMFLOAT3 position = { 0, 0, 0 },
 		float radius = 10.0f,
-		float intensity = 1.0f,
+		float intensity = 10000.0f,
 		dx::XMFLOAT4 diffuseColor = { 1.0f, 1.0f, 1.0f, 1.0f });
 	void clear_light()
 	{

@@ -33,6 +33,9 @@ VolumetricFog::VolumetricFog(ID3D11Device* device, uint32_t width, uint32_t heig
 	tex3d_desc.Width = config.grid_width;
 	tex3d_desc.Height = config.grid_height;
 	tex3d_desc.Depth = config.grid_depth;
+	allocated_grid_width_ = config.grid_width;
+	allocated_grid_height_ = config.grid_height;
+	allocated_grid_depth_ = config.grid_depth;
 	tex3d_desc.MipLevels = 1;
 	tex3d_desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	tex3d_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -80,6 +83,12 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 		target_->Deactivate(ctx);
 		return;
 	}
+
+	// Pipeline 設定の旧バージョンが従来のグリッド寸法を復元しても、
+	// 作成済み3Dテクスチャの範囲とdispatch寸法を一致させる。
+	config.grid_width = allocated_grid_width_;
+	config.grid_height = allocated_grid_height_;
+	config.grid_depth = allocated_grid_depth_;
 
 	// 定数バッファの更新
 	{
@@ -129,7 +138,10 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 
 		// スレッドグループのディスパッチ
 		// グループサイズ (8, 8, 4) に対するグリッドディスパッチ
-		ctx->Dispatch(20, 12, config.grid_depth / 4);
+		ctx->Dispatch(
+			(static_cast<UINT>(config.grid_width) + 7u) / 8u,
+			(static_cast<UINT>(config.grid_height) + 7u) / 8u,
+			(static_cast<UINT>(config.grid_depth) + 3u) / 4u);
 
 		// UAV と SRV のアンバインド (D3D 警告防止)
 		ID3D11UnorderedAccessView* null_uav = nullptr;
@@ -150,7 +162,10 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 		ctx->CSSetUnorderedAccessViews(0, 1, accum_volume_uav_.GetAddressOf(), nullptr);
 
 		// ディスパッチ (8, 8, 1) スレッドグループ
-		ctx->Dispatch(20, 12, 1);
+		ctx->Dispatch(
+			(static_cast<UINT>(config.grid_width) + 7u) / 8u,
+			(static_cast<UINT>(config.grid_height) + 7u) / 8u,
+			1);
 
 		// アンバインド
 		ID3D11UnorderedAccessView* null_uav = nullptr;

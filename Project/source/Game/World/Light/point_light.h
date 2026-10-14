@@ -9,7 +9,7 @@ public:
 	{
 		position = { 0, 0, 0 };
 		radius = 10.0f;
-		intensity = 1.0f;
+	intensity = 10000.0f; // cd; calibrated for the renderer's metric-scale scenes
 		diffuseColor = { 1.0f, 1.0f, 1.0f , 1.0f };
 	}
 
@@ -25,7 +25,7 @@ public:
 	dx::XMFLOAT3 position;
 	float radius;
 
-	float intensity;
+	float intensity; // luminous intensity [cd]
 	float padding[3] = {};
 
 	void update() override
@@ -38,10 +38,11 @@ public:
 		if (ImGui::TreeNode(label))
 		{
 			ImGui::ColorEdit3("Diffuse", (float*)&diffuseColor);
+			ImGui::Checkbox("Show Wireframe", &debug_wireframe);
 
 			ImGui::DragFloat3("Position", (float*)&position, 0.1f);
 			ImGui::DragFloat("Radius", &radius, 0.1f, 0.1f, 200.0f);
-			ImGui::DragFloat("Intensity", &intensity, 0.01f, 0.0f, 10.0f);
+			ImGui::DragFloat("Luminous Intensity (cd)", &intensity, 100.0f, 0.0f, 100000.0f, "%.0f cd");
 
 			ImGui::TreePop();
 		}

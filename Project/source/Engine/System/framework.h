@@ -162,7 +162,6 @@ public:
 		//----------------------
 // imnodes のサイズ調整
 //----------------------
-	ImNodes:
 		ImNodesStyle& ns = ImNodes::GetStyle();
 
 		//ns.NodePadding = ImVec4(4, 4, 4, 4);

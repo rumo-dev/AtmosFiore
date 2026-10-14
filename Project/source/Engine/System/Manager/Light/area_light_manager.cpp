@@ -57,7 +57,7 @@ void AreaLightManager::draw_imgui()
 	// ライト追加ボタン
 	if (ImGui::Button("Add Area Light"))
 	{
-		add_light({ 0, 5, 0 }, { 0, -1, 0 }, { 1, 0, 0 }, 2.0f, 2.0f, 1.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
+		add_light({ 0, 5, 0 }, { 0, -1, 0 }, { 1, 0, 0 }, 2.0f, 2.0f, 3500.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
 
 	ImGui::Separator();
@@ -71,7 +71,7 @@ void AreaLightManager::draw_imgui()
 		ImGui::PushID(index);
 		if (ImGui::CollapsingHeader(label.c_str()))
 		{
-			l.draw_imgui(label.c_str());
+			l.draw_imgui("Parameters");
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(removeButtonLabel.c_str()))
@@ -114,7 +114,7 @@ void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 		if (enable_culling)
 		{
 			DirectX::XMVECTOR pos = DirectX::XMLoadFloat3(&l.position);
-			float maxRadius = max(l.width, l.height);
+			float maxRadius = max(max(l.width, l.height), l.radius);
 			if (!SphereIntersectsFrustum(camera_frustum, pos, maxRadius))
 			{
 				continue; // Culled!
@@ -177,6 +177,7 @@ void AreaLightManager::debug_render()
 
 	for (auto& l : _lights)
 	{
+		if (!l.debug_wireframe) continue;
 		if (enable_culling)
 		{
 			DirectX::XMVECTOR pos = DirectX::XMLoadFloat3(&l.position);
@@ -206,7 +207,6 @@ void AreaLightManager::debug_render()
 		DirectX::XMMATRIX S = DirectX::XMMatrixScaling(l.width, l.height, 0.1f);
 
 		// 回転行列（方向ベクトルに合わせる）
-		dx::XMFLOAT4X4 rotationMatrix;
 		dx::XMFLOAT3X3 rotation3x3;
 		dx::XMFLOAT3 rightFloat, upFloat, normalFloat;
 		DirectX::XMStoreFloat3(&rightFloat, rightProjected);

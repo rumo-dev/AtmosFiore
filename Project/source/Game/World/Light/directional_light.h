@@ -3,6 +3,8 @@
 class DirectionalLight : public LightBase
 {
 public:
+	// Directional light is specified as illuminance on a surface (sunlight ~100,000 lx).
+	float illuminance_lux = 10000.0f;
 	dx::XMFLOAT4 direction = { 0,1,0,0 };
 
 private:
@@ -78,10 +80,12 @@ public:
 
 	void update() override
 	{
+		auto photometric_color = diffuseColor;
+		photometric_color.w = illuminance_lux;
 		Graphics_Core::instance().set_directional_light(
 			ambientColor,
 			direction,
-			diffuseColor
+			photometric_color
 		);
 
 	}
@@ -95,6 +99,8 @@ public:
 			update();
 
 		if (CustomUI::ColorEdit3("Diffuse", (float*)&diffuseColor))
+			update();
+		if (ImGui::DragFloat("Illuminance (lx)", &illuminance_lux, 100.0f, 0.0f, 200000.0f, "%.0f lx"))
 			update();
 
 		CustomUI::Checkbox("Auto Day Cycle", &auto_rotate);

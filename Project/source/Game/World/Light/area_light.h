@@ -33,7 +33,7 @@ public:
 		height = 2.0f;
 		radius = 1.0f;
 		shape = AreaLightShape::Rectangle;
-		intensity = 1.0f;
+		intensity = 3500.0f; // luminance [cd/m^2]
 		diffuseColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 	}
 
@@ -68,7 +68,7 @@ public:
 	float height;
 	float radius;
 	AreaLightShape shape;
-	float intensity;
+	float intensity; // luminance [cd/m^2]
 	float padding[2] = {};
 
 	/**
@@ -88,6 +88,7 @@ public:
 		if (ImGui::TreeNode(label))
 		{
 			ImGui::ColorEdit3("Diffuse", (float*)&diffuseColor);
+			ImGui::Checkbox("Show Wireframe", &debug_wireframe);
 
 			ImGui::DragFloat3("Position", (float*)&position, 0.1f);
 			ImGui::DragFloat3("Direction", (float*)&direction, 0.1f);
@@ -112,7 +113,7 @@ public:
 				ImGui::DragFloat("Radius", &radius, 0.1f, 0.1f, 50.0f);
 			}
 
-			ImGui::DragFloat("Intensity", &intensity, 0.01f, 0.0f, 10.0f);
+			ImGui::DragFloat("Luminance (cd/m²)", &intensity, 10.0f, 0.0f, 100000.0f, "%.0f cd/m²");
 
 			ImGui::TreePop();
 		}

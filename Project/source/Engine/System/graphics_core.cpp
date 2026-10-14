@@ -56,7 +56,7 @@ void Graphics_Core::set_render_targets() {
 }
 void Graphics_Core::present(UINT sync_interval) {
 	TRACY_CPU_ZONE_C("Presents", TracyCategory::System);
-	TRACY_GPU_ZONE("Presents", TracyCategory::System);
+	TRACY_GPU_ZONE_C("Presents", TracyCategory::System);
 	//log_printf("画面の表示開始\n", LogLevel::Info);
 	//HRESULT hr = _swapchain.Get()->Present(sync_interval, static_cast<UINT>(graphics_constants::PresentFlags::None));
 	HRESULT hr = _swapchain.Get()->Present(0, 0);
@@ -96,7 +96,7 @@ bool Graphics_Core::create_device() {
 	);
 	{
 		char buf[256];
-		sprintf_s(buf, "Caller: immediate_context=%p \n", _immediate_context);
+		sprintf_s(buf, "Caller: immediate_context=%p \n", _immediate_context.Get());
 		OutputDebugStringA(buf);
 	}
 	if (FAILED(hr)) {
@@ -148,8 +148,8 @@ bool Graphics_Core::create_swap_chain() {
 // スワップチェーン設定
 	DXGI_SWAP_CHAIN_DESC desc = {};
 	desc.BufferCount = graphics_constants::BackBufferCount;
-	desc.BufferDesc.Width = _screen_width;
-	desc.BufferDesc.Height = _screen_height;
+	desc.BufferDesc.Width = static_cast<UINT>(_screen_width);
+	desc.BufferDesc.Height = static_cast<UINT>(_screen_height);
 	desc.BufferDesc.Format = static_cast<DXGI_FORMAT>(graphics_constants::BackBufferFormat::DEFAULT);
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.OutputWindow = _hwnd;
@@ -173,8 +173,8 @@ bool Graphics_Core::create_swap_chain() {
 			if (SUCCEEDED(adapter->EnumOutputs(0, &output)))
 			{
 				DXGI_MODE_DESC modeDesc = {};
-				modeDesc.Width = _screen_width;
-				modeDesc.Height = _screen_height;
+				modeDesc.Width = static_cast<UINT>(_screen_width);
+				modeDesc.Height = static_cast<UINT>(_screen_height);
 				modeDesc.Format = desc.BufferDesc.Format;
 
 				DXGI_MODE_DESC closestMatch = {};

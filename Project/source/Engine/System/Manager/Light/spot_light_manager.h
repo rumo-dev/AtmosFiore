@@ -66,7 +66,7 @@ public:
 	void add_light(dx::XMFLOAT3 position = { 0, 0, 0 },
 		dx::XMFLOAT3 direction = { 0, -1, 0 },
 		float radius = 10.0f,
-		float intensity = 1.0f,
+		float intensity = 30000.0f,
 		float innerAngle = 0.5f,
 		float outerAngle = 0.7f,
 		dx::XMFLOAT4 diffuseColor = { 1.0f, 1.0f, 1.0f, 1.0f });

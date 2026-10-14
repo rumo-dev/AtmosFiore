@@ -55,7 +55,7 @@ void SpotLightManager::draw_imgui()
 	// ライト追加ボタン
 	if (ImGui::Button("Add Spot Light"))
 	{
-		add_light({ 0, 5, 0 }, { 0, -1, 0 }, 10.0f, 1.0f, 0.5f, 0.7f, { 1.0f, 1.0f, 1.0f, 1.0f });
+		add_light({ 0, 5, 0 }, { 0, -1, 0 }, 10.0f, 30000.0f, 0.5f, 0.7f, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
 
 	ImGui::Separator();
@@ -69,7 +69,7 @@ void SpotLightManager::draw_imgui()
 		ImGui::PushID(index);
 		if (ImGui::CollapsingHeader(label.c_str()))
 		{
-			l.draw_imgui(label.c_str());
+			l.draw_imgui("Parameters");
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(removeButtonLabel.c_str()))
@@ -172,6 +172,7 @@ void SpotLightManager::debug_render()
 
 	for (auto& l : _lights)
 	{
+		if (!l.debug_wireframe) continue;
 		if (enable_culling)
 		{
 			DirectX::XMVECTOR pos = DirectX::XMLoadFloat3(&l.position);

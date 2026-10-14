@@ -130,7 +130,7 @@ Texture2D<float> directional_shadow_map : register(t6);
 //
 //            float3 L = lightVec / max(dist, 0.0001f);
 //            float attenuation = pow(saturate(1.0f - dist / pointLights[p].radius), 2.0f);
-//            
+//
 //            // ライトシャフト強調用ブースト
 //            float intensityBoost = min(1.0f / (dist + 0.1f), 5.0f);
 //            float phase = HGPhase(dot(-rayDir, L), anisotropy);
@@ -157,10 +157,10 @@ Texture2D<float> directional_shadow_map : register(t6);
 //
 //            float distanceAtt = pow(saturate(1.0f - dist / spotLights[s].radius), 2.0f);
 //            float phase = HGPhase(dot(-rayDir, L), anisotropy);
-//            
+//
 //            totalLight += spotLights[s].color * spotLights[s].intensity * (spot * distanceAtt * 2.0f) * phase;
 //        }
-//        
+//
 //        for (uint a = 0; a < numAreaLights; ++a)
 //        {
 //            AreaLight_GPU light = areaLights[a];
@@ -171,7 +171,7 @@ Texture2D<float> directional_shadow_map : register(t6);
 //        // フォグ内では明確な法線がないため、ライトの中心を向くベクトルを法線とする
 //            float3 N_approx = normalize(light.position - currentPos);
 //            float3 V = -rayDir; // レイの進行方向の逆
-//        
+//
 //        // フォグは拡散体なので roughness は大きめに設定（散乱の広がり）
 //            float roughness = 0.8f;
 //            float NoV = saturate(dot(N_approx, V));
@@ -236,7 +236,8 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 specular = 0.0f;
 
     float3 L = normalize(-directional_light_direction.xyz);
-    float3 Li = directional_light_color.rgb * 5;
+    // directional_light_color.w carries illuminance in lux; convert photometric to radiometric scale.
+    float3 Li = directional_light_color.rgb * (directional_light_color.w / 683.0);
     float NoL = max(0.0f, dot(N, L));
     if (NoL > 0.0f)
     {
@@ -244,22 +245,22 @@ float4 main(VS_OUT pin) : SV_TARGET
         float NoH = max(0.0f, dot(N, H));
         float HoV = max(0.0f, dot(H, V));
         float directional_shadow = SampleDirectionalShadow(directional_shadow_map, position, N, L);
-        
+
 
         diffuse += Li * directional_shadow * NoL * brdf_lambertian(f0, f90, c_diff, HoV);
         specular += Li * directional_shadow * NoL * brdf_specular_ggx(f0, f90, alpha_roughness, HoV, NoL, NoV, NoH);
     }
 
-    for (int i = 0; i < numPointLights; ++i)
+    for (uint pointLightIndex = 0u; pointLightIndex < numPointLights; ++pointLightIndex)
     {
-        if (pointLights[i].intensity <= 0.0f || pointLights[i].radius <= 0.0f)
+        if (pointLights[pointLightIndex].intensity <= 0.0f || pointLights[pointLightIndex].radius <= 0.0f)
         {
             continue;
         }
 
-        float3 light_vector = pointLights[i].position - position;
+        float3 light_vector = pointLights[pointLightIndex].position - position;
         float dist = length(light_vector);
-        if (dist >= pointLights[i].radius)
+        if (dist >= pointLights[pointLightIndex].radius)
         {
             continue;
         }
@@ -270,30 +271,31 @@ float4 main(VS_OUT pin) : SV_TARGET
         {
             continue;
         }
-        
-        float att = max(0.0f, 1.0f - (dist / pointLights[i].radius));
-        float attenuation = att * att;
-        float3 pointLi = pointLights[i].color * pointLights[i].intensity * attenuation;
+
+        float cutoff = max(0.0f, 1.0f - pow(dist / pointLights[pointLightIndex].radius, 4.0));
+        // Approximate a finite emitter and avoid an unstable point-source singularity near the light.
+        float attenuation = cutoff * cutoff / (683.0 * (dist * dist + 0.04));
+        float3 pointLi = pointLights[pointLightIndex].color * pointLights[pointLightIndex].intensity * attenuation;
         float3 H = normalize(V + Lp);
         float NoH = max(0.0f, dot(N, H));
         float HoV = max(0.0f, dot(H, V));
-        float point_shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, position, N, Lp, i);
+        float point_shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, position, N, Lp, int(pointLightIndex));
 
         diffuse += pointLi * point_shadow * pointNoL * brdf_lambertian(f0, f90, c_diff, HoV);
         specular += pointLi * point_shadow * pointNoL * brdf_specular_ggx(f0, f90, alpha_roughness, HoV, pointNoL, NoV, NoH);
     }
 
     // スポットライト
-    for (int i = 0; i < numSpotLights; ++i)
+    for (uint spotLightIndex = 0u; spotLightIndex < numSpotLights; ++spotLightIndex)
     {
-        if (spotLights[i].intensity <= 0.0f || spotLights[i].radius <= 0.0f)
+        if (spotLights[spotLightIndex].intensity <= 0.0f || spotLights[spotLightIndex].radius <= 0.0f)
         {
             continue;
         }
 
-        float3 light_vector = spotLights[i].position - position;
+        float3 light_vector = spotLights[spotLightIndex].position - position;
         float dist = length(light_vector);
-        if (dist >= spotLights[i].radius)
+        if (dist >= spotLights[spotLightIndex].radius)
         {
             continue;
         }
@@ -306,11 +308,11 @@ float4 main(VS_OUT pin) : SV_TARGET
         }
 
         // 角度減衰の計算
-        float3 lightDir = normalize(spotLights[i].direction);
+        float3 lightDir = normalize(spotLights[spotLightIndex].direction);
         float cosAngle = dot(-Ls, lightDir);
-        float cosInner = cos(spotLights[i].innerAngle);
-        float cosOuter = cos(spotLights[i].outerAngle);
-        
+        float cosInner = cos(spotLights[spotLightIndex].innerAngle);
+        float cosOuter = cos(spotLights[spotLightIndex].outerAngle);
+
         float spotAttenuation = 1.0f;
         if (cosAngle < cosOuter)
         {
@@ -321,15 +323,16 @@ float4 main(VS_OUT pin) : SV_TARGET
             spotAttenuation = smoothstep(cosOuter, cosInner, cosAngle);
         }
 
-        float distanceAttenuation = pow(max(0.0f, 1.0f - (dist / spotLights[i].radius)), 2.0f);
+        float distanceCutoff = pow(max(0.0f, 1.0f - pow(dist / spotLights[spotLightIndex].radius, 4.0)), 2.0f);
+        float distanceAttenuation = distanceCutoff / (683.0 * (dist * dist + 0.04));
         float totalAttenuation = spotAttenuation * distanceAttenuation;
-        
+
         if (totalAttenuation <= 0.0f)
         {
             continue;
         }
 
-        float3 spotLi = spotLights[i].color * spotLights[i].intensity * totalAttenuation;
+        float3 spotLi = spotLights[spotLightIndex].color * spotLights[spotLightIndex].intensity * totalAttenuation;
         float3 H = normalize(V + Ls);
         float NoH = max(0.0f, dot(N, H));
         float HoV = max(0.0f, dot(H, V));
@@ -340,23 +343,23 @@ float4 main(VS_OUT pin) : SV_TARGET
 
    // エリアライト (LTC - Linearly Transformed Cosines)
 // Area Light
-    for (int i = 0; i < numAreaLights; ++i)
+    for (uint areaLightIndex = 0u; areaLightIndex < numAreaLights; ++areaLightIndex)
     {
-        if (areaLights[i].intensity <= 0)
+        if (areaLights[areaLightIndex].intensity <= 0)
             continue;
 
 
     // 面の向きだけ判定
-        if (dot(N, -normalize(areaLights[i].direction)) <= 0)
+        if (dot(N, -normalize(areaLights[areaLightIndex].direction)) <= 0)
             continue;
 
-        float3 ltcDiffuse = LTC_Diffuse(N, V, position, areaLights[i], c_diff, f0, f90);
+        float3 ltcDiffuse = LTC_Diffuse(N, V, position, areaLights[areaLightIndex], c_diff, f0, f90);
 
-        float3 ltcSpecular = LTC_Specular(N, V, position, areaLights[i], roughness, f0, f90);
+        float3 ltcSpecular = LTC_Specular(N, V, position, areaLights[areaLightIndex], roughness, f0, f90);
 
 
-    // Directional と揃える
-        const float exposure = 5.0;
+        // Area intensity is radiance in cd/m^2; convert to W/(m^2 sr).
+        const float exposure = 1.0 / 683.0;
 
 
         diffuse += ltcDiffuse * exposure;
@@ -365,8 +368,8 @@ float4 main(VS_OUT pin) : SV_TARGET
         specular += ltcSpecular * exposure;
     }
 
-    diffuse += ibl_radiance_lambertian(N, V, roughness, c_diff, f0) * 0.2;
-    specular += ibl_radiance_ggx(N, V, roughness, f0) * 0.2;
+    diffuse += ibl_radiance_lambertian(N, V, roughness, c_diff, f0);
+    specular += ibl_radiance_ggx(N, V, roughness, f0);
 
     diffuse *= occlusion;
     specular *= occlusion;

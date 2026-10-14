@@ -53,7 +53,7 @@ void PointLightManager::draw_imgui()
 	// ライト追加ボタン
 	if (ImGui::Button("Add Point Light"))
 	{
-		add_light({ 0, 5, 0 }, 10.0f, 1.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
+		add_light({ 0, 5, 0 }, 10.0f, 10000.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
 
 	ImGui::Separator();
@@ -67,7 +67,7 @@ void PointLightManager::draw_imgui()
 		ImGui::PushID(index);
 		if (ImGui::CollapsingHeader(label.c_str()))
 		{
-			l.draw_imgui(label.c_str());
+			l.draw_imgui("Parameters");
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(removeButtonLabel.c_str()))
@@ -167,6 +167,7 @@ void PointLightManager::debug_render()
 
 	for (auto& l : _lights)
 	{
+		if (!l.debug_wireframe) continue;
 		if (enable_culling)
 		{
 			DirectX::XMVECTOR pos = DirectX::XMLoadFloat3(&l.position);
@@ -177,7 +178,6 @@ void PointLightManager::debug_render()
 		}
 
 		// 1. スケール行列（半径を球の大きさに）
-		DirectX::XMMATRIX S = DirectX::XMMatrixScaling(0.1f, 0.1f, 0.1f);
 		DirectX::XMMATRIX S_R = DirectX::XMMatrixScaling(l.radius, l.radius, l.radius);
 
 		// 2. 平行移動行列（ライトの位置へ）
@@ -185,14 +185,13 @@ void PointLightManager::debug_render()
 
 
 		// 3. ワールド行列
-		DirectX::XMMATRIX world = S * T;
 		DirectX::XMMATRIX world_R = S_R * T;
 
 
 
 		// 4. XMMATRIX → XMFLOAT4X4 へ変換
 		DirectX::XMFLOAT4X4 worldMatrix;
-		DirectX::XMStoreFloat4x4(&worldMatrix, world);
+		DirectX::XMStoreFloat4x4(&worldMatrix, world_R);
 
 
 		// 5. デバッグ球の描画
@@ -201,12 +200,6 @@ void PointLightManager::debug_render()
 			worldMatrix,
 			{ l.diffuseColor.x, l.diffuseColor.y, l.diffuseColor.z, 1.0f }
 		);
-		//DirectX::XMStoreFloat4x4(&worldMatrix, world_R);
-		//_debug_sphere->Render(
-		//	Graphics_Core::instance().get_device_context(),
-		//	worldMatrix,
-		//	{ l.diffuseColor.x, l.diffuseColor.y, l.diffuseColor.z, 0.3f }
-		//);
 	}
 
 

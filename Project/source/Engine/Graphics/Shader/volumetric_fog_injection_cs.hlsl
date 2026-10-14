@@ -123,7 +123,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // Directional Light
     {
         float3 L_dir = directional_light_direction.xyz;
-        float3 L_col = directional_light_color.rgb * 5.0;
+        float3 L_col = directional_light_color.rgb * (directional_light_color.w / 683.0);
         
         float cos_theta = dot(ray_dir, -L_dir);
         float phase = HGPhase(cos_theta, anisotropy);
@@ -143,14 +143,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
             continue;
 
         float3 L = lv / max(dist, 0.0001);
-        float att = pow(saturate(1.0 - dist / pointLights[p].radius), 2.0);
-        float boost = min(1.0 / (dist + 0.1), 5.0);
+        float cutoff = pow(saturate(1.0 - pow(dist / pointLights[p].radius, 4.0)), 2.0);
+        // Froxels are coarse near local emitters. A 1 m effective source radius avoids a bright voxel popping as the camera moves.
+        float att = cutoff / (683.0 * (dist * dist + 1.0));
         
         float cos_theta = dot(ray_dir, L);
         float phase = HGPhase(cos_theta, anisotropy);
         
         float shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, cur_pos, float3(0, 0, 0), L, p);
-        total_light += pointLights[p].color * pointLights[p].intensity * (att * boost) * phase * shadow;
+        total_light += pointLights[p].color * pointLights[p].intensity * att * phase * shadow;
     }
 
     // Spot Lights
@@ -170,12 +171,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (spot <= 0)
             continue;
 
-        float dist_att = pow(saturate(1.0 - dist / spotLights[s].radius), 2.0);
+        float dist_cutoff = pow(saturate(1.0 - pow(dist / spotLights[s].radius, 4.0)), 2.0);
+        float dist_att = dist_cutoff / (683.0 * (dist * dist + 1.0));
         
         float cos_theta = dot(ray_dir, L);
         float phase = HGPhase(cos_theta, anisotropy);
         
-        total_light += spotLights[s].color * spotLights[s].intensity * (spot * dist_att * 2.0) * phase;
+        total_light += spotLights[s].color * spotLights[s].intensity * spot * dist_att * phase;
     }
 
     // メディア特性の評価

@@ -116,7 +116,7 @@ void GeometryBuffer::Clear(ID3D11DeviceContext* immediate_context)
 	}
 	if (CameraManager::instance().get_active_camera()->get_camera().isReversed_Z) {
 
-		immediate_context->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH, 0, 1.0);
+		immediate_context->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH, 0, 0);
 	}
 	else {
 

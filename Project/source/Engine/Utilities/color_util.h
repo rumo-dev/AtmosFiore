@@ -8,7 +8,7 @@
 #include <cstring>
 #include <d2d1.h>
 #include <stdexcept>
-#include <DirectXMath.h>2522
+#include <DirectXMath.h>
 /**
  * @file color_util.h
  * @brief カラー操作ユーティリティ（RGBA構造体・変換・プリセット・ランダム生成など）

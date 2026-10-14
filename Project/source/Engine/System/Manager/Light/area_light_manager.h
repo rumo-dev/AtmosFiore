@@ -68,7 +68,7 @@ public:
 		dx::XMFLOAT3 right = { 1, 0, 0 },
 		float width = 2.0f,
 		float height = 2.0f,
-		float intensity = 1.0f,
+		float intensity = 3500.0f,
 		dx::XMFLOAT4 diffuseColor = { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	/**

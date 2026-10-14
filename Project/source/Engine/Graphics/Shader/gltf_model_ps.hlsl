@@ -161,7 +161,7 @@ float4 main(VS_OUT pin, bool is_front_face : SV_IsFrontFace) : SV_TARGET
 
 	// Loop for shading process for each light
     float3 L = normalize(-directional_light_direction.xyz);
-    float3 Li = float3(1.0, 1.0, 1.0); // Radiance of the light
+    float3 Li = directional_light_color.rgb * (directional_light_color.w / 683.0);
     const float NoL = max(0.0, dot(N, L));
     const float NoV = max(0.0, dot(N, V));
     if (NoL > 0.0 || NoV > 0.0)

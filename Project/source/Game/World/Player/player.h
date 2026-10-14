@@ -401,7 +401,7 @@ public:
 
 		ImGui::Text("Spotlight:");
 		ImGui::SliderFloat("Light Radius", &light_radius_, 0.5f, 50.0f, "%.1f");
-		ImGui::SliderFloat("Light Intensity", &light_intensity_, 0.0f, 20.0f, "%.1f");
+		ImGui::SliderFloat("Light Intensity (cd)", &light_intensity_, 0.0f, 100000.0f, "%.0f cd");
 		ImGui::SliderFloat("Light Inner Angle", &light_inner_angle_, 0.01f, 1.5f, "%.2f rad");
 		ImGui::SliderFloat("Light Outer Angle", &light_outer_angle_, 0.01f, 1.6f, "%.2f rad");
 		ImGui::ColorEdit3("Light Color", (float*)&light_color_);
@@ -699,7 +699,7 @@ private:
 	// スポットライト
 	int              spotlight_index_ = -1;
 	float            light_radius_ = 20.0f;
-	float            light_intensity_ = 12.0f;
+	float            light_intensity_ = 12000.0f; // spotlight luminous intensity [cd]
 	float            light_inner_angle_ = 0.10f;
 	float            light_outer_angle_ = 0.30f;
 	float            light_height_offset_ = 0.8f;

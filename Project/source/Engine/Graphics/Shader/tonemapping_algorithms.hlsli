@@ -392,9 +392,6 @@ float3 ToneMap_CustomCurve(float3 x)
 
 float3 ApplyToneMapping(float3 color)
 {
-    if (!is_enabled)
-        return color;
-
     color *= exposure;
 
     switch (mapping_type)

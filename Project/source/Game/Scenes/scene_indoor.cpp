@@ -33,7 +33,7 @@ void Scene_Indoor::initialize()
 		float z = Random::Range(-10.0f, 10.0f);
 		float y = Random::Range(3.0f, 7.0f);
 		float r = Random::Range(5.0f, 15.0f);
-		float intensity = Random::Range(5.0f, 15.0f);
+		float intensity = Random::Range(25000.0f, 75000.0f); // cd
 		float innerAngle = Random::Range(0.1f, 0.5f);
 		float outerAngle = Random::Range(0.4f, 0.8f);
 		dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) };
@@ -47,7 +47,7 @@ void Scene_Indoor::initialize()
 		float z = Random::Range(-10.0f, 10.0f);
 		float y = Random::Range(3.0f, 7.0f);
 		float r = 5.0f;
-		float intensity = 10.0f;
+		float intensity = 10000.0f; // cd
 		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f);
 		Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
 	}
@@ -159,7 +159,6 @@ void Scene_Indoor::update(float elapsedTime)
 		}
 	}
 	camera_mgr.update(elapsedTime, viewport_aspect_ratio, viewport_height);
-
 	// -----------------------------------------------------------------
 	// ライト・リソース更新
 	// -----------------------------------------------------------------

@@ -8,7 +8,7 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
 
 	glow_extraction = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT,
-		1,		// mip_levels: ƒ~ƒbƒvƒ}ƒbƒv•s—v
+		1,		// mip_levels: ãƒŸãƒƒãƒ—ãƒãƒƒãƒ—ä¸è¦
 		false	// use_depth
 	);
 
@@ -18,14 +18,14 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 			device,
 			width >> downsampled_index,
 			height >> downsampled_index, DXGI_FORMAT_R16G16B16A16_FLOAT,
-			1,		// mip_levels: ƒ~ƒbƒvƒ}ƒbƒv•s—v
+			1,		// mip_levels: ãƒŸãƒƒãƒ—ãƒãƒƒãƒ—ä¸è¦
 			false	// use_depth
 		);
 		gaussian_blur[downsampled_index][1] = std::make_unique<Framebuffer>(
 			device,
 			width >> downsampled_index,
 			height >> downsampled_index, DXGI_FORMAT_R16G16B16A16_FLOAT,
-			1,		// mip_levels: ƒ~ƒbƒvƒ}ƒbƒv•s—v
+			1,		// mip_levels: ãƒŸãƒƒãƒ—ãƒãƒƒãƒ—ä¸è¦
 			false	// use_depth
 		);
 	}
@@ -33,7 +33,7 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 		device,
 		width,
 		height, DXGI_FORMAT_R16G16B16A16_FLOAT,
-		0,		// mip_levels: 0 = Å¬ƒTƒCƒY(1x1)‚Ü‚Å‚Ìƒtƒ‹ƒ~ƒbƒvƒ`ƒFƒCƒ“‚ğ¶¬
+		0,		// mip_levels: 0 = æœ€å°ã‚µã‚¤ã‚º(1x1)ã¾ã§ã®ãƒ•ãƒ«ãƒŸãƒƒãƒ—ãƒã‚§ã‚¤ãƒ³ã‚’ç”Ÿæˆ
 		false	// use_depth
 	);
 	create_ps_from_cso(device, "glow_extraction_ps.cso", glow_extraction_ps.GetAddressOf());
@@ -163,7 +163,7 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 
 
 	bloom_final->Deactivate(immediate_context);
-	// Å¬ƒTƒCƒY(1x1)‚Ü‚Å‚Ìƒ~ƒbƒvƒ}ƒbƒv‚ğ¶¬
+	// æœ€å°ã‚µã‚¤ã‚º(1x1)ã¾ã§ã®ãƒŸãƒƒãƒ—ãƒãƒƒãƒ—ã‚’ç”Ÿæˆ
 	bloom_final->GenerateMips(immediate_context);
 	// Restore states
 	immediate_context->PSSetConstantBuffers(8, 1, cached_constant_buffer.GetAddressOf());

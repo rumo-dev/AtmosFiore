@@ -21,7 +21,7 @@ public:
 	struct alignas(16) Config
 	{
 		float base_height = 0.0f;     // フォグが最大密度になる Y 座標
-		float falloff = 1.549;     // 高さ方向の密度減衰係数（大きいほど薄くなる）
+		float falloff = 1.549f;    // 高さ方向の密度減衰係数（大きいほど薄くなる）
 		float density_max = 0.8f;     // base_height における最大密度 [0..1]
 		float intensity = 0.022f;     // フォグ輝度乗数
 
