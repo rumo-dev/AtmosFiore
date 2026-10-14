@@ -583,4 +583,9 @@ void Post_Process_Manager::drawToneMappingGUI()
 }
 void Post_Process_Manager::drawDOFGUI() {
 	CheckboxInt("Enable Dof", dofer->is_dof, "Enable bloom effect");
+	static const char* debug_views[] = {
+		"Normal", "FFS Result RGB", "Near CoC", "Far CoC"
+	};
+	ImGui::Combo("DOF Debug View", &dofer->debug_view, debug_views,
+		4);
 }

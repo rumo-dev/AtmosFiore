@@ -40,18 +40,19 @@ void main(uint3 group_id : SV_GroupID)
     if (x >= buf_width)
         return;
 
-    int4 acc = int4(0, 0, 0, 0);
+    int4 first_integral = int4(0, 0, 0, 0);
+    int4 second_integral = int4(0, 0, 0, 0);
 
     for (int y = 0; y < buf_height; ++y)
     {
         int base = (y * buf_width + x) * 4;
-        acc.r += delta_buffer[base + 0];
-        acc.g += delta_buffer[base + 1];
-        acc.b += delta_buffer[base + 2];
-        acc.a += delta_buffer[base + 3];
-        delta_buffer[base + 0] = acc.r;
-        delta_buffer[base + 1] = acc.g;
-        delta_buffer[base + 2] = acc.b;
-        delta_buffer[base + 3] = acc.a;
+        first_integral += int4(
+            delta_buffer[base + 0], delta_buffer[base + 1],
+            delta_buffer[base + 2], delta_buffer[base + 3]);
+        second_integral += first_integral;
+        delta_buffer[base + 0] = second_integral.r;
+        delta_buffer[base + 1] = second_integral.g;
+        delta_buffer[base + 2] = second_integral.b;
+        delta_buffer[base + 3] = second_integral.a;
     }
 }

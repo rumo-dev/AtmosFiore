@@ -22,17 +22,15 @@
  *      │
  *  [Pass 1] coc_generation_ps        → coc_map  (R=NearCoC G=FarCoC)
  *      │
- *  [Pass 2] field_separation_*_ps    → near_field (premult α), far_field
- *      │
- *  [Pass 3a] ffs_scatter_cs          → delta_buffer[near], delta_buffer[far]
- *             各ピクセルが CoC 矩形四隅に Bartlett デルタを InterlockedAdd
+ *  [Pass 2] ffs_scatter_cs          → delta_buffer (all pixels, signed near/far CoC)
+ *             各ピクセルが Bartlett デルタを InterlockedAdd
  *      │
  *  [Pass 3b] ffs_prefix_h_cs         → delta_buffer （水平プレフィックスサム）
  *      │
  *  [Pass 3c] ffs_prefix_v_cs         → delta_buffer （垂直プレフィックスサム）
  *      │
- *  [Pass 3d] ffs_resolve_cs          → blurred_near, blurred_far (float16 tex)
- *             固定小数点 → float 変換 + 正規化
+ *  [Pass 3d] ffs_resolve_cs          → complete blurred image (float16 tex)
+ *             固定小数点 → float 変換 + alpha weight normalization
  *      │
  *  [Pass 4] composite_ps             → dof_final
  *
@@ -103,29 +101,25 @@ public:
 
 	/** @brief DoF 有効フラグ（0 = オフ、オリジナルをそのまま出力） */
 	int  is_dof = 1;
+	int  debug_view = 0; // 0=通常, 1=FFS結果, 2=Near CoC, 3=Far CoC
 
 	/**
 	 * @brief ハーフ解像度処理フラグ
 	 * @note  true にすると内部バッファを 1/2 解像度にして高速化。
-	 *        最終合成（composite_ps）のみフル解像度で実行される。
+	 *        最終コピー（composite_ps）のみフル解像度で実行される。
 	 *        コンストラクタ呼び出し前に設定すること。
 	 */
 	bool half_resolution = true;
 
 private:
-	// ---- ヘルパー ----
-	void CreateDeltaBuffer(ID3D11Device* device);
-
 	// ---- フルスクリーン描画 ----
 	std::unique_ptr<FullscreenQuad> bit_block_transfer;
 
 	// ---- フレームバッファ ----
 	std::unique_ptr<Framebuffer> coc_map;      ///< R=NearCoC, G=FarCoC（フル解像度）
-	std::unique_ptr<Framebuffer> near_field;   ///< premultiplied α（ワーク解像度）
-	std::unique_ptr<Framebuffer> far_field;    ///< A=FarCoC（ワーク解像度）
 
 	/**
-	 * @brief FFS 最終ブラー結果テクスチャ [0]=near, [1]=far
+	 * @brief FFS Resolve が生成する完全な出力画像
 	 *
 	 * RWTexture2D として ffs_resolve_cs が書き込み、
 	 * composite_ps が SRV として読み込む。
@@ -138,24 +132,22 @@ private:
 		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
 		Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> uav;
 	};
-	BlurredBuffer blurred[2]; ///< [0]=near, [1]=far
+	BlurredBuffer blurred;
 
 	/** @brief 最終出力（フル解像度） */
 	std::unique_ptr<Framebuffer> dof_final;
 
-	// ---- デルタバッファ（固定小数点 Scatter 用） [0]=near, [1]=far ----
+	// ---- デルタバッファ（固定小数点 Scatter 用） ----
 	struct DeltaBuffer
 	{
 		Microsoft::WRL::ComPtr<ID3D11Buffer>             buffer;
 		Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> uav;
 		uint32_t element_count = 0; ///< 要素数（RGBA × ピクセル数）
 	};
-	DeltaBuffer delta_buf[2];
+	DeltaBuffer delta_buf;
 
 	// ---- ピクセルシェーダ ----
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> coc_generation_ps;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> field_separation_near_ps;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> field_separation_far_ps;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> composite_ps;
 
 	// ---- コンピュートシェーダ ----
@@ -176,6 +168,10 @@ private:
 		int   is_dof;
 		float inv_buffer_width;
 		float inv_buffer_height;
+		int   debug_view;
+		float inv_full_width;
+		float inv_full_height;
+		float work_scale;
 		float padding;
 	};
 	static_assert(sizeof(dof_local_constants) % 16 == 0,
@@ -193,8 +189,8 @@ private:
 		int   padding_y;         ///< MAX_RADIUS + 1
 		int   work_width_cb;     ///< ワーク解像度幅
 		int   work_height_cb;    ///< ワーク解像度高さ
-		float ffs_pad0;
-		float ffs_pad1;
+		float max_radius_work;   ///< ワーク解像度での最大 CoC 半径
+		float fixed_scale;       ///< Scatter/Resolve 共通の固定小数点スケール
 	};
 	static_assert(sizeof(ffs_constants) % 16 == 0,
 		"ffs_constants must be 16-byte aligned");

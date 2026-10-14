@@ -32,15 +32,6 @@
 // =============================================================
 #include "dof_common.hlsli"
 
-// b9: DoF ローカル定数
-cbuffer dof_local_constants : register(b9)
-{
-    int is_dof;
-    float inv_buffer_width;
-    float inv_buffer_height;
-    float local_padding;
-};
-
 Texture2D source_tex : register(t0);
 
 float4 main(VS_OUT pin) : SV_TARGET
