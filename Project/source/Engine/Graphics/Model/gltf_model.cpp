@@ -1,5 +1,6 @@
 #include "gltf_model.h"
 
+#include <cstring>
 #include <stack>
 #include "Engine/Utilities/misc.h"
 #include "Engine/System/graphics_core.h"
@@ -116,7 +117,8 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
 	buffer_desc.ByteWidth = sizeof(primitive_joint_constants);
-	buffer_desc.Usage = D3D11_USAGE_DEFAULT;
+	buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
+	buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	hr = device->CreateBuffer(&buffer_desc, NULL, primitive_joint_cbuffer.ReleaseAndGetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
@@ -685,6 +687,21 @@ void Gltf_Model::render_node(
 
 	if (node.skin > -1)
 	{
+		const skin& current_skin = skins.at(node.skin);
+		auto upload_joint_constants = [&](const primitive_joint_constants& data)
+		{
+			D3D11_MAPPED_SUBRESOURCE mapped{};
+			const HRESULT hr = immediate_context->Map(primitive_joint_cbuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+			_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+			if (FAILED(hr)) return false;
+
+			const size_t bytes = current_skin.joints.size() * sizeof(data.matrices[0]);
+			std::memcpy(mapped.pData, data.matrices, bytes);
+			immediate_context->Unmap(primitive_joint_cbuffer.Get(), 0);
+			immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+			return true;
+		};
+
 		const primitive_joint_constants* cached_data = nullptr;
 		if (precomputed_joint_matrices)
 		{
@@ -697,24 +714,21 @@ void Gltf_Model::render_node(
 
 		if (cached_data)
 		{
-			immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, cached_data, 0, 0);
-			immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+			if (!upload_joint_constants(*cached_data)) return;
 		}
 		else
 		{
-			const skin& skin{ skins.at(node.skin) };
 			primitive_joint_constants primitive_joint_data{};
 			const XMMATRIX node_global_inverse{ XMMatrixInverse(NULL, XMLoadFloat4x4(&node.global_transform)) };
-			for (size_t joint_index = 0; joint_index < skin.joints.size(); ++joint_index)
+			for (size_t joint_index = 0; joint_index < current_skin.joints.size(); ++joint_index)
 			{
 				XMStoreFloat4x4(&primitive_joint_data.matrices[joint_index],
-					XMLoadFloat4x4(&skin.inverse_bind_matrices.at(joint_index)) *
-					XMLoadFloat4x4(&current_nodes.at(skin.joints.at(joint_index)).global_transform) *
+					XMLoadFloat4x4(&current_skin.inverse_bind_matrices.at(joint_index)) *
+					XMLoadFloat4x4(&current_nodes.at(current_skin.joints.at(joint_index)).global_transform) *
 					node_global_inverse
 				);
 			}
-			immediate_context->UpdateSubresource(primitive_joint_cbuffer.Get(), 0, 0, &primitive_joint_data, 0, 0);
-			immediate_context->VSSetConstantBuffers(3, 1, primitive_joint_cbuffer.GetAddressOf());
+			if (!upload_joint_constants(primitive_joint_data)) return;
 		}
 	}
 
