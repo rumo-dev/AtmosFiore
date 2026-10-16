@@ -11,6 +11,10 @@
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
 Framebuffer                  Post_Process_Manager::adaptation_input;
+std::unique_ptr<DLSSManager> Post_Process_Manager::dlss = nullptr;
+bool Post_Process_Manager::dlss_applied_this_frame = false;
+UINT Post_Process_Manager::render_width = 0;
+UINT Post_Process_Manager::render_height = 0;
 ID3D11ShaderResourceView*    Post_Process_Manager::final_color_map = nullptr;
 std::array<Post_Process_Manager::EffectId, 13> Post_Process_Manager::effect_order = {
 	EffectId::Sky, EffectId::VolumetricFog, EffectId::HeightFog, EffectId::DistanceFog,
@@ -43,7 +47,11 @@ void Post_Process_Manager::initialize()
 	auto  w = static_cast<uint32_t>(Graphics_Core::instance().get_screen_width());
 	auto  h = static_cast<uint32_t>(Graphics_Core::instance().get_screen_height());
 
-	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, false, false);
+	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	render_width = w;
+	render_height = h;
+	dlss = std::make_unique<DLSSManager>();
+	dlss->Initialize(device, Graphics_Core::instance().get_device_context(), w, h);
 	adaptation_input = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, false, false);
 	effect_enabled.fill(true);
 
@@ -67,6 +75,19 @@ void Post_Process_Manager::initialize()
 
 	// 保存済みのパイプライン設定があれば、エフェクト生成後に起動設定として適用する。
 	Post_Process_Manager{}.loadPipelineSettings();
+}
+
+void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
+{
+	if (width == 0 || height == 0 || (width == render_width && height == render_height)) return;
+	auto* device = Graphics_Core::instance().get_device();
+	if (!device) return;
+
+	// Reduce geometry, deferred-lighting, and forward-transparent pixel work.
+	fsquad = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	render_width = width;
+	render_height = height;
+	Graphics_Core::instance().resize_geometry_buffer(width, height);
 }
 
 // ─── 更新 ─────────────────────────────────────────────────────────
@@ -129,6 +150,7 @@ void Post_Process_Manager::end()
 void Post_Process_Manager::draw()
 {
 	auto* ctx = Graphics_Core::instance().get_device_context();
+	dlss_applied_this_frame = false;
 	ID3D11ShaderResourceView* current = fsquad.GetColorMap();
 	final_color_map = current;
 	for (size_t i = 0; i < effect_order.size(); ++i) {
@@ -156,20 +178,40 @@ void Post_Process_Manager::draw()
 		case EffectId::ChromaticAberration: ca_effect->make(ctx, current); current = ca_effect->GetColorMap(); break;
 		case EffectId::LensDistortion: lens_distortion->make(ctx, current); current = lens_distortion->GetColorMap(); break;
 		case EffectId::Vignetting: vignetting->make(ctx, current); current = vignetting->GetColorMap(); break;
-		case EffectId::ToneMapping: tone_mapper->make(ctx, current); current = tone_mapper->get_color_map(); break;
+		case EffectId::ToneMapping:
+			if (dlss && dlss->IsEnabled() && dlss->Process(ctx, current,
+				Graphics_Core::instance().get_geometry_buffer()->GetDepth(),
+				Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors())) {
+				current = dlss->GetOutput();
+				dlss_applied_this_frame = true;
+			}
+			tone_mapper->make(ctx, current);
+			current = tone_mapper->get_color_map();
+			break;
 		case EffectId::Adaptation: break;
 		}
 		final_color_map = current;
 	}
+	// Keep DLSS available when Tone Mapping is disabled or removed from the
+	// configurable post-process order. In the normal path it runs before tone mapping.
+	if (!dlss_applied_this_frame && dlss && dlss->IsEnabled() && dlss->Process(ctx, current,
+		Graphics_Core::instance().get_geometry_buffer()->GetDepth(),
+		Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors())) {
+		current = dlss->GetOutput();
+		dlss_applied_this_frame = true;
+	}
+	final_color_map = current;
 }
 
 // ─── 最終描画 ─────────────────────────────────────────────────────
 void Post_Process_Manager::render()
 {
+	auto* context = Graphics_Core::instance().get_device_context();
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Final");
+		Render_State::instance().set_blend_state(context, Blend_State::Opaque);
 		Graphics_Core::instance().get_fullscreen_quad()->Blit(
-			Graphics_Core::instance().get_device_context(),
+			context,
 			&final_color_map, 0, 1
 		);
 	}

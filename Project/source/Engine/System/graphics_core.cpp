@@ -54,6 +54,12 @@ void Graphics_Core::set_render_targets() {
 	//_immediate_context.Get()->OMSetRenderTargets(1, _render_target_view.GetAddressOf(), _depth_stencil_view.Get());
 	//log_printf("レンダーターゲットの設定終了\n", LogLevel::Info);
 }
+
+void Graphics_Core::resize_geometry_buffer(UINT width, UINT height) {
+	if (!_device || width == 0 || height == 0) return;
+	_g_buffer = std::make_unique<GeometryBuffer>(_device.Get(), width, height);
+}
+
 void Graphics_Core::present(UINT sync_interval) {
 	TRACY_CPU_ZONE_C("Presents", TracyCategory::System);
 	TRACY_GPU_ZONE_C("Presents", TracyCategory::System);
@@ -273,7 +279,13 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	//dx::XMMATRIX V = camera.view;
 	//dx::XMMATRIX P = camera.projection;
 	XMStoreFloat4(&data.camera_position, camera.position);
-	dx::XMStoreFloat4x4(&data.view_projection, camera.view * camera.projection);
+	const DirectX::XMMATRIX current_view_projection = camera.view * camera.projection;
+	dx::XMStoreFloat4x4(&data.view_projection, current_view_projection);
+	data.previous_view_projection = _has_previous_view_projection
+		? _previous_view_projection
+		: data.view_projection;
+	dx::XMStoreFloat4x4(&_previous_view_projection, current_view_projection);
+	_has_previous_view_projection = true;
 	dx::XMStoreFloat4x4(&data.inv_view_projection, camera.inv_view * camera.inv_projection);
 	dx::XMStoreFloat4x4(&data.view, camera.view);
 	dx::XMStoreFloat4x4(&data.projection, camera.projection);

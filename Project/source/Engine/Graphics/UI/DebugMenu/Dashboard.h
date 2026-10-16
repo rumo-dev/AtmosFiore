@@ -78,4 +78,5 @@ private:
 	bool some_bool = false;
 	float some_float = 0.0f;
 	Resource_Monitor _monitor;
+	void RenderDLSSSettings();
 };

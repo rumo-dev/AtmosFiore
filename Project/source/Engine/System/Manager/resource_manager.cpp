@@ -69,6 +69,14 @@ void Resource_Manager::load_shaders() {
 		"DEFERRED_LIGHTING_PS",
 		"deferred_lighting_ps"
 	);
+	shader_manager.load<Pixel_Shader>(
+		"DLSS_DEPTH_COPY_PS",
+		"dlss_depth_copy_ps"
+	);
+	shader_manager.load<Pixel_Shader>(
+		"DLSS_MOTION_COPY_PS",
+		"dlss_motion_copy_ps"
+	);
 	//ssao
 	shader_manager.load<Pixel_Shader>(
 		"SSAO_PS",

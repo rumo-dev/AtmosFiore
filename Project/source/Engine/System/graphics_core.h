@@ -79,6 +79,8 @@ private:
 	std::unique_ptr<GeometryBuffer> _g_buffer;
 	//ComPtr<ID3D11DepthStencilView> _depth_stencil_view;
 	D3D11_VIEWPORT _viewport = {};
+	DirectX::XMFLOAT4X4 _previous_view_projection{};
+	bool _has_previous_view_projection = false;
 
 	std::unique_ptr<Render_State>					_render_state;
 	ComPtr<ID3D11Buffer> _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Num)];
@@ -159,6 +161,7 @@ public:
 	// レンダーステート取得
 	Render_State* get_render_state() { return _render_state.get(); }
 	GeometryBuffer* get_geometry_buffer() { return _g_buffer.get(); }
+	void resize_geometry_buffer(UINT width, UINT height);
 
 	void get_viewport(D3D11_VIEWPORT& out_viewport) const
 	{

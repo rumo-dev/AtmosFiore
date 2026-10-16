@@ -123,6 +123,18 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <!-- NVIDIA DLSS SDK (NGX) is used by the x64 renderer. -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)extentions\NVIDIA-DLSS\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ATMOSFIORE_HAS_NGX_SDK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(ProjectDir)extentions\NVIDIA-DLSS\lib\Windows_x86_64\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies Condition="'$(Configuration)'=='Release'">nvsdk_ngx_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(Configuration)'!='Release'">nvsdk_ngx_d_dbg.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">
     <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
   </PropertyGroup>
@@ -394,6 +406,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\Shadow\shadow_map.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\CustomWidgets.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Dashboard.h" />
+    <ClInclude Include="source\Engine\Graphics\DLSS\dlss_manager.h" />
     <ClInclude Include="source\Engine\Graphics\UI\DebugMenu\Icons.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\AudioGraphEditor.h" />
     <ClInclude Include="source\Engine\Graphics\UI\ImGui\imnodes.h" />
@@ -551,6 +564,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Engine\Graphics\Shader\shader.cpp" />
     <ClCompile Include="source\Engine\Graphics\Texture\texture.cpp" />
     <ClCompile Include="source\Engine\Graphics\FrameBuffer\frame_buffer.cpp" />
+    <ClCompile Include="source\Engine\Graphics\DLSS\dlss_manager.cpp" />
     <ClCompile Include="source\Engine\Graphics\FullscreenQuad\fullscreen_quad.cpp" />
     <ClCompile Include="source\Engine\System\Manager\Light\area_light_manager.cpp" />
     <ClCompile Include="source\Engine\System\Manager\Light\point_light_manager.cpp" />
@@ -624,6 +638,14 @@ if exist export rmdir /s /q export</Command>
     <None Include="source\Engine\Graphics\Shader\tonemapping_algorithms.hlsli" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="source\Engine\Graphics\Shader\dlss_depth_copy_ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\dlss_motion_copy_ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\adaptation_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
@@ -1044,4 +1066,7 @@ if exist export rmdir /s /q export</Command>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyDLSSRuntime" AfterTargets="Build" Condition="'$(Platform)'=='x64'">
+    <Copy SourceFiles="$(ProjectDir)extentions\NVIDIA-DLSS\lib\Windows_x86_64\rel\nvngx_dlss.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)extentions\NVIDIA-DLSS\lib\Windows_x86_64\rel\nvngx_dlss.dll')" />
+  </Target>
 </Project>

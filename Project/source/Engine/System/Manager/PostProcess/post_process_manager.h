@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include "Engine/Graphics/FrameBuffer/frame_buffer.h"
+#include "Engine/Graphics/DLSS/dlss_manager.h"
 #include "Engine/Graphics/Shader/shader.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 
@@ -57,6 +58,7 @@ public:
 	static void end();
 	static void draw();
 	static void render();
+	static void SetDLSSRenderResolution(UINT width, UINT height);
 	static void renderGUI();
 	void drawPipelineGUI();
 	bool savePipelineSettings() const;
@@ -74,6 +76,7 @@ public:
 	ChromaticAberration& GetChromaticAberration() { return *ca_effect; }
 	LensDistortion& GetLensDistortion() { return *lens_distortion; }
 	Vignetting& GetVignetting() { return *vignetting; }
+	DLSSManager& GetDLSS() { return *dlss; }
 
 	// ★ 新フォグアクセサ
 	VolumetricFog& GetVolumetricFog() { return *vol_fog; }
@@ -98,6 +101,10 @@ private:
 	static Framebuffer adaptation_input;
 	static ID3D11ShaderResourceView* final_color_map;
 	static Framebuffer fsquad;
+	static std::unique_ptr<DLSSManager> dlss;
+	static bool dlss_applied_this_frame;
+	static UINT render_width;
+	static UINT render_height;
 
 	// ── 既存エフェクト ────────────────────────────────────────────
 	static std::unique_ptr<bloom>               bloomer;

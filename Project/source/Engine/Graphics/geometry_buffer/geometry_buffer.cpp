@@ -100,6 +100,25 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 	// ★ 深度SRV
 	DX_SET_NAME(m_depthStencilShaderResourceView, L"GBuffer_DepthBuffer_SRV");
 
+	// DLSS motion vectors are stored separately from the material G-buffer so
+	// the deferred-lighting shader's existing texture register layout remains stable.
+	texture2d_desc = {};
+	texture2d_desc.Width = width;
+	texture2d_desc.Height = height;
+	texture2d_desc.MipLevels = 1;
+	texture2d_desc.ArraySize = 1;
+	texture2d_desc.Format = DXGI_FORMAT_R16G16_FLOAT;
+	texture2d_desc.SampleDesc.Count = 1;
+	texture2d_desc.Usage = D3D11_USAGE_DEFAULT;
+	texture2d_desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	hr = device->CreateTexture2D(&texture2d_desc, nullptr, &m_motionVectorBuffer);
+	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	hr = device->CreateRenderTargetView(m_motionVectorBuffer, nullptr, &m_motionVectorView);
+	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	hr = device->CreateShaderResourceView(m_motionVectorBuffer, nullptr, &m_motionVectorShaderResourceView);
+	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	DX_SET_NAME(m_motionVectorBuffer, L"GBuffer_MotionVectors_Tex");
+
 	m_viewport.Width = static_cast<float>(width);
 	m_viewport.Height = static_cast<float>(height);
 	m_viewport.MinDepth = 0.0f;
@@ -114,6 +133,8 @@ void GeometryBuffer::Clear(ID3D11DeviceContext* immediate_context)
 	{
 		immediate_context->ClearRenderTargetView(m_renderTargetViews[render_target_index], color);
 	}
+	const float zero_motion[4] = {};
+	immediate_context->ClearRenderTargetView(m_motionVectorView, zero_motion);
 	if (CameraManager::instance().get_active_camera()->get_camera().isReversed_Z) {
 
 		immediate_context->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH, 0, 0);
@@ -128,17 +149,20 @@ void GeometryBuffer::Activate(ID3D11DeviceContext* immediate_context)
 {
 	m_cachedViewportCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
 	immediate_context->RSGetViewports(&m_cachedViewportCount, m_cachedViewports);
-	immediate_context->OMGetRenderTargets(GBUFFER_COUNT, m_cachedRenderTargetViews, &m_cachedDepthStencilView);
+		immediate_context->OMGetRenderTargets(GBUFFER_TARGET_COUNT, m_cachedRenderTargetViews, &m_cachedDepthStencilView);
 
 	immediate_context->RSSetViewports(1, &m_viewport);
 
-	immediate_context->OMSetRenderTargets(GBUFFER_COUNT, m_renderTargetViews, m_depthStencilView);
+	ID3D11RenderTargetView* render_targets[GBUFFER_TARGET_COUNT] = {
+		m_renderTargetViews[0], m_renderTargetViews[1], m_renderTargetViews[2], m_renderTargetViews[3], m_motionVectorView
+	};
+	immediate_context->OMSetRenderTargets(GBUFFER_TARGET_COUNT, render_targets, m_depthStencilView);
 }
 void GeometryBuffer::Deactivate(ID3D11DeviceContext* immediate_context)
 {
 	immediate_context->RSSetViewports(m_cachedViewportCount, m_cachedViewports);
-	immediate_context->OMSetRenderTargets(1, m_cachedRenderTargetViews, m_cachedDepthStencilView);
-	for (size_t render_target_index = 0; render_target_index < GBUFFER_COUNT; ++render_target_index)
+		immediate_context->OMSetRenderTargets(GBUFFER_TARGET_COUNT, m_cachedRenderTargetViews, m_cachedDepthStencilView);
+	for (size_t render_target_index = 0; render_target_index < GBUFFER_TARGET_COUNT; ++render_target_index)
 	{
 		if (m_cachedRenderTargetViews[render_target_index])
 		{

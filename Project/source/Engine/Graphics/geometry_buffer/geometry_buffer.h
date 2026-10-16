@@ -5,6 +5,7 @@
 
 /// Gバッファのレンダーターゲット数（位置・法線・アルベド・マテリアルなど）
 #define GBUFFER_COUNT  4
+#define GBUFFER_TARGET_COUNT (GBUFFER_COUNT + 1)
 
 /**
  * @brief ジオメトリバッファ（G-buffer）
@@ -58,6 +59,9 @@ public:
 			if (m_renderTargetViews[render_target_index]) m_renderTargetViews[render_target_index]->Release();
 			if (m_renderTargetShaderResourceViews[render_target_index]) m_renderTargetShaderResourceViews[render_target_index]->Release();
 		}
+		if (m_motionVectorBuffer) m_motionVectorBuffer->Release();
+		if (m_motionVectorView) m_motionVectorView->Release();
+		if (m_motionVectorShaderResourceView) m_motionVectorShaderResourceView->Release();
 		if (m_depthStencilBuffer) m_depthStencilBuffer->Release();
 		if (m_depthStencilView) m_depthStencilView->Release();
 		if (m_depthStencilShaderResourceView) m_depthStencilShaderResourceView->Release();
@@ -116,6 +120,7 @@ public:
 	ID3D11DepthStencilView* GetDepthStencilView() const { return m_depthStencilView; }
 
 	ID3D11ShaderResourceView* GetDepth() const { return m_depthStencilShaderResourceView; }
+	ID3D11ShaderResourceView* GetMotionVectors() const { return m_motionVectorShaderResourceView; }
 private:
 	/// キャッシュするビューポート数
 	UINT m_cachedViewportCount = { D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE };
@@ -124,7 +129,7 @@ private:
 	D3D11_VIEWPORT m_cachedViewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE];
 
 	/// キャッシュされたRTV
-	ID3D11RenderTargetView* m_cachedRenderTargetViews[GBUFFER_COUNT];
+	ID3D11RenderTargetView* m_cachedRenderTargetViews[GBUFFER_TARGET_COUNT];
 
 	/// キャッシュされたDSV
 	ID3D11DepthStencilView* m_cachedDepthStencilView;
@@ -137,6 +142,9 @@ private:
 
 	/// シェーダーリソースビュー（ライティング用）
 	ID3D11ShaderResourceView* m_renderTargetShaderResourceViews[GBUFFER_COUNT] = {};
+	ID3D11Texture2D* m_motionVectorBuffer = {};
+	ID3D11RenderTargetView* m_motionVectorView = {};
+	ID3D11ShaderResourceView* m_motionVectorShaderResourceView = {};
 
 	/// 深度バッファ
 	ID3D11Texture2D* m_depthStencilBuffer = {};

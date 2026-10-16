@@ -17,6 +17,7 @@ cbuffer CAMERA_CONSTANT_BUFFER : register(b1)
 {
     float4 camera_position;
     row_major float4x4 view_projection; //ビュー・プロジェクション変換行列;
+    row_major float4x4 previous_view_projection; // 前フレームのビュー・プロジェクション変換行列;
     row_major float4x4 inv_view_projection; //ビュー・プロジェクション変換行列;
     row_major float4x4 view; //ビュー変換行列;
     row_major float4x4 projection; //プロジェクション変換行列;

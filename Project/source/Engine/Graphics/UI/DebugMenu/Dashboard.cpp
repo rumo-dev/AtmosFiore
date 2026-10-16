@@ -251,6 +251,10 @@ void Dashboard::InitializeUI() {
 
 	} });
 
+	dash.RegisterModule({ "DLSS", {
+		{"Settings", "DLSS availability and Super Resolution settings", [&](SharedMetricsData&) { RenderDLSSSettings(); }},
+	} });
+
 	dash.RegisterModule({ "Light", {
 		{"Point", "Manage point lights", [](SharedMetricsData& d) { Graphics_Core::instance().get_point_light_manager().draw_imgui(); }},
 		{"Spot",  "Manage spot lights", [](SharedMetricsData& d) { Graphics_Core::instance().get_spot_light_manager().draw_imgui(); }},
@@ -271,6 +275,34 @@ void Dashboard::InitializeUI() {
 		{"Setting", "Test custom UI widgets", [](SharedMetricsData& d) { CustomUI::DrawCustomUIWidgetsTestWindow(); }},
 		{"View",    "Test UI Camera view", [](SharedMetricsData& d) { CameraManager::instance().draw_imgui(); }},
 	} });
+}
+
+void Dashboard::RenderDLSSSettings() {
+	auto& dlss = Graphics_Core::instance().post_procss.GetDLSS();
+	const bool available = dlss.IsAvailable();
+	ImGui::Text("NVIDIA DLSS Super Resolution");
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (available) {
+		ImGui::TextColored(ImVec4(0.35f, 0.85f, 0.45f, 1.0f), "利用可能");
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.35f, 1.0f), "利用不可");
+		ImGui::TextWrapped("%s", dlss.GetUnavailableReason().c_str());
+	}
+
+	ImGui::Spacing();
+	ImGui::BeginDisabled(!available);
+	bool enabled = dlss.IsEnabled();
+	if (ImGui::Checkbox("DLSSを有効化", &enabled)) dlss.SetEnabled(enabled);
+	static const char* modes[] = { "Ultra Performance", "Performance", "Balanced", "Quality", "DLAA" };
+	int mode = static_cast<int>(dlss.GetMode());
+	if (ImGui::Combo("モード", &mode, modes, IM_ARRAYSIZE(modes))) {
+		dlss.SetMode(static_cast<DLSSManager::Mode>(mode));
+	}
+	ImGui::TextDisabled("入力解像度はNGX推奨値に自動設定されます。");
+	ImGui::EndDisabled();
 }
 
 void Dashboard::SetupStyle() {

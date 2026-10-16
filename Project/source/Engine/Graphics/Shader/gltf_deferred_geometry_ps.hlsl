@@ -105,6 +105,7 @@ struct PS_OUT_GBUFFER
     float4 gbuffer1 : SV_TARGET1; // Albedo + Metalness
     float4 gbuffer2 : SV_TARGET2; // World Position + AO
     float4 gbuffer3 : SV_TARGET3; // Emissive + Subsurface/Clearcoat
+    float2 motionVectors : SV_TARGET4; // Previous-frame UV minus current-frame UV (camera motion)
 };
 
 #if 0
@@ -205,6 +206,15 @@ PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
 
     pout.gbuffer3.rgb = emissive_factor;
     pout.gbuffer3.w = 0;
+
+    // The current world position is reprojected through the previous camera
+    // matrix. This captures camera motion; moving/skinned-object motion is
+    // added by the model animation path separately.
+    const float4 currentClip = mul(pin.w_position, view_projection);
+    const float4 previousClip = mul(pin.w_position, previous_view_projection);
+    const float2 currentNdc = currentClip.xy / max(abs(currentClip.w), 1e-6) * sign(currentClip.w);
+    const float2 previousNdc = previousClip.xy / max(abs(previousClip.w), 1e-6) * sign(previousClip.w);
+    pout.motionVectors = float2(previousNdc.x - currentNdc.x, currentNdc.y - previousNdc.y) * 0.5;
 
     return pout;
 }

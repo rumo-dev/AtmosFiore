@@ -2,7 +2,7 @@
 #include "Engine/Utilities/misc.h"
 #include "Engine/Utilities/render_marker_util.h"
 
-Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format/*format of render target*/, int mip_levels, bool use_depth, bool use_stencil)
+Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, DXGI_FORMAT format/*format of render target*/, int mip_levels, bool use_depth, bool use_stencil, bool use_unordered_access)
 {
 
 	HRESULT hr{ S_OK };
@@ -22,6 +22,7 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	texture2d_desc.SampleDesc.Quality = 0;
 	texture2d_desc.Usage = D3D11_USAGE_DEFAULT;
 	texture2d_desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	if (use_unordered_access) texture2d_desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
 	texture2d_desc.CPUAccessFlags = 0;
 	// ミップマップ自動生成には D3D11_RESOURCE_MISC_GENERATE_MIPS に加え、
 	// レンダーターゲット兼シェーダーリソースとしてのバインドが必要（上記 BindFlags で満たしている）。
@@ -42,6 +43,14 @@ Framebuffer::Framebuffer(ID3D11Device* device, uint32_t width, uint32_t height, 
 	shader_resource_view_desc.Texture2D.MipLevels = m_mipmapEnabled ? static_cast<UINT>(-1) : 1;
 	hr = device->CreateShaderResourceView(render_target_buffer.Get(), &shader_resource_view_desc, m_colorMap.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	if (use_unordered_access)
+	{
+		D3D11_UNORDERED_ACCESS_VIEW_DESC unordered_access_view_desc{};
+		unordered_access_view_desc.Format = format;
+		unordered_access_view_desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+		hr = device->CreateUnorderedAccessView(render_target_buffer.Get(), &unordered_access_view_desc, m_unorderedAccessView.GetAddressOf());
+		_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	}
 	// 深度ステンシルバッファの作成
 	if (use_depth)
 	{

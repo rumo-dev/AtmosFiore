@@ -7,6 +7,12 @@
   </ProjectOutputs>
   <ContentFiles>
     <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\dlss_depth_copy_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\dlss_motion_copy_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\adaptation_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>

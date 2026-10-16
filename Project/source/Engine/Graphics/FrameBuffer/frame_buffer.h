@@ -32,7 +32,8 @@ public:
 		DXGI_FORMAT format,
 		int mip_levels = 1,
 		bool use_depth = false,
-		bool use_stencil = false);
+		bool use_stencil = false,
+		bool use_unordered_access = false);
 
 	Framebuffer() = default;
 	virtual ~Framebuffer() = default;
@@ -93,6 +94,7 @@ public:
 	 * @note DXGIフォーマットに応じてシェーダーから参照可能（例: UNORM → float）
 	 */
 	ID3D11ShaderResourceView* GetColorMap() { return m_colorMap.Get(); }
+	ID3D11UnorderedAccessView* GetUnorderedAccessView() { return m_unorderedAccessView.Get(); }
 
 	/**
 	 * @brief カラーバッファSRVのアドレスを取得
@@ -152,6 +154,7 @@ private:
 
 	/// レンダーターゲットビュー（RTV）
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTargetView;
+	Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_unorderedAccessView;
 
 	/// 深度ステンシルビュー（DSV）
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthStencilView;

@@ -262,6 +262,7 @@ struct alignas(16) Camera_Constants
 	DirectX::XMFLOAT4 camera_position;              //カメラのワールド空間位置;
 
 	DirectX::XMFLOAT4X4 view_projection;         //ビュー・プロジェクション変換行列;
+	DirectX::XMFLOAT4X4 previous_view_projection; // 前フレームのビュー・プロジェクション行列;
 
 	DirectX::XMFLOAT4X4 inv_view_projection;         //ビュー・プロジェクション変換行列;
 
