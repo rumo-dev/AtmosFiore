@@ -279,7 +279,10 @@ float4 main(VS_OUT pin) : SV_TARGET
         float3 H = normalize(V + Lp);
         float NoH = max(0.0f, dot(N, H));
         float HoV = max(0.0f, dot(H, V));
-        float point_shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, position, N, Lp, int(pointLightIndex));
+        float point_shadow = SamplePointLightShadow(
+            point_shadow_front_map, point_shadow_back_map, position, N, Lp,
+            pointLights[pointLightIndex].position, pointLights[pointLightIndex].radius,
+            pointLights[pointLightIndex].shadow_tile);
 
         diffuse += pointLi * point_shadow * pointNoL * brdf_lambertian(f0, f90, c_diff, HoV);
         specular += pointLi * point_shadow * pointNoL * brdf_specular_ggx(f0, f90, alpha_roughness, HoV, pointNoL, NoV, NoH);

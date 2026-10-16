@@ -4,7 +4,8 @@
 struct POINT_SHADOW_VS_OUT
 {
     float4 position : SV_POSITION;
-    float light_z : TEXCOORD0;
+    float3 world_position : TEXCOORD0;
+    float clip_distance : SV_ClipDistance0;
 };
 
 POINT_SHADOW_VS_OUT main(VS_IN vin)
@@ -25,11 +26,16 @@ POINT_SHADOW_VS_OUT main(VS_IN vin)
     float3 direction = light_vector / max(distance_from_light, 0.0001f);
 
     POINT_SHADOW_VS_OUT vout;
-    vout.light_z = direction.z * point_shadow_params.z;
+    vout.world_position = world_position;
 
-    direction.z *= point_shadow_params.z;
-    float2 projected = direction.xy / (direction.z + 1.0f);
-
-    vout.position = float4(projected, PointShadowDepth(distance_from_light), 1.0f);
+    const float seam_overlap = 0.02f;
+    float hemisphere_z = direction.z * point_shadow_params.z;
+    float projection_w = max(1.0f + hemisphere_z, 0.0001f);
+    float projection_scale = rcp(1.0f + seam_overlap);
+    float depth = PointShadowDepth(distance_from_light, point_shadow_params.y);
+    vout.clip_distance = hemisphere_z + seam_overlap;
+    // Use the paraboloid denominator as clip-space w. This preserves perspective-
+    // correct world-position interpolation and clips the opposite pole before rasterization.
+    vout.position = float4(direction.xy * projection_scale, depth * projection_w, projection_w);
     return vout;
 }

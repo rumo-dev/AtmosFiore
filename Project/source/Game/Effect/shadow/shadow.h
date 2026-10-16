@@ -136,7 +136,7 @@ public:
 	 * @note
 	 * この後にシーンを描画することでシャドウマップが生成される
 	 */
-	void make_shadow_begin(PointShadowFace face = PointShadowFace::Front);
+	void make_shadow_begin(PointShadowFace face, int light_index, bool clear_atlas);
 	void make_directional_shadow_begin();
 
 	/**

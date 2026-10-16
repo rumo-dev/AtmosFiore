@@ -5,6 +5,9 @@ struct PointLight_GPU
 
     float3 color;
     float intensity;
+
+    int shadow_tile;
+    uint3 padding;
 };
 
 StructuredBuffer<PointLight_GPU> pointLights : register(t8);

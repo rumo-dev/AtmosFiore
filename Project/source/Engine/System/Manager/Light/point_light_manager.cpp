@@ -23,6 +23,8 @@ void PointLightManager::add_light(dx::XMFLOAT3 position, float radius, float int
 	light.radius = radius;
 	light.intensity = intensity;
 	light.diffuseColor = diffuseColor;
+	// Keep the original first-light shadow behavior; additional lights opt in individually.
+	light.cast_shadows = _lights.empty();
 	_lights.push_back(light);
 }
 
@@ -48,6 +50,14 @@ void PointLightManager::update()
 void PointLightManager::draw_imgui()
 {
 	ImGui::Text("Point Lights: %d / %d (Visible / Total)", _visible_count, static_cast<int>(_lights.size()));
+	int shadowCount = 0;
+	for (const auto& light : _lights)
+		shadowCount += light.cast_shadows ? 1 : 0;
+	ImGui::Text("Shadow atlas: %d / %u lights (4x4, 512px per light)",
+		shadowCount < static_cast<int>(POINT_LIGHT_SHADOW_ATLAS_CAPACITY) ? shadowCount : static_cast<int>(POINT_LIGHT_SHADOW_ATLAS_CAPACITY),
+		POINT_LIGHT_SHADOW_ATLAS_CAPACITY);
+	if (shadowCount > static_cast<int>(POINT_LIGHT_SHADOW_ATLAS_CAPACITY))
+		ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Atlas full: later shadow-enabled lights are skipped.");
 	ImGui::Separator();
 
 	// ライト追加ボタン
@@ -83,6 +93,14 @@ void PointLightManager::draw_imgui()
 
 void PointLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 {
+	int nextShadowTile = 0;
+	for (auto& light : _lights)
+	{
+		light.shadow_tile = light.cast_shadows && nextShadowTile < static_cast<int>(POINT_LIGHT_SHADOW_ATLAS_CAPACITY)
+			? nextShadowTile++
+			: -1;
+	}
+
 	if (_lights.empty())
 	{
 		_visible_count = 0;
@@ -121,6 +139,7 @@ void PointLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 		g.radius = l.radius;
 		g.color = { l.diffuseColor.x, l.diffuseColor.y, l.diffuseColor.z };
 		g.intensity = l.intensity;
+		g.shadow_tile = l.shadow_tile;
 		gpuLights.push_back(g);
 	}
 

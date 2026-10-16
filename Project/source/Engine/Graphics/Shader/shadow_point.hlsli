@@ -5,44 +5,71 @@ cbuffer POINT_SHADOW_CONSTANT_BUFFER : register(b5)
     float4 point_shadow_options; // x: strength, y: enabled
 };
 
-float2 DualParaboloidUV(float3 light_vector)
+float2 DualParaboloidUV(float3 light_vector, float hemisphere_sign)
 {
     float3 direction = normalize(light_vector);
-    float z = abs(direction.z);
-    return direction.xy / (z + 1.0f) * float2(0.5f, -0.5f) + 0.5f;
+    float z = direction.z * hemisphere_sign;
+    float2 projected = direction.xy / (z + 1.0f) * rcp(1.0f + 0.02f);
+    return projected * float2(0.5f, -0.5f) + 0.5f;
 }
 
-float PointShadowDepth(float distance_from_light)
+float2 PointShadowAtlasUV(float2 uv, int shadow_tile)
+{
+    const float atlas_grid = 4.0f;
+    const float atlas_size = 2048.0f;
+    const float tile_padding = 2.0f / atlas_size;
+    uint tile_index = (uint)shadow_tile;
+    float2 tile = float2(tile_index % 4u, tile_index / 4u);
+    return tile / atlas_grid + tile_padding + uv * (1.0f / atlas_grid - 2.0f * tile_padding);
+}
+
+float PointShadowDepth(float distance_from_light, float shadow_far)
 {
     return saturate((distance_from_light - point_shadow_params.x) /
-        max(point_shadow_params.y - point_shadow_params.x, 0.0001f));
+        max(shadow_far - point_shadow_params.x, 0.0001f));
 }
 
 #include "samplers.hlsli"
 #include "constants.hlsli"
-float SamplePointLightShadow(Texture2D<float> frontshadow_map, Texture2D<float> backshadow_map, float3 world_position, float3 normal, float3 light_dir, int light_index)
+float SamplePointLightShadow(Texture2D<float> frontshadow_map, Texture2D<float> backshadow_map,
+    float3 world_position, float3 normal, float3 light_dir, float3 light_position, float light_radius, int shadow_tile)
 {
-    float3 light_vector = world_position - point_shadow_position_radius.xyz;
+    float3 light_vector = world_position - light_position;
     float distance_from_light = length(light_vector);
     bool use_shadow =
         point_shadow_options.y > 0.0f &&
-        light_index == 0 &&
+        shadow_tile >= 0 &&
         distance_from_light > point_shadow_params.x &&
-        distance_from_light < point_shadow_params.y;
+        distance_from_light < light_radius;
 
     float lit = 1.0f;
     if (use_shadow)
     {
-        float2 uv = DualParaboloidUV(light_vector);
         float slope_bias = point_shadow_params.w * (1.0f - saturate(dot(normal, light_dir)));
-        float receiver_depth = PointShadowDepth(distance_from_light) - max(point_shadow_params.w, slope_bias);
-        lit = light_vector.z >= 0.0f
-            ? frontshadow_map.SampleCmpLevelZero(comparison_sampler_state, uv, receiver_depth)
-            : backshadow_map.SampleCmpLevelZero(comparison_sampler_state, uv, receiver_depth);
+        float receiver_depth = PointShadowDepth(distance_from_light, light_radius) - max(point_shadow_params.w, slope_bias);
+        float3 direction = normalize(light_vector);
+        const float seam_width = 0.02f;
+        if (abs(direction.z) < seam_width)
+        {
+            float2 front_uv = PointShadowAtlasUV(DualParaboloidUV(light_vector, 1.0f), shadow_tile);
+            float2 back_uv = PointShadowAtlasUV(DualParaboloidUV(light_vector, -1.0f), shadow_tile);
+            float front_lit = frontshadow_map.SampleCmpLevelZero(comparison_sampler_state, front_uv, receiver_depth);
+            float back_lit = backshadow_map.SampleCmpLevelZero(comparison_sampler_state, back_uv, receiver_depth);
+            float front_weight = smoothstep(-seam_width, seam_width, direction.z);
+            lit = lerp(back_lit, front_lit, front_weight);
+        }
+        else if (direction.z > 0.0f)
+        {
+            float2 uv = PointShadowAtlasUV(DualParaboloidUV(light_vector, 1.0f), shadow_tile);
+            lit = frontshadow_map.SampleCmpLevelZero(comparison_sampler_state, uv, receiver_depth);
+        }
+        else
+        {
+            float2 uv = PointShadowAtlasUV(DualParaboloidUV(light_vector, -1.0f), shadow_tile);
+            lit = backshadow_map.SampleCmpLevelZero(comparison_sampler_state, uv, receiver_depth);
+        }
     }
-
-   // return lerp(1.0f - point_shadow_options.x, 1.0f, lit);
-    return lerp(1.0f - 1.0f, 1.0f, lit);
+    return use_shadow ? lerp(1.0f - point_shadow_options.x, 1.0f, lit) : 1.0f;
 }
 
 // スクリーンスペースシャドウ（ライトごとのループ内で呼び出す）

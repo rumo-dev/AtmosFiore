@@ -154,7 +154,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
         float cos_theta = dot(ray_dir, L);
         float phase = HGPhase(cos_theta, anisotropy);
         
-        float shadow = SamplePointLightShadow(point_shadow_front_map, point_shadow_back_map, cur_pos, float3(0, 0, 0), L, p);
+        float shadow = SamplePointLightShadow(
+            point_shadow_front_map, point_shadow_back_map, cur_pos, float3(0, 0, 0), L,
+            pointLights[p].position, pointLights[p].radius, pointLights[p].shadow_tile);
         total_light += pointLights[p].color * pointLights[p].intensity * att * phase * shadow;
     }
 

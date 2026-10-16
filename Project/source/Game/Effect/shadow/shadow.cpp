@@ -153,7 +153,7 @@ void shadow::make_directional_shadow_begin()
 }
 
 // ポイントライトのシャドウマップ生成開始
-void shadow::make_shadow_begin(PointShadowFace face)
+void shadow::make_shadow_begin(PointShadowFace face, int light_index, bool clear_atlas)
 {
 	TRACY_CPU_ZONE_C("shadow::make_shadow_begin", TracyCategory::Shadow);
 
@@ -163,10 +163,10 @@ void shadow::make_shadow_begin(PointShadowFace face)
 	const auto& lights = Graphics_Core::instance().get_point_light_manager().get_lights();
 
 	Point_Shadow_Constants constants{};
-	if (!lights.empty())
+	if (light_index >= 0 && light_index < static_cast<int>(lights.size()))
 	{
-		const auto& light = lights.front();
-		const float shadow_far = light.radius > light_view_near_z ? light.radius : light_view_far_z;
+		const auto& light = lights[light_index];
+		const float shadow_far = max(light.radius, light_view_near_z + 0.001f);
 		constants.position_radius = { light.position.x, light.position.y, light.position.z, light.radius };
 		constants.params = {
 			light_view_near_z,
@@ -186,11 +186,11 @@ void shadow::make_shadow_begin(PointShadowFace face)
 	}
 
 	// キューブマップの各面(6面分)のView-Projection行列を計算
-	if (!lights.empty())
+	if (light_index >= 0 && light_index < static_cast<int>(lights.size()))
 	{
 		TRACY_CPU_ZONE_N("shadow::make_shadow_begin::CalcCubeFaceViewProj");
 
-		const auto& light = lights.front();
+		const auto& light = lights[light_index];
 		XMVECTOR pos = XMLoadFloat3(&light.position);
 
 		// +X, -X, +Y, -Y, +Z, -Z
@@ -219,8 +219,23 @@ void shadow::make_shadow_begin(PointShadowFace face)
 	current_point_face_group = face;
 
 	active_shadow_map = (face == PointShadowFace::Front) ? point_shadow_front.get() : point_shadow_back.get();
-	active_shadow_map->clear(context, 1.0f);
+	if (clear_atlas)
+		active_shadow_map->clear(context, 1.0f);
 	active_shadow_map->activate(context);
+
+	// Store one light's dual-paraboloid hemisphere in its atlas cell.
+	const int tile = lights[light_index].shadow_tile;
+	const float tile_width = active_shadow_map->viewport.Width / POINT_LIGHT_SHADOW_ATLAS_GRID;
+	const float tile_height = active_shadow_map->viewport.Height / POINT_LIGHT_SHADOW_ATLAS_GRID;
+	constexpr float padding = 2.0f;
+	D3D11_VIEWPORT tile_viewport{};
+	tile_viewport.TopLeftX = (tile % POINT_LIGHT_SHADOW_ATLAS_GRID) * tile_width + padding;
+	tile_viewport.TopLeftY = (tile / POINT_LIGHT_SHADOW_ATLAS_GRID) * tile_height + padding;
+	tile_viewport.Width = tile_width - padding * 2.0f;
+	tile_viewport.Height = tile_height - padding * 2.0f;
+	tile_viewport.MinDepth = 0.0f;
+	tile_viewport.MaxDepth = 1.0f;
+	context->RSSetViewports(1, &tile_viewport);
 }
 
 // シャドウマップ描画の終了処理

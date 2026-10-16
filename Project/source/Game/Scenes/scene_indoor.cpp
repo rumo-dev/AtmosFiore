@@ -219,22 +219,22 @@ void Scene_Indoor::render_shadowmap(float elapsedTime) {
 		shadower.make_shadow_end();
 	}
 
-	// ポイントライト（前方）のシャドウ
+	// Keep exactly two dual-paraboloid textures and pack enabled point lights into 4x4 atlas cells.
+	auto& pointLights = Graphics_Core::instance().get_point_light_manager().get_lights();
+	bool clearFrontAtlas = true;
+	bool clearBackAtlas = true;
+	for (int lightIndex = 0; shadower.point_shadow_enabled && lightIndex < static_cast<int>(pointLights.size()); ++lightIndex)
 	{
-		TRACY_CPU_ZONE_C("PointShadow_Front_CPU", TracyCategory::Shadow);
-		TRACY_GPU_ZONE_C("PointShadow_Front_GPU", TracyCategory::Shadow);
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Point Shadow Front");
-		shadower.make_shadow_begin(shadow::PointShadowFace::Front);
+		if (pointLights[lightIndex].shadow_tile < 0)
+			continue;
+
+		shadower.make_shadow_begin(shadow::PointShadowFace::Front, lightIndex, clearFrontAtlas);
+		clearFrontAtlas = false;
 		Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
 		shadower.make_shadow_end();
-	}
 
-	// ポイントライト（後方）のシャドウ
-	{
-		TRACY_CPU_ZONE_C("PointShadow_Back_CPU", TracyCategory::Shadow);
-		TRACY_GPU_ZONE_C("PointShadow_Back_GPU", TracyCategory::Shadow);
-		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Point Shadow Back");
-		shadower.make_shadow_begin(shadow::PointShadowFace::Back);
+		shadower.make_shadow_begin(shadow::PointShadowFace::Back, lightIndex, clearBackAtlas);
+		clearBackAtlas = false;
 		Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
 		shadower.make_shadow_end();
 	}
