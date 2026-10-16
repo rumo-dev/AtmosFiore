@@ -18,7 +18,7 @@ struct AreaLight_GPU
 
     uint shape;
     float intensity;
-    uint pad1;
+    float range;
     uint pad2;
 
     float3 color;
@@ -30,6 +30,8 @@ struct AreaLight_GPU
 #define AREA_LIGHT_SHAPE_SPHERE 2
 
 StructuredBuffer<AreaLight_GPU> areaLights : register(t10);
+Texture2D<float4> ltcMatrixLut : register(t11);
+Texture2D<float4> ltcAmplitudeLut : register(t12);
 
 cbuffer CB_AreaLightCount : register(b7)
 {
@@ -149,21 +151,14 @@ float3x3 BuildBasis(float3 N, float3 V)
 }
 
 //-----------------------------------------------------------------------------
-// LTC Approximation (Textureless)
+// Standard 64x64 LTC fit: roughness and sqrt(1 - NoV).
 //-----------------------------------------------------------------------------
-float3x3 LTC_MatrixInv(float roughness, float NoV)
+void LTC_Lookup(float roughness, float NoV, out float4 matrixData, out float4 amplitudeData)
 {
-    roughness = max(roughness, 0.04);
-
-    float r2 = roughness * roughness;
-    float stretchX = 1.0 / r2;
-    float stretchY = 1.0 / roughness;
-
-    return float3x3(
-        stretchX, 0.0, 0.0,
-        0.0, stretchY, 0.0,
-        0.0, 0.0, 1.0
-    );
+	float2 uv = float2(saturate(roughness), sqrt(saturate(1.0 - NoV)));
+	uv = uv * ((LTC_LUT_SIZE - 1.0) / LTC_LUT_SIZE) + (0.5 / LTC_LUT_SIZE);
+	matrixData = ltcMatrixLut.SampleLevel(sampler_states[LINEAR_CLAMP], uv, 0);
+	amplitudeData = ltcAmplitudeLut.SampleLevel(sampler_states[LINEAR_CLAMP], uv, 0);
 }
 
 //-----------------------------------------------------------------------------
@@ -283,14 +278,17 @@ float3 LTC_Specular(
 {
     float NoV = saturate(dot(N, V));
 
-    float3x3 Minv = LTC_MatrixInv(roughness, NoV);
+    float4 ltc;
+    float4 ltcAmplitude;
+    LTC_Lookup(roughness, NoV, ltc, ltcAmplitude);
+    float3x3 Minv = float3x3(
+        ltc.x, 0.0, ltc.z,
+        0.0, 1.0, 0.0,
+        ltc.y, 0.0, ltc.w);
 
     float integral = LTC_Evaluate(N, V, P, light, Minv);
 
-    float ltcNorm = 1.0 / (Minv[0][0] * Minv[1][1]);
-    integral *= ltcNorm;
-
-    float3 F = f0 + (f90 - f0) * pow(1.0 - NoV, 5.0);
+    float3 F = f0 * ltcAmplitude.x + (f90 - f0) * ltcAmplitude.y;
 
     return light.color * light.intensity * integral * F;
 }

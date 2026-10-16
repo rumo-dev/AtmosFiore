@@ -279,6 +279,7 @@ void Scene_Indoor::render_forward(float elapsedTime) {
 	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 
 	Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
+	render_debug(elapsedTime);
 }
 
 // 4. UI・ポストプロセス描画

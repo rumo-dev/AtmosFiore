@@ -141,6 +141,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> _sbLights;
 	/// ライト用ShaderResourceView
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _sbLightsSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _ltcMatrixLutSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> _ltcAmplitudeLutSRV;
 	/// ライト数用定数バッファ
 	Microsoft::WRL::ComPtr<ID3D11Buffer> _cbLightCount;
 
@@ -153,6 +155,7 @@ private:
 	 * @brief ライト数用定数バッファ生成
 	 */
 	void create_light_count_buffer(ID3D11Device* device);
+	void create_ltc_lut(ID3D11Device* device);
 
 	/// デバッグ描画用矩形
 	Debug_Cube* _debug_box;

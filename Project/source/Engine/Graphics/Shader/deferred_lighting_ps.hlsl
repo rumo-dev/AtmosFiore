@@ -357,6 +357,12 @@ float4 main(VS_OUT pin) : SV_TARGET
 
         float3 ltcSpecular = LTC_Specular(N, V, position, areaLights[areaLightIndex], roughness, f0, f90);
 
+        float rangeRatio = length(position - areaLights[areaLightIndex].position) / max(areaLights[areaLightIndex].range, 1e-3);
+        float rangeFade = saturate(1.0 - rangeRatio * rangeRatio * rangeRatio * rangeRatio);
+        rangeFade *= rangeFade;
+        ltcDiffuse *= rangeFade;
+        ltcSpecular *= rangeFade;
+
 
         // Area intensity is radiance in cd/m^2; convert to W/(m^2 sr).
         const float exposure = 1.0 / 683.0;

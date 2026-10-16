@@ -33,6 +33,8 @@ public:
 		height = 2.0f;
 		radius = 1.0f;
 		shape = AreaLightShape::Rectangle;
+		range = 50.0f;
+		debug_show_range = false;
 		intensity = 3500.0f; // luminance [cd/m^2]
 		diffuseColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 	}
@@ -53,7 +55,7 @@ public:
 
 		uint32_t shape;
 		float intensity;
-		uint32_t padding1;
+		float range;
 		uint32_t padding2;
 
 		dx::XMFLOAT3 color;
@@ -67,9 +69,11 @@ public:
 	float width;
 	float height;
 	float radius;
+	float range;
 	AreaLightShape shape;
 	float intensity; // luminance [cd/m^2]
 	float padding[2] = {};
+	bool debug_show_range = false;
 
 	/**
 	 * @brief 更新処理
@@ -88,7 +92,8 @@ public:
 		if (ImGui::TreeNode(label))
 		{
 			ImGui::ColorEdit3("Diffuse", (float*)&diffuseColor);
-			ImGui::Checkbox("Show Wireframe", &debug_wireframe);
+			ImGui::Checkbox("Show Light Shape", &debug_wireframe);
+			ImGui::Checkbox("Show Influence Range", &debug_show_range);
 
 			ImGui::DragFloat3("Position", (float*)&position, 0.1f);
 			ImGui::DragFloat3("Direction", (float*)&direction, 0.1f);
@@ -114,6 +119,7 @@ public:
 			}
 
 			ImGui::DragFloat("Luminance (cd/m²)", &intensity, 10.0f, 0.0f, 100000.0f, "%.0f cd/m²");
+			ImGui::DragFloat("Range", &range, 0.1f, 0.1f, 1000.0f, "%.1f");
 
 			ImGui::TreePop();
 		}
