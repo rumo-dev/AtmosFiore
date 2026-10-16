@@ -54,6 +54,9 @@ public:
 		uint32_t start_slot,
 		uint32_t num_views,
 		ID3D11PixelShader* replaced_pixel_shader = nullptr);
+
+	/// テクスチャを使わないHLSLエフェクトをフルスクリーン描画する。
+	void Draw(ID3D11DeviceContext* immediate_context, ID3D11PixelShader* pixel_shader);
 private:
 	/// 内部頂点シェーダー（フルスクリーンクアッド用）
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_embeddedVertexShader;

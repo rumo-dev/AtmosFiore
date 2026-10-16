@@ -2,6 +2,7 @@
 #include "scene_indoor.h"
 #include <windows.h>
 #include "tracy_util.h"
+#include <algorithm>
 
 // 初期化
 void Scene_Title::initialize()
@@ -11,6 +12,7 @@ void Scene_Title::initialize()
 	log_printf("タイトルシーン開始\n", LogLevel::Info);
 	log_printf("タイトルシーン初期化開始\n", LogLevel::Info);
 	_timer = 0.0f;
+	_transition_requested = false;
 	log_printf("タイトルシーン初期化終了\n", LogLevel::Info);
 }
 
@@ -45,11 +47,12 @@ void Scene_Title::update(float elapsedTime)
 	//Easing_Util::draw_easing_editor(selected3, t3, "test3");
 	_timer += elapsedTime;
 	// スプラッシュスキップ時のキー入力引き継ぎ防止のため、遷移後0.5秒間は入力を受け付けない
-	if (_timer > 0.5f)
+	if (!_transition_requested && _timer > 0.5f)
 	{
 		if ((GetAsyncKeyState(VK_SPACE) & 0x8000) || (GetAsyncKeyState(VK_RETURN) & 0x8000))
 		{
 			Scene_Manager::instance().change_scene(new Scene_Loading(new Scene_Indoor()));
+			_transition_requested = true;
 		}
 	}
 }
@@ -59,15 +62,30 @@ void Scene_Title::render(float elapsedTime)
 {
 	TRACY_CPU_ZONE_C("Scene_Title::render", TracyCategory::RenderPass);
 
-	Graphics_Core::instance().clear(Color_Utils::from_hex("#1E1B26"));
+	Graphics_Core::instance().clear(Color_Utils::from_hex("#000000"));
+	const float pulse = 0.55f + 0.45f * sinf(_timer * 2.4f);
+	const float screenWidth = Graphics_Core::instance().get_screen_width();
+	const float screenHeight = Graphics_Core::instance().get_screen_height();
+	if (!_background_effect.is_initialized())
+		_background_effect.initialize(Graphics_Core::instance().get_device(), "title_background_ps.cso", 16);
+	struct alignas(16) TitleConstants { float resolution[2]; float time; float padding; } constants{};
+	constants.resolution[0] = screenWidth;
+	constants.resolution[1] = screenHeight;
+	constants.time = _timer;
+	_background_effect.draw(&constants, sizeof(constants));
 	Text::text_data.font = Text::text->get_font_name(Font_Name::Font_karakaze_R);
-	Text::text_data.fontSize = 40;
-	Text::text_data.Color = Color_Utils::hex_to_colorF("#C9A7EB");
-	Text::text_data.textAlignment = DWRITE_TEXT_ALIGNMENT::DWRITE_TEXT_ALIGNMENT_JUSTIFIED;
+	Text::text_data.fontSize = std::max(28.0f, std::min(screenWidth * 0.08f, screenHeight * 0.075f));
+	Text::text_data.Color = D2D1::ColorF(1.0f, 0.86f, 0.62f, 1.0f);
+	Text::text_data.textAlignment = DWRITE_TEXT_ALIGNMENT::DWRITE_TEXT_ALIGNMENT_CENTER;
+	Text::text_data.textParagraphAlignment = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
 	Text::text->set_font(Text::text_data);
 	//Text::draw("タイトル画面", D2D1::RectF(0, 0, 640, 720), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 	//Text::draw("HOME\t：タイトル\n1キー\t：スプライト\n2キー\t：プリミティブ", D2D1::RectF(0, 300, 640, 720), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
-	Text::draw(L"Title", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+	Text::draw(L"AtmosFiore", D2D1::RectF(0, screenHeight * 0.12f, screenWidth, screenHeight * 0.63f), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+	Text::text_data.fontSize = std::max(14.0f, std::min(screenWidth * 0.03f, screenHeight * 0.03f));
+	Text::text_data.Color = D2D1::ColorF(0.92f, 0.86f, 0.72f, pulse);
+	Text::text->set_font(Text::text_data);
+	Text::draw(L"PRESS SPACE TO BEGIN", D2D1::RectF(0, screenHeight * 0.65f, screenWidth, screenHeight * 0.84f), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 }
 
 // GUI描画

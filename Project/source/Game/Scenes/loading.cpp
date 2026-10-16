@@ -1,5 +1,8 @@
 #include "scene.h"
 #include "tracy_util.h"
+#include <algorithm>
+#include <cmath>
+#include "Engine/System/graphics_core.h"
 
 static bool is_first_loading = true;
 
@@ -15,6 +18,7 @@ void Scene_Loading::initialize()
 	_thread = new std::thread(loading_thread, this);
 	_timer = 0.0f;
 	_loading_timer = 0.0f;
+	_transition_requested = false;
 	log_printf("ローディング初期化終了\n", LogLevel::Info);
 }
 
@@ -42,7 +46,7 @@ void Scene_Loading::update(float elapsedTime)
 
 	_loading_timer += elapsedTime;
 	//次のシーンの準備が完了したらシーンを切り替える
-	if (_next_scene->is_ready())
+	if (!_transition_requested && _next_scene->is_ready())
 	{
 		//if (is_first_loading)
 		//{	//初回のみ3秒以上経過で遷移可能
@@ -58,6 +62,7 @@ void Scene_Loading::update(float elapsedTime)
 		//{
 			// 2回目以降は即遷移
 		Scene_Manager::instance().change_scene(_next_scene);
+		_transition_requested = true;
 		//}
 		_timer += elapsedTime;
 	}
@@ -67,41 +72,30 @@ void Scene_Loading::update(float elapsedTime)
 void Scene_Loading::render(float elapsedTime)
 {
 	TRACY_CPU_ZONE_C("Scene_Loading::render", TracyCategory::RenderPass);
+	const float width = Graphics_Core::instance().get_screen_width();
+	const float height = Graphics_Core::instance().get_screen_height();
+	if (!_background_effect.is_initialized())
+		_background_effect.initialize(Graphics_Core::instance().get_device(), "loading_background_ps.cso", 16);
+	struct alignas(16) LoadingConstants { float resolution[2]; float time; float padding; } constants{};
+	constants.resolution[0] = width;
+	constants.resolution[1] = height;
+	constants.time = _loading_timer;
+	_background_effect.draw(&constants, sizeof(constants));
 
-	//elapsedTime;
-	//if (is_first_loading)
-	//{
-	//	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	//	Render_State::instance().set_depth_stencil_state(immediate_context, Depth_State::Test_Disable_Write_Disable);
-	//	Render_State::instance().set_blend_state(immediate_context, Blend_State::Alpha);
-	//	Graphics_Core::instance().clear(Color_Utils::from_hex("#09080F"));
-	//	Text::text_data.font = Text::text->get_font_name(Font_Name::Font_karakaze_R);
-	//	Text::text_data.textAlignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-	//	Text::text_data.textParagraphAlignment = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
-	//	Text::text_data.Color = Color_Utils::hex_to_colorF("#F2D7EE");
-	//	Text::text->set_font(Text::text_data);
-	//	if (_timer > 0.f)
-	//	{
-	//		Text::text->draw_text(L"スペースキーで開始", D2D1::RectF(0, 0, 1280, 720), D2D1_DRAW_TEXT_OPTIONS_NONE);
-	//	}
-	//	else {
-	//	}
-	//}
-	//else {
-	//	Graphics_Core::instance().clear(Color_Utils::from_hex("#09080F"));
-	//	Text::text_data.font = Text::text->get_font_name(Font_Name::Font_karakaze_R);
-	//	Text::text_data.Color = Color_Utils::hex_to_colorF("#D1B8F0");
-	//	Text::text->set_font(Text::text_data);
-	//	Text::text->draw_text(L"ローディング", DirectX::XMFLOAT2(100, 200), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
-	//}
-	// 「読み込み中...」の点滅・増殖アニメーション
+	// 画面下寄りに置き、フォントサイズと領域を実際の解像度に合わせる。
 	int dot_count = static_cast<int>(_loading_timer * 2.0f) % 4;
 	std::wstring loading_text = L"読み込み中";
 	for (int i = 0; i < dot_count; ++i)
 	{
 		loading_text += L".";
 	}
-	Text::text->draw_text(loading_text, D2D1::RectF(0, 0, 1280, 720), D2D1_DRAW_TEXT_OPTIONS_NONE);
+	Text::text_data.font = Text::text->get_font_name(Font_Name::Font_karakaze_R);
+	Text::text_data.fontSize = std::max(16.0f, std::min(width * 0.045f, height * 0.055f));
+	Text::text_data.Color = D2D1::ColorF(0.92f, 0.90f, 0.82f, 0.95f);
+	Text::text_data.textAlignment = DWRITE_TEXT_ALIGNMENT_CENTER;
+	Text::text_data.textParagraphAlignment = DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
+	Text::text->set_font(Text::text_data);
+	Text::text->draw_text(loading_text, D2D1::RectF(width * 0.08f, height * 0.78f, width * 0.92f, height * 0.91f), D2D1_DRAW_TEXT_OPTIONS_NONE);
 }
 
 //GUI描画

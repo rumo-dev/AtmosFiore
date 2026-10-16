@@ -463,6 +463,9 @@
     <ClInclude Include="source\Engine\Graphics\FullscreenQuad\fullscreen_quad.h">
       <Filter>source\Engine\Graphics\FullscreenQuad</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\Graphics\FullscreenQuad\fullscreen_effect.h">
+      <Filter>source\Engine\Graphics\FullscreenQuad</Filter>
+    </ClInclude>
     <ClInclude Include="source\Game\Effect\bloom\Bloom.h">
       <Filter>source\Game\Effect\bloom</Filter>
     </ClInclude>

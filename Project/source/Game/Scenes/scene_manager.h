@@ -1,6 +1,7 @@
 #pragma once
 
 #include "scene_base.h"
+#include "Engine/Graphics/FullscreenQuad/fullscreen_effect.h"
 
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 
@@ -40,4 +41,8 @@ private:
 	Scene_Base* _current_scene = nullptr;
 	Scene_Base* _next_scene = nullptr;
 	bool _is_exit = false;
+	float _transition_time = 0.0f;
+	bool _transition_switched = false;
+	float _transition_seed = 0.0f;
+	FullscreenEffect _transition_effect;
 };

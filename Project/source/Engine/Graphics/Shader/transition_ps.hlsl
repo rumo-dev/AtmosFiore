@@ -1,58 +1,61 @@
-// transition_ps.hlsl
-// Grid-based scene transition effect
-// Based on skaplun 3D "Megapolis" https://shadertoy.com/view/MlKBWD
 #include "fullscreen_quad.hlsli"
 
 cbuffer TransitionConstants : register(b11)
 {
-    float progress; // 0.0 to 1.0
-    int transition_type; // 0: Transition Out (wipe to black), 1: Transition In (wipe from black)
-    float2 resolution; // Screen resolution (width, height)
-    float seed; // Random seed
+    float progress;
+    int transition_type;
+    float2 resolution;
+    float seed;
     float3 padding;
 };
 
-float rnd(float2 p)
+float hash21(float2 p)
 {
-    return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453123);
+    return frac(sin(dot(p, float2(12.9898, 58.233)) + seed) * 13758.5453);
+}
+
+float sdHexagon(float2 p, float radius)
+{
+    const float3 k = float3(-0.8660254, 0.5, 0.5773503);
+    p = abs(p);
+    p -= 2.0 * min(dot(k.xy, p), 0.0) * k.xy;
+    p -= float2(clamp(p.x, -k.z * radius, k.z * radius), radius);
+    return length(p) * sign(p.y);
 }
 
 float4 main(VS_OUT pin) : SV_TARGET
 {
-    float2 uv = pin.texcoord;
-    
-    // Safety check for resolution to prevent division by zero
-    float aspect = (resolution.y > 0.0f) ? (resolution.x / resolution.y) : (16.0f / 9.0f);
-    float resY = (resolution.y > 0.0f) ? resolution.y : 720.0f;
-    
-    // Grid settings
-    float cellCountY = 12.0f; // Grid density vertically
-    float cellCountX = cellCountY * aspect;
-    
-    float2 U = uv * float2(cellCountX, cellCountY);
-    
-    float p = cellCountY / resY; // 1 pixel width in cell units for anti-aliasing
-    
-    // Generate cell start time based on cell coordinates and random seed
-    float cellStartTime = rnd(floor(U) + float2(seed, seed)) * 0.5f; // [0.0, 0.5]
-    
-    float w = 0.0f;
-    float mask = 0.0f;
-    
-    if (progress > cellStartTime)
+    float aspect = resolution.x / max(resolution.y, 1.0);
+    // FullscreenQuad UVは左上原点。Shadertoyの左下原点・Y上向きへ変換する。
+    float2 p = (pin.texcoord - 0.5) * float2(aspect * 2.0, -2.0);
+    const float tileRadius = 0.105;
+    float2 gridSize = float2(1.7320508 * tileRadius, 1.5 * tileRadius);
+    float2 estimate = float2(p.x / gridSize.x, p.y / gridSize.y);
+    float mask = 0.0;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
     {
-        // w starts at 0.25 and grows to 1.0 over a duration of 0.25, starting 0.25 after cellStartTime
-        w = 0.25f + 0.75f * smoothstep(0.0f, 0.25f, progress - cellStartTime - 0.25f);
-        
-        float2 localU = frac(U) - 0.5f;
-        float2 edge = smoothstep(p, 0.0f, abs(localU) - w * 0.5f);
-        mask = edge.x * edge.y;
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            float2 cell = floor(estimate) + float2(x, y);
+            float2 center = float2(cell.x * gridSize.x + (fmod(abs(cell.y), 2.0) > 0.5 ? gridSize.x * 0.5 : 0.0), cell.y * gridSize.y);
+            float2 local = p - center;
+            // centerはY上向き空間なので、UVへ戻すときはYを再反転する。
+            float2 uvCell = float2(center.x / (aspect * 2.0) + 0.5, 0.5 - center.y * 0.5);
+            float wave = saturate(uvCell.x * 0.62 + uvCell.y * 0.38);
+            float start = saturate(wave * 0.66 + hash21(cell) * 0.18 + 0.04);
+            float localProgress = saturate((progress - start) / 0.22);
+            localProgress = localProgress * localProgress * (3.0 - 2.0 * localProgress);
+            float radius = tileRadius * (0.015 + 0.985 * localProgress);
+            float d = sdHexagon(local, radius);
+            float aa = fwidth(d) * 1.25;
+            mask = max(mask, 1.0 - smoothstep(-aa, aa, d));
+        }
     }
-    
-    // type == 0 (Out): alpha goes from 0.0 (transparent) to 1.0 (opaque black/color)
-    // type == 1 (In): alpha goes from 1.0 (opaque black/color) to 0.0 (transparent)
-    float alpha = (transition_type == 0) ? mask : (1.0f - mask);
-    
-    // Return solid color `#09080F` (deep purple/black) with calculated opacity
-    return float4(0.035f, 0.031f, 0.059f, alpha);
+
+    float edge = exp(-abs(mask - 0.5) * 16.0) * mask;
+    float3 color = lerp(float3(0.0, 0.0, 0.0), float3(0.055, 0.035, 0.014), edge * 0.65);
+	return float4(color, mask);
 }

@@ -488,6 +488,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\Texture\texture.h" />
     <ClInclude Include="source\Engine\Graphics\FrameBuffer\frame_buffer.h" />
     <ClInclude Include="source\Engine\Graphics\FullscreenQuad\fullscreen_quad.h" />
+    <ClInclude Include="source\Engine\Graphics\FullscreenQuad\fullscreen_effect.h" />
     <ClInclude Include="source\Game\Effect\bloom\Bloom.h" />
     <ClInclude Include="source\Engine\System\Manager\PostProcess\post_process_manager.h" />
     <ClInclude Include="source\Game\Scenes\scene.h" />
@@ -566,6 +567,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Engine\Graphics\FrameBuffer\frame_buffer.cpp" />
     <ClCompile Include="source\Engine\Graphics\DLSS\dlss_manager.cpp" />
     <ClCompile Include="source\Engine\Graphics\FullscreenQuad\fullscreen_quad.cpp" />
+    <ClCompile Include="source\Engine\Graphics\FullscreenQuad\fullscreen_effect.cpp" />
     <ClCompile Include="source\Engine\System\Manager\Light\area_light_manager.cpp" />
     <ClCompile Include="source\Engine\System\Manager\Light\point_light_manager.cpp" />
     <ClCompile Include="source\Engine\System\Manager\Light\spot_light_manager.cpp" />
@@ -1025,6 +1027,18 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\transition_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\loading_background_ps.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\title_background_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>

@@ -5,6 +5,8 @@
 #include "scene_manager.h"
 #include "scene_title.h"
 #include "scene_indoor.h"
+#include "Engine/Graphics/UI/sprite/sprite.h"
+#include <memory>
 
 /**
  * @brief スプラッシュ画面シーンクラス
@@ -58,4 +60,7 @@ public:
 private:
 	float _timer = 0.0f;       ///< シーン全体の経過時間
 	bool _is_skipped = false;  ///< スキップが要求されたかどうかのフラグ
+	bool _transition_requested = false;
+	std::unique_ptr<sprite> _brand_logo;
+	std::unique_ptr<sprite> _directx_logo;
 };

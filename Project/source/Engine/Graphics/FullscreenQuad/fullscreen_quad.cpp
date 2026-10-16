@@ -27,3 +27,15 @@ void FullscreenQuad::Blit(ID3D11DeviceContext* immediate_context,
 
 	immediate_context->Draw(4, 0);
 }
+
+void FullscreenQuad::Draw(ID3D11DeviceContext* immediate_context, ID3D11PixelShader* pixel_shader)
+{
+	immediate_context->IASetVertexBuffers(0, 0, nullptr, nullptr, nullptr);
+	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	immediate_context->IASetInputLayout(nullptr);
+	immediate_context->VSSetShader(m_embeddedVertexShader.Get(), nullptr, 0);
+	immediate_context->PSSetShader(pixel_shader, nullptr, 0);
+	ID3D11ShaderResourceView* null_views[16]{};
+	immediate_context->PSSetShaderResources(0, ARRAYSIZE(null_views), null_views);
+	immediate_context->Draw(4, 0);
+}

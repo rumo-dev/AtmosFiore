@@ -5,6 +5,7 @@
 #include "Engine/system/graphics_core.h"
 
 #include "Engine/Graphics/UI/text/text.h"
+#include "Engine/Graphics/FullscreenQuad/fullscreen_effect.h"
 #include "Engine/System/Manager/resource_manager.h"
 #include <thread>
 
@@ -120,4 +121,6 @@ private:
 
 	///< 読み込み中の点滅・アニメーション用タイマー（毎フレーム更新される）
 	float _loading_timer = 0.0f;
+	bool _transition_requested = false;
+	FullscreenEffect _background_effect;
 };

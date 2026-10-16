@@ -1,6 +1,7 @@
 #pragma once
 #include "scene_base.h"
 #include "Engine/Graphics/UI/text/text.h"
+#include "Engine/Graphics/FullscreenQuad/fullscreen_effect.h"
 
 #include "Engine/utilities/easing_util.h"
 #include "scene_manager.h"
@@ -30,4 +31,6 @@ public:
 
 private:
 	float _timer = 0.0f;
+	bool _transition_requested = false;
+	FullscreenEffect _background_effect;
 };
