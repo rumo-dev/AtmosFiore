@@ -2,11 +2,16 @@
 #include "Engine/System/graphics_core.h"
 #include "Engine/System/Manager/resource_manager.h"
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
+#include "Game/World/camera/camera_manager.h"
 #include "Game/Effect/ChromaticAberration/ChromaticAberration.h"
 #include "Game/Effect/lensDistortion/LensDistortion.h"
 #include "Game/Effect/vignetting/Vignetting.h"
 #include "Engine/Graphics/Model/Tiny/Json.hpp"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <fstream>
+#include <limits>
 
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
@@ -120,9 +125,13 @@ void Post_Process_Manager::begin()
 	DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Lighting Pass"); {
 		Graphics_Core::instance().get_fullscreen_quad()->Blit(
 			ctx, srvs, 0, GBUFFER_COUNT + 3,
-			Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DEFERRED_LIGHTING_PS")
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("DEFERRED_LIGHTING_PS")
 		);
 	}
+	// The directional shadow map occupies PS slot 6. Release every lighting
+	// input before the shadow pass binds that texture as a depth output next frame.
+	ID3D11ShaderResourceView* null_lighting_srvs[GBUFFER_COUNT + 3]{};
+	ctx->PSSetShaderResources(0, GBUFFER_COUNT + 3, null_lighting_srvs);
 }
 
 // ─── 終了 ─────────────────────────────────────────────────────────
@@ -342,7 +351,7 @@ bool Post_Process_Manager::savePipelineSettings() const
 	SAVE_PARAM("bloom", "enabled", bloomer->is_bloom); SAVE_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); SAVE_PARAM("bloom", "intensity", bloomer->bloom_intensity);
 	SAVE_PARAM("adaptation", "target_lum", adaptation->target_lum); SAVE_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); SAVE_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
 	SAVE_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); SAVE_PARAM("tone_mapping", "mapping_type", static_cast<int>(tone_mapper->mapping_type)); SAVE_PARAM("tone_mapping", "exposure", tone_mapper->exposure); SAVE_PARAM("tone_mapping", "gamma", tone_mapper->gamma); SAVE_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); SAVE_PARAM("tone_mapping", "max_white", tone_mapper->max_white); SAVE_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); SAVE_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); SAVE_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); SAVE_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
-	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled);
+	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("dof", "blur_strength", dofer->blur_strength); SAVE_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); SAVE_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled);
 	SAVE_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); SAVE_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); SAVE_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
 	SAVE_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); SAVE_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); SAVE_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
 	SAVE_PARAM("vignetting", "enabled", vignetting->is_enabled); SAVE_PARAM("vignetting", "physical_link", vignetting->physical_link); SAVE_PARAM("vignetting", "intensity", vignetting->intensity); SAVE_PARAM("vignetting", "inner_radius", vignetting->inner_radius); SAVE_PARAM("vignetting", "outer_radius", vignetting->outer_radius); SAVE_PARAM("vignetting", "smoothness", vignetting->smoothness);
@@ -376,7 +385,9 @@ bool Post_Process_Manager::loadPipelineSettings()
 	LOAD_PARAM("bloom", "enabled", bloomer->is_bloom); LOAD_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); LOAD_PARAM("bloom", "intensity", bloomer->bloom_intensity);
 	LOAD_PARAM("adaptation", "target_lum", adaptation->target_lum); LOAD_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); LOAD_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
 	LOAD_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); { int type = static_cast<int>(tone_mapper->mapping_type); LOAD_PARAM("tone_mapping", "mapping_type", type); if (type >= 0 && type < 34) tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(type); } LOAD_PARAM("tone_mapping", "exposure", tone_mapper->exposure); LOAD_PARAM("tone_mapping", "gamma", tone_mapper->gamma); LOAD_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); LOAD_PARAM("tone_mapping", "max_white", tone_mapper->max_white); LOAD_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); LOAD_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); LOAD_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); LOAD_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
-	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled);
+	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("dof", "blur_strength", dofer->blur_strength); LOAD_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); LOAD_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled);
+	dofer->blur_strength = std::clamp(dofer->blur_strength, 0.0f, 4.0f);
+	dofer->debug_blur_threshold_px = std::clamp(dofer->debug_blur_threshold_px, 0.25f, 4.0f);
 	LOAD_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); LOAD_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); LOAD_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
 	LOAD_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); LOAD_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); LOAD_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
 	LOAD_PARAM("vignetting", "enabled", vignetting->is_enabled); LOAD_PARAM("vignetting", "physical_link", vignetting->physical_link); LOAD_PARAM("vignetting", "intensity", vignetting->intensity); LOAD_PARAM("vignetting", "inner_radius", vignetting->inner_radius); LOAD_PARAM("vignetting", "outer_radius", vignetting->outer_radius); LOAD_PARAM("vignetting", "smoothness", vignetting->smoothness);
@@ -624,10 +635,91 @@ void Post_Process_Manager::drawToneMappingGUI()
 	ImGui::EndChild();
 }
 void Post_Process_Manager::drawDOFGUI() {
-	CheckboxInt("Enable Dof", dofer->is_dof, "Enable bloom effect");
+	CheckboxInt("Enable DoF", dofer->is_dof, "Enable depth of field");
+	auto active_camera = CameraManager::instance().get_active_camera();
+	if (active_camera) {
+		auto& camera = active_camera->get_camera();
+		ImGui::BeginDisabled(camera.autoSettingsEnabled && camera.autoFocusDistance);
+		ImGui::DragFloat("Focus Distance", &camera.FocusDist, 0.1f, 0.1f, 100.0f, "%.2f m");
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::Checkbox("Auto Focus", &camera.autoFocusDistance);
+		ImGui::BeginDisabled(camera.autoSettingsEnabled && camera.autoFNumber);
+		ImGui::SliderFloat("F-Number", &camera.FNumber, 1.0f, 22.0f, "f/%.1f");
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::Checkbox("Auto Aperture", &camera.autoFNumber);
+	}
+	ImGui::SliderFloat("Blur Strength", &dofer->blur_strength, 0.0f, 4.0f, "%.2fx");
+	ImGui::SliderFloat("Blur Range Threshold", &dofer->debug_blur_threshold_px, 0.25f, 4.0f, "%.2f px");
+	ImGui::Checkbox("Show Focus / Blur Range Overlay", &dofer->show_debug_overlay);
 	static const char* debug_views[] = {
 		"Normal", "FFS Result RGB", "Near CoC", "Far CoC"
 	};
 	ImGui::Combo("DOF Debug View", &dofer->debug_view, debug_views,
 		4);
+
+	if (!dofer->show_debug_overlay || !active_camera) return;
+
+	const auto& camera = active_camera->get_camera();
+	const float coc_normalization_radius = (std::max)(camera.MaxBlurRadius, 0.001f);
+	const float effective_max_blur = (std::min)(
+		camera.MaxBlurRadius * std::clamp(dofer->blur_strength, 0.0f, 4.0f), 64.0f);
+	const float blur_scale = effective_max_blur / coc_normalization_radius;
+	const float threshold_coc_px = blur_scale > 0.0f
+		? dofer->debug_blur_threshold_px / blur_scale
+		: (std::numeric_limits<float>::infinity)();
+	const float focus_mm = (std::max)(camera.FocusDist, 0.0001f) * 1000.0f;
+	const float focal_mm = (std::max)(camera.FocalLength, 0.001f);
+	const float pixel_pitch_mm = (std::max)(
+		camera.SensorSize / (std::max)(Graphics_Core::instance().get_screen_width(), 1.0f),
+		0.000001f);
+	const float coc_scale = (focal_mm / (std::max)(camera.FNumber, 0.001f)) * focal_mm
+		/ ((std::max)(std::abs(focus_mm - focal_mm), 0.000001f) * pixel_pitch_mm);
+	const float near_clip_mm = (std::max)(camera.near_z, 0.0001f) * 1000.0f;
+	const float far_clip_mm = (std::max)(camera.far_z, camera.near_z) * 1000.0f;
+	float near_focus_edge_mm = near_clip_mm;
+	float far_focus_edge_mm = far_clip_mm;
+	const bool threshold_reached = dofer->blur_strength > 0.0f
+		&& threshold_coc_px <= coc_normalization_radius && coc_scale > 0.0f;
+	if (threshold_reached) {
+		near_focus_edge_mm = (std::clamp)(
+			coc_scale * focus_mm / (coc_scale + threshold_coc_px), near_clip_mm, focus_mm);
+		if (coc_scale > threshold_coc_px) {
+			far_focus_edge_mm = (std::clamp)(
+				coc_scale * focus_mm / (coc_scale - threshold_coc_px), focus_mm, far_clip_mm);
+		}
+	}
+	const bool has_near_blur = threshold_reached && near_focus_edge_mm > near_clip_mm + 0.001f;
+	const bool has_far_blur = threshold_reached && far_focus_edge_mm < far_clip_mm - 0.001f;
+
+	char lines[6][128]{};
+	sprintf_s(lines[0], "DOF focus / blur (>= %.2f px)", dofer->debug_blur_threshold_px);
+	sprintf_s(lines[1], "Focus plane: %.2f m from camera", camera.FocusDist);
+	if (has_near_blur) {
+		sprintf_s(lines[2], "Near blur: %.2f - %.2f m", near_clip_mm / 1000.0f, near_focus_edge_mm / 1000.0f);
+	}
+	else {
+		sprintf_s(lines[2], "Near blur: below threshold");
+	}
+	sprintf_s(lines[3], "In focus: %.2f - %.2f m", near_focus_edge_mm / 1000.0f, far_focus_edge_mm / 1000.0f);
+	if (has_far_blur) {
+		sprintf_s(lines[4], "Far blur: %.2f - %.2f m", far_focus_edge_mm / 1000.0f, far_clip_mm / 1000.0f);
+	}
+	else {
+		sprintf_s(lines[4], "Far blur: below threshold");
+	}
+	sprintf_s(lines[5], "Strength %.2fx | Max radius %.1f px", dofer->blur_strength, effective_max_blur);
+
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 16.0f, viewport->WorkPos.y + 16.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowBgAlpha(0.78f);
+	constexpr ImGuiWindowFlags overlay_flags = ImGuiWindowFlags_NoDecoration
+		| ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
+		| ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav
+		| ImGuiWindowFlags_NoInputs;
+	if (ImGui::Begin("DOF Focus / Blur Range", nullptr, overlay_flags)) {
+		for (const char* line : lines) ImGui::TextUnformatted(line);
+	}
+	ImGui::End();
 }

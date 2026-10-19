@@ -39,6 +39,26 @@ void ModelManager::unload_all()
 	model_cache_.clear();
 }
 
+size_t ModelManager::unload_unused()
+{
+	size_t removed = 0;
+	for (auto model = model_cache_.begin(); model != model_cache_.end();)
+	{
+		const bool referenced = std::any_of(instances_.begin(), instances_.end(),
+			[&model](const auto& instance) { return instance.second.model_key == model->first; });
+		if (!referenced)
+		{
+			model = model_cache_.erase(model);
+			++removed;
+		}
+		else
+		{
+			++model;
+		}
+	}
+	return removed;
+}
+
 // ===== Instance Management =====
 
 void ModelManager::add_instance(const std::string& key, ModelInstance instance)
@@ -417,8 +437,13 @@ void ModelManager::draw_imgui()
 				// Directly edit world_transform translation/rotation/scale
 				float* m = &inst.world_transform._11;
 				ImGui::DragFloat3("Translation", m + 12, 0.01f);
-				ImGui::DragFloat3("Scale",
-					new float[3] {m[0], m[5], m[10]}, 0.01f, 0.001f, 100.0f);
+				float scale[3] = { m[0], m[5], m[10] };
+				if (ImGui::DragFloat3("Scale", scale, 0.01f, 0.001f, 100.0f))
+				{
+					m[0] = scale[0];
+					m[5] = scale[1];
+					m[10] = scale[2];
+				}
 				ImGui::TreePop();
 			}
 

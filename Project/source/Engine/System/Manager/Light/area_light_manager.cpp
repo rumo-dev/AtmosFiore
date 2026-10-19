@@ -1,5 +1,5 @@
 #include "area_light_manager.h"
-#include "Engine/System/graphics_core.h"
+#include "Engine/System/render_state.h"
 #include "Game/World/camera/camera_manager.h"
 #include "Engine/Utilities/math_util.h"
 #include "Engine/Graphics/Shader/ltc_matrix.hpp"
@@ -185,9 +185,9 @@ void AreaLightManager::create_ltc_lut(ID3D11Device* device)
 		device->CreateShaderResourceView(amplitudeTexture.Get(), nullptr, _ltcAmplitudeLutSRV.GetAddressOf());
 }
 
-void AreaLightManager::debug_render()
+void AreaLightManager::debug_render(ID3D11DeviceContext* immediate_context)
 {
-	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
+	if (!immediate_context) return;
 	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Wireframe_CCW);
 	// Scene depthで遮蔽し、可視化形状が深度バッファを書き換えないようにする。
 	const auto camera = CameraManager::instance().get_active_camera();
@@ -264,7 +264,7 @@ void AreaLightManager::debug_render()
 		if (l.debug_wireframe && l.shape == AreaLightShape::Rectangle)
 		{
 			_debug_box->Render(
-				Graphics_Core::instance().get_device_context(),
+				immediate_context,
 				worldMatrix,
 				{ l.diffuseColor.x, l.diffuseColor.y, l.diffuseColor.z, 1.0f }
 			);
@@ -277,7 +277,7 @@ void AreaLightManager::debug_render()
 			DirectX::XMStoreFloat4x4(&worldMatrix, world_disk);
 
 			_debug_disk->Render(
-				Graphics_Core::instance().get_device_context(),
+				immediate_context,
 				worldMatrix,
 				{ l.diffuseColor.x, l.diffuseColor.y, l.diffuseColor.z, 1.0f }
 			);
@@ -290,7 +290,7 @@ void AreaLightManager::debug_render()
 			DirectX::XMStoreFloat4x4(&worldMatrix, world_sphere);
 
 			_debug_sphere->Render(
-				Graphics_Core::instance().get_device_context(),
+				immediate_context,
 				worldMatrix,
 				{ l.diffuseColor.x, l.diffuseColor.y, l.diffuseColor.z, 1.0f }
 			);

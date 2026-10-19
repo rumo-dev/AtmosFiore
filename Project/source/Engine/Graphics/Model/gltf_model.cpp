@@ -102,11 +102,11 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 	  { "WEIGHTS", 0,vertex_buffer_views.at("WEIGHTS_0").format, 5, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 
-	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("GLTF_VS")->create_input_layout(
+	Resource_Manager::instance().get_shader<Vertex_Shader>("GLTF_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
-	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("POINT_SHADOW_VS")->create_input_layout(
+	Resource_Manager::instance().get_shader<Vertex_Shader>("POINT_SHADOW_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
-	Resource_Manager::instance().shader_manager.Get<Vertex_Shader>("DIRECTIONAL_SHADOW_VS")->create_input_layout(
+	Resource_Manager::instance().get_shader<Vertex_Shader>("DIRECTIONAL_SHADOW_VS")->create_input_layout(
 		input_element_desc, _countof(input_element_desc));
 
 	D3D11_BUFFER_DESC buffer_desc{};
@@ -528,7 +528,7 @@ void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Glt
 			const ::byte* data = buffer.data.data() + buffer_view.byteOffset;
 
 			ID3D11ShaderResourceView* texture_resource_view{};
-			hr = load_texture_from_memory(device, data, buffer_view.byteLength, &texture_resource_view);
+			hr = Resource_Manager::instance().load_texture_memory(data, buffer_view.byteLength, &texture_resource_view);
 			if (hr == S_OK)
 			{
 				texture_resource_views.emplace_back().Attach(texture_resource_view);
@@ -542,7 +542,7 @@ void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Glt
 			std::wstring filename{
 			  path.parent_path().concat(L"/").wstring() +
 			  std::wstring(gltf_image.uri.begin(), gltf_image.uri.end()) };
-			hr = load_texture_from_file(device, filename.c_str(), &shader_resource_view, &texture2d_desc);
+			hr = Resource_Manager::instance().load_texture(filename, &shader_resource_view, &texture2d_desc);
 			if (hr == S_OK)
 			{
 				texture_resource_views.emplace_back().Attach(shader_resource_view);
@@ -787,15 +787,15 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 {
 	if (pass == pass_mode::deferred_geometry)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::forward_opaque)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::forward_transparency)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::directional_shadow)
 	{
@@ -803,7 +803,7 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	}
 	else if (pass == pass_mode::shadow)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("POINT_SHADOW_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("POINT_SHADOW_PS"), NULL, 0);
 	}
 	else
 	{
@@ -856,9 +856,9 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 		break;
 	}
 
-	immediate_context->VSSetShader(Resource_Manager::instance().shader_manager.GetNative<Vertex_Shader>(vertex_shader_name), nullptr, 0);
+	immediate_context->VSSetShader(Resource_Manager::instance().get_native_shader<Vertex_Shader>(vertex_shader_name), nullptr, 0);
 	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
-	immediate_context->IASetInputLayout(Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name)->get_input_layout());
+	immediate_context->IASetInputLayout(Resource_Manager::instance().get_shader<Vertex_Shader>(vertex_shader_name)->get_input_layout());
 	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	int last_bound_material = -1;
@@ -883,15 +883,15 @@ void Gltf_Model::render_with_nodes(
 
 	if (pass == pass_mode::deferred_geometry)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::forward_opaque)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::forward_transparency)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::directional_shadow)
 	{
@@ -899,7 +899,7 @@ void Gltf_Model::render_with_nodes(
 	}
 	else if (pass == pass_mode::shadow)
 	{
-		immediate_context->PSSetShader(Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("POINT_SHADOW_PS"), NULL, 0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("POINT_SHADOW_PS"), NULL, 0);
 	}
 	else
 	{
@@ -920,9 +920,9 @@ void Gltf_Model::render_with_nodes(
 		break;
 	}
 
-	immediate_context->VSSetShader(Resource_Manager::instance().shader_manager.GetNative<Vertex_Shader>(vertex_shader_name), nullptr, 0);
+	immediate_context->VSSetShader(Resource_Manager::instance().get_native_shader<Vertex_Shader>(vertex_shader_name), nullptr, 0);
 	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
-	immediate_context->IASetInputLayout(Resource_Manager::instance().shader_manager.Get<Vertex_Shader>(vertex_shader_name)->get_input_layout());
+	immediate_context->IASetInputLayout(Resource_Manager::instance().get_shader<Vertex_Shader>(vertex_shader_name)->get_input_layout());
 	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	int last_bound_material = -1;

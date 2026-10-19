@@ -1,9 +1,11 @@
 #pragma once
 
 #include <unordered_map>
+#include <algorithm>
 #include <string>
 #include <memory>
 #include <type_traits>
+#include <filesystem>
 #include <wrl/client.h>
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 
@@ -126,18 +128,31 @@ public:
 	{
 		// 既にロード済みならそれを返す
 		if (m_shaders.find(name) != m_shaders.end()) {
-			return std::static_pointer_cast<T>(m_shaders[name]);
+			return std::dynamic_pointer_cast<T>(m_shaders[name]);
 		}
-
-		auto shader = std::make_shared<T>();
 
 		// デフォルト設定
 		std::string entryPoint = entry.empty() ? "main" : entry;
 		std::string shaderTarget = target.empty() ? ShaderTargetTraits<T>::GetDefault() : target;
 
 		// フルパス構築
-		std::wstring hlslPath = m_hlslDir + s2ws(fileName) + L".hlsl";
-		std::wstring csoPath = m_csoDir + s2ws(fileName) + L".cso";
+		const std::string shaderFileName = std::filesystem::path(fileName).stem().string();
+		std::shared_ptr<T> cachedByFile;
+		for (const auto& [cachedName, cachedFile] : m_shaderFiles) {
+			if (cachedFile == shaderFileName) {
+				cachedByFile = std::dynamic_pointer_cast<T>(m_shaders.at(cachedName));
+				if (cachedByFile) break;
+			}
+		}
+		if (cachedByFile) {
+			m_shaders.emplace(name, cachedByFile);
+			m_shaderFiles.emplace(name, shaderFileName);
+			return cachedByFile;
+		}
+
+		auto shader = std::make_shared<T>();
+		std::wstring hlslPath = m_hlslDir + s2ws(shaderFileName) + L".hlsl";
+		std::wstring csoPath = m_csoDir + s2ws(shaderFileName) + L".cso";
 
 		log_printf("Loading Shader: %s\n", LogLevel::Info, name.c_str());
 		log_printf(" HLSL Path: %ls\n", LogLevel::Info, hlslPath.c_str());
@@ -150,7 +165,30 @@ public:
 		}
 
 		m_shaders[name] = shader;
+		m_shaderFiles[name] = shaderFileName;
 		return shader;
+	}
+
+	template<typename T>
+	std::shared_ptr<T> LoadByFile(const std::string& fileName)
+	{
+		const std::string shaderFileName = std::filesystem::path(fileName).stem().string();
+		for (const auto& [name, cachedFile] : m_shaderFiles) {
+			if (cachedFile == shaderFileName)
+				return Get<T>(name);
+		}
+		return load<T>("@file:" + shaderFileName, shaderFileName);
+	}
+
+	template<typename T>
+	std::shared_ptr<T> GetByFile(const std::string& fileName)
+	{
+		const std::string shaderFileName = std::filesystem::path(fileName).stem().string();
+		for (const auto& [name, cachedFile] : m_shaderFiles) {
+			if (cachedFile == shaderFileName)
+				return Get<T>(name);
+		}
+		return nullptr;
 	}
 
 	/**
@@ -194,6 +232,35 @@ public:
 			}
 		}
 	}
+
+	// Drop cached shaders that are not currently referenced outside this manager.
+	size_t UnloadUnused() {
+		size_t removed = 0;
+		for (auto it = m_shaders.begin(); it != m_shaders.end();) {
+			auto* shader = it->second.get();
+			const auto managerReferences = std::count_if(m_shaders.begin(), m_shaders.end(),
+				[shader](const auto& entry) { return entry.second.get() == shader; });
+			if (it->second.use_count() == managerReferences) {
+				for (auto entry = m_shaders.begin(); entry != m_shaders.end();) {
+					if (entry->second.get() == shader) {
+						m_shaderFiles.erase(entry->first);
+						entry = m_shaders.erase(entry);
+						++removed;
+					} else {
+						++entry;
+					}
+				}
+				it = m_shaders.begin();
+			} else {
+				++it;
+			}
+		}
+		return removed;
+	}
+
+	size_t GetLoadedCount() const { return m_shaders.size(); }
+
+	void UnloadAll() { m_shaders.clear(); m_shaderFiles.clear(); }
 
 	/**
 	 * @brief ImGui を使用したシェーダー管理UIを描画
@@ -284,4 +351,5 @@ private:
 	 * value: Shader_Base 派生インスタンス
 	 */
 	std::unordered_map<std::string, std::shared_ptr<Shader_Base>> m_shaders;
+	std::unordered_map<std::string, std::string> m_shaderFiles;
 };

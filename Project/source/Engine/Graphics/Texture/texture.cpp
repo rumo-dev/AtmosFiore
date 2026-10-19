@@ -40,8 +40,8 @@ HRESULT load_texture_from_file(ID3D11Device* device, const wchar_t* filename,
 		{
 
 			hr = CreateWICTextureFromFile(device, filename, resource.GetAddressOf(), shader_resource_view);
-			resources.insert(make_pair(filename, *shader_resource_view));
 		}
+		if (SUCCEEDED(hr)) resources.insert_or_assign(filename, *shader_resource_view);
 	}
 	if (FAILED(hr)) {
 		log_printf("texture取得 >>失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
@@ -69,6 +69,27 @@ HRESULT load_texture_from_file(ID3D11Device* device, const wchar_t* filename,
 void release_all_textures()
 {
 	resources.clear();
+}
+
+size_t release_unused_textures()
+{
+	size_t released = 0;
+	for (auto it = resources.begin(); it != resources.end();)
+	{
+		ID3D11ShaderResourceView* view = it->second.Get();
+		const ULONG referencesWithProbe = view->AddRef();
+		view->Release();
+		if (referencesWithProbe == 2)
+		{
+			it = resources.erase(it);
+			++released;
+		}
+		else
+		{
+			++it;
+		}
+	}
+	return released;
 }
 
 HRESULT make_dummy_texture(ID3D11Device* device, ID3D11ShaderResourceView** shader_resource_view, DWORD value/*0xAABBGGRR*/, UINT dimension)

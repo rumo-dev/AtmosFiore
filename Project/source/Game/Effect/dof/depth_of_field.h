@@ -102,6 +102,9 @@ public:
 	/** @brief DoF 有効フラグ（0 = オフ、オリジナルをそのまま出力） */
 	int  is_dof = 1;
 	int  debug_view = 0; // 0=通常, 1=FFS結果, 2=Near CoC, 3=Far CoC
+	float blur_strength = 1.0f;
+	float debug_blur_threshold_px = 1.0f;
+	bool show_debug_overlay = false;
 
 	/**
 	 * @brief ハーフ解像度処理フラグ

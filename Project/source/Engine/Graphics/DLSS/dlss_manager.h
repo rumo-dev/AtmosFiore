@@ -52,7 +52,5 @@ private:
 	std::string m_reason = "NGX is not initialized";
 	std::unique_ptr<FullscreenQuad> m_fullscreenQuad;
 	std::unique_ptr<Framebuffer> m_scaledColor;
-	std::unique_ptr<Framebuffer> m_scaledDepth;
-	std::unique_ptr<Framebuffer> m_scaledMotionVectors;
 	std::unique_ptr<Framebuffer> m_output;
 };

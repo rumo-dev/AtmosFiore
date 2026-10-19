@@ -46,10 +46,10 @@ void Sky::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceView*
 		color_map->Activate(immediate_context);
 		{
 			ID3D11ShaderResourceView* srvs[2] = { input_hdr_srv ,Graphics_Core::instance().get_geometry_buffer()->GetDepth() };
-			bit_block_transfer->Blit(immediate_context, srvs, 0, 2, Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("SKY_PS"));
+			bit_block_transfer->Blit(immediate_context, srvs, 0, 2, Resource_Manager::instance().get_native_shader<Pixel_Shader>("SKY_PS"));
 		}
+		// Release G-buffer depth before restoring it as the previous depth target.
+		immediate_context->PSSetShaderResources(0, 2, null_srvs);
 		color_map->Deactivate(immediate_context);
 	}
-
-	immediate_context->PSSetShaderResources(0, 2, null_srvs);
 }

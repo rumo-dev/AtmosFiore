@@ -262,8 +262,8 @@ void Dashboard::InitializeUI() {
 	} });
 
 	dash.RegisterModule({ "Resource", {
-		{"Shaders", "Manage and hot-reload shaders", [](SharedMetricsData& d) { Resource_Manager::instance().shader_manager.draw_imgui(); }},
-		{"Models",  "View loaded 3D models", [](SharedMetricsData& d) { Resource_Manager::instance().model_manager.draw_imgui(); }},
+		{"Shaders", "Manage and hot-reload shaders", [](SharedMetricsData& d) { Resource_Manager::instance().draw_shader_debug(); }},
+		{"Models",  "View loaded 3D models", [](SharedMetricsData& d) { Resource_Manager::instance().draw_model_debug(); }},
 	} });
 
 	dash.RegisterModule({ "Camera", {

@@ -7,9 +7,7 @@
 
 #include "nvsdk_ngx_helpers.h"
 #include "nvsdk_ngx_helpers_d3d.h"
-#include "Engine/Graphics/Shader/shader.h"
 #include "Engine/System/graphics_core.h"
-#include "Engine/System/Manager/resource_manager.h"
 #include "Engine/System/Manager/PostProcess/post_process_manager.h"
 #include "Game/World/camera/camera_manager.h"
 
@@ -107,8 +105,7 @@ bool DLSSManager::CreateFeature() {
 	createParams.Feature.InTargetWidth = m_outputWidth;
 	createParams.Feature.InTargetHeight = m_outputHeight;
 	createParams.Feature.InPerfQualityValue = ToNgxMode(m_mode);
-	// The G-buffer motion vectors are produced at output resolution. DLSS expects
-	// render-resolution vectors when MVLowRes is set; Process downsamples them.
+	// The G-buffer produces render-resolution motion vectors for MVLowRes.
 	createParams.InFeatureCreateFlags = NVSDK_NGX_DLSS_Feature_Flags_MVLowRes | NVSDK_NGX_DLSS_Feature_Flags_IsHDR;
 	createParams.InEnableOutputSubrects = false;
 	NVSDK_NGX_Handle* feature = nullptr;
@@ -125,8 +122,6 @@ bool DLSSManager::CreateFeature() {
 	m_inputHeight = renderHeight;
 	auto* device = m_device;
 	m_scaledColor = std::make_unique<Framebuffer>(device, renderWidth, renderHeight, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
-	m_scaledDepth = std::make_unique<Framebuffer>(device, renderWidth, renderHeight, DXGI_FORMAT_R32_FLOAT, 1, false);
-	m_scaledMotionVectors = std::make_unique<Framebuffer>(device, renderWidth, renderHeight, DXGI_FORMAT_R16G16_FLOAT, 1, false);
 	m_featureDirty = false;
 	m_resetNextFrame = true;
 	m_reason.clear();
@@ -178,32 +173,20 @@ bool DLSSManager::Process(ID3D11DeviceContext* context, ID3D11ShaderResourceView
 	if (!m_enabled || !IsAvailable() || !context || !color || !depth || !motionVectors) return false;
 	if (m_featureDirty && !CreateFeature()) return false;
 
-	// The scene is still rendered at output resolution, so resample the linear
-	// HDR color, depth, and motion vectors to NGX's recommended render size.
+	// Post-process color targets remain at output resolution, so resample the
+	// linear HDR color to NGX's recommended render size.
 	Render_State::instance().set_blend_state(context, Blend_State::Opaque);
 	m_scaledColor->Clear(context);
 	m_scaledColor->Activate(context);
 	m_fullscreenQuad->Blit(context, &color, 0, 1);
 	m_scaledColor->Deactivate(context);
 
-	// Use point sampling for depth so foreground/background depth discontinuities
-	// are not averaged together during the resolution conversion.
-	ID3D11PixelShader* depthCopyShader = Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DLSS_DEPTH_COPY_PS");
-	m_scaledDepth->Clear(context);
-	m_scaledDepth->Activate(context);
-	m_fullscreenQuad->Blit(context, &depth, 0, 1, depthCopyShader);
-	m_scaledDepth->Deactivate(context);
-
-	ID3D11PixelShader* motionCopyShader = Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("DLSS_MOTION_COPY_PS");
-	m_scaledMotionVectors->Clear(context, 0.0f, 0.0f, 0.0f, 0.0f);
-	m_scaledMotionVectors->Activate(context);
-	m_fullscreenQuad->Blit(context, &motionVectors, 0, 1, motionCopyShader);
-	m_scaledMotionVectors->Deactivate(context);
-
+	// GeometryBuffer already matches DLSS's input resolution, so use its depth
+	// and motion-vector resources directly instead of copying them every frame.
 	Microsoft::WRL::ComPtr<ID3D11Resource> colorResource, depthResource, motionResource, outputResource;
 	m_scaledColor->GetColorMap()->GetResource(&colorResource);
-	m_scaledDepth->GetColorMap()->GetResource(&depthResource);
-	m_scaledMotionVectors->GetColorMap()->GetResource(&motionResource);
+	depth->GetResource(&depthResource);
+	motionVectors->GetResource(&motionResource);
 	m_output->GetColorMap()->GetResource(&outputResource);
 
 	NVSDK_NGX_Parameter* parameters = nullptr;

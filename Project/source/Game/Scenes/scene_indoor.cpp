@@ -69,8 +69,8 @@ void Scene_Indoor::initialize()
 	library.animation_speed = 0.01f;
 	library.anim_mode = Gltf_Model::animation_mode::all;
 
-	auto& mgr = Resource_Manager::instance().model_manager;
-	mgr.add_instance("Library", library);
+	auto& mgr = Resource_Manager::instance();
+	mgr.add_model_instance("Library", library);
 
 	IBL::Initialize(device, L"./data/ibl");
 
@@ -176,7 +176,7 @@ void Scene_Indoor::update(float elapsedTime)
 	Graphics_Core::instance().get_area_light_manager().update();
 	Graphics_Core::instance().get_area_light_manager().upload_to_gpu(Graphics_Core::instance().get_device_context());
 
-	Resource_Manager::instance().model_manager.update(elapsedTime);
+	Resource_Manager::instance().update_models(elapsedTime);
 }
 
 // 描画処理
@@ -215,7 +215,7 @@ void Scene_Indoor::render_shadowmap(float elapsedTime) {
 		TRACY_GPU_ZONE_C("DirectionalShadow_GPU", TracyCategory::Shadow);
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Directional Shadow");
 		shadower.make_directional_shadow_begin();
-		Resource_Manager::instance().model_manager.render_all(pass_mode::directional_shadow);
+		Resource_Manager::instance().render_models(pass_mode::directional_shadow);
 		shadower.make_shadow_end();
 	}
 
@@ -230,12 +230,12 @@ void Scene_Indoor::render_shadowmap(float elapsedTime) {
 
 		shadower.make_shadow_begin(shadow::PointShadowFace::Front, lightIndex, clearFrontAtlas);
 		clearFrontAtlas = false;
-		Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
+		Resource_Manager::instance().render_models(pass_mode::shadow);
 		shadower.make_shadow_end();
 
 		shadower.make_shadow_begin(shadow::PointShadowFace::Back, lightIndex, clearBackAtlas);
 		clearBackAtlas = false;
-		Resource_Manager::instance().model_manager.render_all(pass_mode::shadow);
+		Resource_Manager::instance().render_models(pass_mode::shadow);
 		shadower.make_shadow_end();
 	}
 }
@@ -257,7 +257,7 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 	Graphics_Core::instance().get_geometry_buffer()->Activate(immediate_context);
 	Render_State::instance().set_deferred_render_states(immediate_context, Rasterizer_State::Cull_None_CCW);
 
-	Resource_Manager::instance().model_manager.render_all(pass_mode::deferred_geometry);
+	Resource_Manager::instance().render_models(pass_mode::deferred_geometry);
 	Graphics_Core::instance().get_geometry_buffer()->Deactivate(immediate_context);
 }
 
@@ -270,7 +270,10 @@ void Scene_Indoor::render_forward(float elapsedTime) {
 	DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Forward");
 
 	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	immediate_context->OMSetRenderTargets(1, Graphics_Core::instance().get_render_target_view().GetAddressOf(), Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
+	// The back buffer is at output resolution, while the G-buffer depth surface
+	// may be at DLSS render resolution. Post_Process_Manager::begin binds the
+	// matching render-resolution color/depth targets immediately afterwards.
+	immediate_context->OMSetRenderTargets(1, Graphics_Core::instance().get_render_target_view().GetAddressOf(), nullptr);
 
 	Render_State::instance().set_2d_render_states(immediate_context);
 	Graphics_Core::instance().clear(Color_Utils::from_hex("#291F32"));
@@ -278,7 +281,7 @@ void Scene_Indoor::render_forward(float elapsedTime) {
 	Graphics_Core::instance().post_procss.begin();
 	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 
-	Resource_Manager::instance().model_manager.render_all(pass_mode::forward_transparency);
+	Resource_Manager::instance().render_models(pass_mode::forward_transparency);
 	render_debug(elapsedTime);
 }
 
@@ -315,7 +318,7 @@ void Scene_Indoor::render_debug(float elapsedTime) {
 
 	Graphics_Core::instance().get_point_light_manager().debug_render();
 	Graphics_Core::instance().get_spot_light_manager().debug_render();
-	Graphics_Core::instance().get_area_light_manager().debug_render();
+	Graphics_Core::instance().get_area_light_manager().debug_render(Graphics_Core::instance().get_device_context());
 }
 
 // GUI描画

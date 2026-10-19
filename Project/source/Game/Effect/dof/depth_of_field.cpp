@@ -208,7 +208,10 @@ void DepthOfField::make(
 	ffs_data.work_width_cb = static_cast<int>(work_width);
 	ffs_data.work_height_cb = static_cast<int>(work_height);
 	const float max_blur_radius = CameraManager::instance().get_active_camera()->get_camera().MaxBlurRadius;
-	ffs_data.max_radius_work = (std::min)(max_blur_radius, static_cast<float>(MAX_BLUR_RADIUS_ASSUMED)) * local_data.work_scale;
+	const float effective_max_blur = (std::min)(
+		max_blur_radius * std::clamp(blur_strength, 0.0f, 4.0f),
+		static_cast<float>(MAX_BLUR_RADIUS_ASSUMED));
+	ffs_data.max_radius_work = effective_max_blur * local_data.work_scale;
 	ffs_data.fixed_scale = FFS_FIXED_SCALE;
 	immediate_context->UpdateSubresource(ffs_constant_buffer.Get(), 0, 0, &ffs_data, 0, 0);
 	// CS / PS 両方にバインド
@@ -230,8 +233,9 @@ void DepthOfField::make(
 		};
 		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, coc_generation_ps.Get());
 	}
-	coc_map->Deactivate(immediate_context);
+	// Release G-buffer depth before restoring it as the previous depth target.
 	immediate_context->PSSetShaderResources(0, 2, null_srvs);
+	coc_map->Deactivate(immediate_context);
 
 	// ============================================================
 	// Pass 2: Scatter the complete color image using signed near/far CoC.

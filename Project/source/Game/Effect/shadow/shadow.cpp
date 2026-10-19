@@ -85,7 +85,7 @@ void shadow::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVi
 				shader_resource_views,
 				0,
 				6,
-				Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("SHADOW_PS")
+				Resource_Manager::instance().get_native_shader<Pixel_Shader>("SHADOW_PS")
 			);
 		}
 		shaded->Deactivate(immediate_context);

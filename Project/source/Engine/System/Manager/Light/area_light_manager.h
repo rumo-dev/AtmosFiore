@@ -128,7 +128,7 @@ public:
 	 * @note
 	 * デバッグ用途のみ使用
 	 */
-	void debug_render();
+	void debug_render(ID3D11DeviceContext* immediate_context);
 
 private:
 	/// ライト配列

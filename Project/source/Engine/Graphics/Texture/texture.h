@@ -8,6 +8,7 @@ using namespace Microsoft::WRL;
 #include <string>
 #include <sstream>
 #include <map>
+#include <cstddef>
 using namespace std;
 
 #include "texture.h"
@@ -52,6 +53,9 @@ HRESULT load_texture_from_file(
  * アプリケーション終了時やリソースリロード時に使用
  */
 void release_all_textures();
+
+/// Release cached texture views whose only remaining reference is the cache itself.
+size_t release_unused_textures();
 
 /**
  * @brief ダミーテクスチャ生成

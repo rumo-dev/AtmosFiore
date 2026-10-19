@@ -58,11 +58,6 @@ private:
 	/// 頂点バッファ生�??
 	bool create_vs_buffer_object(ID3D11Device* device);
 
-	/// 頂点シェーダーと入力レイアウト生�?
-	bool create_vs_shader_object_and_input_layout(ID3D11Device* device);
-
-	/// ピクセルシェーダー生�??
-	bool create_ps_shader_object(ID3D11Device* device);
 
 public:
 	/**

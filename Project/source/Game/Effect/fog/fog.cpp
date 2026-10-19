@@ -72,7 +72,7 @@ void Fog::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceView*
 			color_map,
 			deapth_map
 		};
-		bit_block_transfer->Blit(immediate_context, shader_resource_views, 0, 2, Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("FOG_PS"));
+		bit_block_transfer->Blit(immediate_context, shader_resource_views, 0, 2, Resource_Manager::instance().get_native_shader<Pixel_Shader>("FOG_PS"));
 	}
 
 

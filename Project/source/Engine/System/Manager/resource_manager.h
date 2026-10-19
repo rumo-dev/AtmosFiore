@@ -1,6 +1,11 @@
 #pragma once
 #include "Engine/System/Manager/Shader/shader_manager.h"
 #include "Engine/System/Manager/Model/model_manager.h"
+#include <memory>
+#include <string>
+#include <cstddef>
+#include <utility>
+#include <d3d11.h>
 
 /**
  * @brief 各種リソース管理クラス（シングルトン）
@@ -41,7 +46,7 @@
  * rm.load_models();
  *
  * // 使用例（Shader）
- * auto vs = rm.shader_manager.Get<Vertex_Shader>("BasicVS");
+ * auto vs = rm.get_shader<Vertex_Shader>("BasicVS");
  *
  * // ImGui デバッグUI
  * rm.draw_imgui();
@@ -59,11 +64,46 @@ public:
 		return inst;
 	}
 
-	/// シェーダーマネージャ
-	ShaderManager shader_manager;
+	template<typename T>
+	std::shared_ptr<T> load_shader(const std::string& name, const std::string& file,
+		const std::string& entry = "", const std::string& target = "") {
+		return shader_manager_.load<T>(name, file, entry, target);
+	}
 
-	/// モデルマネージャ
-	ModelManager model_manager;
+	template<typename T>
+	std::shared_ptr<T> get_shader(const std::string& name) {
+		return shader_manager_.Get<T>(name);
+	}
+
+	template<typename T>
+	auto get_native_shader(const std::string& name) {
+		return shader_manager_.GetNative<T>(name);
+	}
+
+	template<typename T>
+	std::shared_ptr<T> load_shader_file(const std::string& fileName) {
+		return shader_manager_.LoadByFile<T>(fileName);
+	}
+
+	template<typename T>
+	std::shared_ptr<T> get_shader_file(const std::string& fileName) {
+		return shader_manager_.GetByFile<T>(fileName);
+	}
+
+	Gltf_Model* load_model(const std::string& key, const std::string& path) {
+		return model_manager_.load(key, path);
+	}
+	Gltf_Model* get_model(const std::string& key) { return model_manager_.get_model(key); }
+	void add_model_instance(const std::string& key, ModelInstance instance) { model_manager_.add_instance(key, std::move(instance)); }
+	ModelInstance* get_model_instance(const std::string& key) { return model_manager_.get_instance(key); }
+	void remove_model_instance(const std::string& key) { model_manager_.remove_instance(key); }
+	void update_models(float delta_time) { model_manager_.update(delta_time); }
+	void render_models(pass_mode pass) { model_manager_.render_all(pass); }
+	void draw_shader_debug() { shader_manager_.draw_imgui(); }
+	void draw_model_debug() { model_manager_.draw_imgui(); }
+	HRESULT load_texture(const std::wstring& path, ID3D11ShaderResourceView** view,
+		D3D11_TEXTURE2D_DESC* desc = nullptr);
+	HRESULT load_texture_memory(const void* data, size_t size, ID3D11ShaderResourceView** view);
 
 	/**
 	 * @brief 全リソースをロード
@@ -83,6 +123,10 @@ public:
 	 */
 	void load_models();
 
+	// Release cache entries that have no live users and report how many were freed.
+	size_t unload_unused();
+	void unload_all();
+
 	/**
 	 * @brief ImGui デバッグUI描画
 	 *
@@ -95,21 +139,34 @@ public:
 	{
 #ifdef USE_IMGUI
 
+		if (ImGui::Button("Release unused resources"))
+			unload_unused();
+		ImGui::SameLine();
+		if (ImGui::Button("Release all resources"))
+			unload_all();
+		ImGui::Text("Cached shaders: %zu | models: %zu | instances: %zu",
+			shader_manager_.GetLoadedCount(), model_manager_.get_loaded_model_count(), model_manager_.get_instance_count());
+
 		if (ImGui::CollapsingHeader("Shaders"))
-			shader_manager.draw_imgui();
+			shader_manager_.draw_imgui();
 
 		if (ImGui::CollapsingHeader("Textures"))
 			ImGui::Text("Texture viewer is not implemented yet.");
 
 		if (ImGui::CollapsingHeader("Models"))
-			model_manager.draw_imgui();
+			model_manager_.draw_imgui();
 
 #endif  // USE_IMGUI
 	}
 
 private:
+	/// 具体的なキャッシュへのアクセスは Resource_Manager に集約する
+	ShaderManager shader_manager_;
+	ModelManager model_manager_;
+	bool shaders_loaded_ = false;
+
 	/// コンストラクタ（外部生成禁止）
-	Resource_Manager() = default;
+	Resource_Manager();
 
 	/// コピー禁止
 	Resource_Manager(const Resource_Manager&) = delete;

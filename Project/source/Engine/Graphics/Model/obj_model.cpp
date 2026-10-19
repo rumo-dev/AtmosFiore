@@ -1,5 +1,6 @@
 
 #include "obj_model.h"
+#include "Engine/System/Manager/resource_manager.h"
 
 using namespace DirectX;
 Obj_Model::Obj_Model(ID3D11Device* device, const wchar_t* obj_filename, bool flipping_v_coordinates/*UNIT.14*/)
@@ -343,14 +344,12 @@ Obj_Model::Obj_Model(ID3D11Device* device, const wchar_t* obj_filename, bool fli
 	// UNIT.14
 	D3D11_TEXTURE2D_DESC texture2d_desc{};
 	// UNIT.15
-	//load_texture_from_file(device, texture_filename.c_str(), shader_resource_view.GetAddressOf(), &texture2d_desc);
 	for (Material& material : materials)
 	{
-		//load_texture_from_file(device, material.texture_filename.c_str(), material.shader_resource_view.GetAddressOf(), &texture2d_desc);
 		// UNIT.16
 		if (material.texture_filenames[0].size() > 0)
 		{
-			load_texture_from_file(device, material.texture_filenames[0].c_str(), material.shader_resource_views[0].GetAddressOf(), &texture2d_desc);
+			Resource_Manager::instance().load_texture(material.texture_filenames[0], material.shader_resource_views[0].GetAddressOf(), &texture2d_desc);
 		}
 		else
 		{
@@ -358,7 +357,7 @@ Obj_Model::Obj_Model(ID3D11Device* device, const wchar_t* obj_filename, bool fli
 		}
 		if (material.texture_filenames[1].size() > 0)
 		{
-			load_texture_from_file(device, material.texture_filenames[1].c_str(), material.shader_resource_views[1].GetAddressOf(), &texture2d_desc);
+			Resource_Manager::instance().load_texture(material.texture_filenames[1], material.shader_resource_views[1].GetAddressOf(), &texture2d_desc);
 		}
 		else
 		{

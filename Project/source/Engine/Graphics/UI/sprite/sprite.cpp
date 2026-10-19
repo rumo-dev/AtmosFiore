@@ -1,8 +1,8 @@
 #include "sprite.h"
 #include <sstream>
 #include <WICTextureLoader.h>
-#include "Engine/Graphics/texture/texture.h"
 #include "Engine/Graphics/shader/shader.h"
+#include "Engine/System/Manager/resource_manager.h"
 
 sprite::sprite(ID3D11Device* device, const wchar_t* filename) {
 	create_vs_buffer_object(device);
@@ -17,10 +17,7 @@ sprite::sprite(ID3D11Device* device, const wchar_t* filename) {
 	create_vs_from_cso(device, "sprite_vs.cso", &_vertex_shader, &_input_layout, layout, 3);
 	create_ps_from_cso(device, "sprite_ps.cso", &_pixel_shader);
 	/// --- テクスチャの読み込み ---
-	load_texture_from_file(device, filename, &_shader_resource_view, &_texture2d_desc);
-
-	/// --- 不要なテクスチャリソースの開放 ---
-	release_all_textures();
+	Resource_Manager::instance().load_texture(filename, &_shader_resource_view, &_texture2d_desc);
 
 }
 bool sprite::create_vs_buffer_object(ID3D11Device* device) {
@@ -171,73 +168,6 @@ void sprite::render(ID3D11DeviceContext* immediate_context,
 	immediate_context->PSSetShader(_pixel_shader, nullptr, 0);
 	immediate_context->PSSetShaderResources(0, 1, &_shader_resource_view);
 	immediate_context->Draw(4, 0);
-}
-bool sprite::create_vs_shader_object_and_input_layout(ID3D11Device* device) {
-	HRESULT hr{ S_OK };
-
-	const char* cso_name{ "./data/shaders/cso/sprite_vs.cso" };
-
-	FILE* fp{};
-	fopen_s(&fp, cso_name, "rb");
-
-	if (!fp) {
-		log_printf("スプライトー＞vsシェーダーの取得 >> 失敗", LogLevel::Warning);
-	}
-	fseek(fp, 0, SEEK_END);
-	long cso_sz{ ftell(fp) };
-	fseek(fp, 0, SEEK_SET);
-
-	std::unique_ptr<unsigned char[]> cso_data{ std::make_unique<unsigned char[]>(cso_sz) };
-	fread(cso_data.get(), cso_sz, 1, fp);
-	fclose(fp);
-
-	hr = device->CreateVertexShader(cso_data.get(), cso_sz, nullptr, &_vertex_shader);
-	if (FAILED(hr)) {
-		log_printf("スプライトシェーダーオブジェクトの生成 >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
-		return false;
-	}
-	log_printf("スプライトシェーダーオブジェクトの生成 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
-
-	D3D11_INPUT_ELEMENT_DESC layout[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		 { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	};
-
-
-	UINT num_elements = ARRAYSIZE(layout);
-	hr = device->CreateInputLayout(layout, num_elements, cso_data.get(), cso_sz, &_input_layout);
-	if (FAILED(hr)) {
-		log_printf("スプライトー＞入力レイアウトの生成 >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
-		return false;
-	}
-	log_printf("スプライトー＞入力レイアウトの生成 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
-	return true;
-}
-
-bool sprite::create_ps_shader_object(ID3D11Device* device) {
-	HRESULT hr{ S_OK };
-	const char* cso_name{ "./data/shaders/cso/sprite_ps.cso" };
-	FILE* fp{};
-	fopen_s(&fp, cso_name, "rb");
-	if (!fp) {
-		log_printf("スプライトー＞psシェーダーの取得 >> 失敗", LogLevel::Warning);
-		return false;
-	}
-	fseek(fp, 0, SEEK_END);
-	long cso_sz{ ftell(fp) };
-	fseek(fp, 0, SEEK_SET);
-	std::unique_ptr<unsigned char[]> cso_data{ std::make_unique<unsigned char[]>(cso_sz) };
-	fread(cso_data.get(), cso_sz, 1, fp);
-	fclose(fp);
-	hr = device->CreatePixelShader(cso_data.get(), cso_sz, nullptr, &_pixel_shader);
-	if (FAILED(hr)) {
-		log_printf("スプライトー＞ピクセルシェーダーの生成 >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
-		return false;
-	}
-	log_printf("スプライトー＞ピクセルシェーダーの生成 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
-	return true;
 }
 //bool sprite::create_shader_resource_view_object(ID3D11Device* device, const wchar_t* filename) {
 //	ID3D11Resource* resource{};

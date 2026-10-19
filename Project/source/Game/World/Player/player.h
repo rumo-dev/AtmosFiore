@@ -71,7 +71,7 @@ public:
 	{
 		TRACY_CPU_ZONE_C("Player::setup_collision", TracyCategory::System);
 
-		auto& mgr = Resource_Manager::instance().model_manager;
+		auto& mgr = Resource_Manager::instance();
 		Gltf_Model* model = mgr.get_model(model_key);
 		if (!model) return false;
 
@@ -130,7 +130,7 @@ public:
 		inst.animation_speed = 1.0f;
 		inst.anim_mode = Gltf_Model::animation_mode::single;
 
-		Resource_Manager::instance().model_manager.add_instance(instance_key_, inst);
+		Resource_Manager::instance().add_model_instance(instance_key_, inst);
 	}
 
 	// ======================================================
@@ -184,13 +184,13 @@ public:
 	{
 		TRACY_CPU_ZONE_C("Player::sync_model_instance", TracyCategory::Update);
 
-		auto& mgr = Resource_Manager::instance().model_manager;
+		auto& mgr = Resource_Manager::instance();
 
 		// モデル名が変更されたら再登録
 		if (last_model_name_ != model_name_)
 		{
 			last_model_name_ = model_name_;
-			mgr.remove_instance(instance_key_);
+			mgr.remove_model_instance(instance_key_);
 
 			ModelInstance new_inst;
 			new_inst.model_key = model_name_;
@@ -202,10 +202,10 @@ public:
 			new_inst.animation_speed = 1.0f;
 			new_inst.anim_mode = Gltf_Model::animation_mode::single;
 
-			mgr.add_instance(instance_key_, new_inst);
+			mgr.add_model_instance(instance_key_, new_inst);
 		}
 
-		auto* inst = mgr.get_instance(instance_key_);
+		auto* inst = mgr.get_model_instance(instance_key_);
 		if (!inst) return;
 
 		inst->world_transform = get_world_transform();

@@ -1,4 +1,5 @@
 #include "graphics_core.h"
+#include "Engine/System/Manager/resource_manager.h"
 #include "Engine/utilities/misc.h"
 #include "Engine/utilities/color_util.h"
 #include "tracy_util.h"
@@ -24,6 +25,7 @@ void Graphics_Core::initialize(HWND hwnd) {
 
 
 	create_device();
+	Resource_Manager::instance().load_shaders();
 	create_swap_chain();
 	create_render_target_view();
 	set_viewport();

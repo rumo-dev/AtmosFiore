@@ -104,6 +104,11 @@ public:
 	 */
 	void unload_all();
 
+	// Release cached models not referenced by any live instance.
+	size_t unload_unused();
+	size_t get_loaded_model_count() const { return model_cache_.size(); }
+	size_t get_instance_count() const { return instances_.size(); }
+
 	// ─────────────────────────────
 	// インスタンス管理
 	// ─────────────────────────────

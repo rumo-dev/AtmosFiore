@@ -1,5 +1,6 @@
 #pragma once
 #include <stdio.h>
+#include <atomic>
 #include "Engine/utilities/misc.h"
 
 /**
@@ -98,7 +99,7 @@ public:
      * @note
      * 主にローディングシーンとの連携に使用
      */
-    bool is_ready() const { return _ready; }
+    bool is_ready() const { return _ready.load(std::memory_order_acquire); }
 
     /**
      * @brief 準備完了フラグ設定
@@ -106,7 +107,7 @@ public:
      * @warning
      * 非同期スレッドから呼ぶ場合は競合に注意（atomic推奨）
      */
-    void set_ready() { _ready = true; }
+    void set_ready() { _ready.store(true, std::memory_order_release); }
 
 private:
 
@@ -116,5 +117,5 @@ private:
      * @note
      * ローディングシーンなどで利用
      */
-    bool _ready = false;
+    std::atomic_bool _ready{ false };
 };

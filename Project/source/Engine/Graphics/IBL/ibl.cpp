@@ -1,35 +1,32 @@
 #include "IBL.h"
-#include "Engine/Graphics/Texture/texture.h"   
+#include "Engine/System/Manager/resource_manager.h"
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> IBL::m_srvs[TextureCount];
 HRESULT IBL::Initialize(ID3D11Device* device, const std::wstring& basePath)
 {
+	(void)device;
 	D3D11_TEXTURE2D_DESC desc = {};
 
 	HRESULT hr{ S_OK };
 
-	hr = load_texture_from_file(
-		device,
+	hr = Resource_Manager::instance().load_texture(
 		(basePath + L"/sunset_jhbcentral_4k/sunset_jhbcentral_4k.dds").c_str(),
 		m_srvs[Environment].GetAddressOf(),
 		&desc
 	);
 
-	hr = load_texture_from_file(
-		device,
+	hr = Resource_Manager::instance().load_texture(
 		(basePath + L"/sunset_jhbcentral_4k/diffuse_iem.dds").c_str(),
 		m_srvs[DiffuseIEM].GetAddressOf(),
 		&desc
 	);
 
-	hr = load_texture_from_file(
-		device,
+	hr = Resource_Manager::instance().load_texture(
 		(basePath + L"/sunset_jhbcentral_4k/specular_pmrem.dds").c_str(),
 		m_srvs[SpecularPMREM].GetAddressOf(),
 		&desc
 	);
 
-	hr = load_texture_from_file(
-		device,
+	hr = Resource_Manager::instance().load_texture(
 		(basePath + L"/lut_ggx.dds").c_str(),
 		m_srvs[LUT_GGX].GetAddressOf(),
 		&desc

@@ -33,7 +33,7 @@ void $safeitemrootname$::make(ID3D11DeviceContext* immediate_context, ID3D11Shad
 	color_map->Activate(immediate_context);
 	{
 		ID3D11ShaderResourceView* srvs[1] = {};
-		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("_PS"));
+		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, Resource_Manager::instance().get_native_shader<Pixel_Shader>("_PS"));
 	}
 	color_map->Deactivate(immediate_context);
 

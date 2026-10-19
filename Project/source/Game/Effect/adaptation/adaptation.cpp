@@ -72,7 +72,7 @@ void Adaptation::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResour
 	immediate_context->CSSetShaderResources(0, 1, &input_hdr_srv);
 	immediate_context->CSSetUnorderedAccessViews(0, 1, exposure_uav.GetAddressOf(), nullptr);
 	immediate_context->CSSetConstantBuffers(0, 1, cb_adaptation.GetAddressOf());
-	immediate_context->CSSetShader(Resource_Manager::instance().shader_manager.GetNative<Compute_Shader>("ADAPTATION_CS"), nullptr, 0);
+	immediate_context->CSSetShader(Resource_Manager::instance().get_native_shader<Compute_Shader>("ADAPTATION_CS"), nullptr, 0);
 
 	immediate_context->Dispatch(1, 1, 1);
 
@@ -88,7 +88,7 @@ void Adaptation::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResour
 	{
 		// ここでバインドするとき、上記でUAVが外れているため SRV（exposure_srv）が正常に認識されます
 		ID3D11ShaderResourceView* srvs[2] = { input_hdr_srv, exposure_srv.Get() };
-		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, Resource_Manager::instance().shader_manager.GetNative<Pixel_Shader>("ADAPTATION_PS"));
+		bit_block_transfer->Blit(immediate_context, srvs, 0, 2, Resource_Manager::instance().get_native_shader<Pixel_Shader>("ADAPTATION_PS"));
 	}
 	color_map->Deactivate(immediate_context);
 
