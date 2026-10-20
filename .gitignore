@@ -66,3 +66,8 @@ Project/x64/
 Project/AtmosFiore_Release/
 Project/ReleasePackage/concrt140.dll
 Project/ReleasePackage/
+Project/vcruntime140_1.dll
+Project/vcruntime140.dll
+Project/nvngx_dlss.dll
+Project/msvcp140.dll
+Project/AtmosFiore_Release.zip

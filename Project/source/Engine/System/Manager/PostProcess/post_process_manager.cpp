@@ -45,10 +45,17 @@ namespace {
 		float thickness = 0.2f;
 		float debug_view = 0.0f;
 	};
+	struct alignas(16) LensFlareConstants {
+		float threshold = 0.7f;
+		float intensity = 0.8f;
+		float ghost_spacing = 0.55f;
+		float streak_intensity = 0.55f;
+	};
 	SsaoConstants ssao_constants;
 	SsrConstants ssr_constants;
 	TaaConstants taa_constants;
 	SsgiConstants ssgi_constants;
+	LensFlareConstants lens_flare_constants;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssao_constant_buffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssr_constant_buffer;
 }
@@ -63,17 +70,19 @@ Framebuffer                  Post_Process_Manager::ssr_buffer;
 Framebuffer                  Post_Process_Manager::ssr_composite_buffer;
 Framebuffer                  Post_Process_Manager::ssgi_buffer;
 Framebuffer                  Post_Process_Manager::ssgi_composite_buffer;
+Framebuffer                  Post_Process_Manager::lens_flare_buffer;
+Framebuffer                  Post_Process_Manager::lens_flare_composite_buffer;
 std::array<Framebuffer, 2>   Post_Process_Manager::taa_history;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Post_Process_Manager::taa_constant_buffer;
 bool                         Post_Process_Manager::taa_enabled = true;
 bool                         Post_Process_Manager::taa_history_valid = false;
 UINT                         Post_Process_Manager::taa_history_index = 0;
-UINT                         Post_Process_Manager::taa_jitter_index = 0;
 float                        Post_Process_Manager::taa_history_weight = 0.90f;
 bool                         Post_Process_Manager::ssao_enabled = true;
 bool                         Post_Process_Manager::ssr_enabled = false;
 bool                         Post_Process_Manager::ssgi_enabled = true;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Post_Process_Manager::ssgi_constant_buffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Post_Process_Manager::lens_flare_constant_buffer;
 namespace { int ssgi_debug_view = 0; }
 Framebuffer                  Post_Process_Manager::adaptation_input;
 std::unique_ptr<DLSSManager> Post_Process_Manager::dlss = nullptr;
@@ -81,13 +90,14 @@ bool Post_Process_Manager::dlss_applied_this_frame = false;
 UINT Post_Process_Manager::render_width = 0;
 UINT Post_Process_Manager::render_height = 0;
 ID3D11ShaderResourceView*    Post_Process_Manager::final_color_map = nullptr;
-std::array<Post_Process_Manager::EffectId, 13> Post_Process_Manager::effect_order = {
+std::array<Post_Process_Manager::EffectId, 14> Post_Process_Manager::effect_order = {
 	EffectId::Sky, EffectId::VolumetricFog, EffectId::HeightFog, EffectId::DistanceFog,
 	EffectId::ExponentialFog, EffectId::DoF, EffectId::Exposure, EffectId::ChromaticAberration,
-	EffectId::LensDistortion, EffectId::Vignetting, EffectId::Bloom, EffectId::Adaptation, EffectId::ToneMapping
+	EffectId::LensDistortion, EffectId::Vignetting, EffectId::LensFlare, EffectId::Bloom,
+	EffectId::Adaptation, EffectId::ToneMapping
 };
-std::array<bool, 13> Post_Process_Manager::effect_enabled{};
-std::array<bool, 13> Post_Process_Manager::saved_effect_enabled{};
+std::array<bool, 14> Post_Process_Manager::effect_enabled{};
+std::array<bool, 14> Post_Process_Manager::saved_effect_enabled{};
 bool Post_Process_Manager::ssr_performance_mode = false;
 std::unique_ptr<bloom>       Post_Process_Manager::bloomer = nullptr;
 std::unique_ptr<Fog>         Post_Process_Manager::fogger = nullptr;
@@ -107,20 +117,6 @@ std::unique_ptr<HeightFog>           Post_Process_Manager::hgt_fog = nullptr;
 std::unique_ptr<DistanceFog>         Post_Process_Manager::dst_fog = nullptr;
 std::unique_ptr<ExponentialFog>      Post_Process_Manager::exp_fog = nullptr;
 
-namespace {
-	float halton(UINT index, UINT base)
-	{
-		float result = 0.0f;
-		float fraction = 1.0f;
-		while (index > 0) {
-			fraction /= static_cast<float>(base);
-			result += fraction * static_cast<float>(index % base);
-			index /= base;
-		}
-		return result;
-	}
-}
-
 void Post_Process_Manager::SetTAAEnabled(bool enabled)
 {
 	if (taa_enabled != enabled) {
@@ -133,7 +129,6 @@ void Post_Process_Manager::ResetTemporalHistory()
 {
 	taa_history_valid = false;
 	taa_history_index = 0;
-	taa_jitter_index = 0;
 }
 
 void Post_Process_Manager::SetSSRPerformanceMode(bool enabled)
@@ -156,13 +151,9 @@ void Post_Process_Manager::SetSSRPerformanceMode(bool enabled)
 
 DirectX::XMFLOAT2 Post_Process_Manager::GetTAAJitterNdc()
 {
-	if (!taa_enabled || (dlss && dlss->IsEnabled()) || render_width == 0 || render_height == 0)
-		return { 0.0f, 0.0f };
-	const UINT sample = (taa_jitter_index++ % 8) + 1;
-	const float pixel_x = halton(sample, 2) - 0.5f;
-	const float pixel_y = halton(sample, 3) - 0.5f;
-	return { 2.0f * pixel_x / static_cast<float>(render_width),
-		-2.0f * pixel_y / static_cast<float>(render_height) };
+	// Keep the camera projection stable. The current motion-vector path is not
+	// reliable enough to fully cancel per-frame Halton projection offsets.
+	return { 0.0f, 0.0f };
 }
 
 // ─── 初期化 ───────────────────────────────────────────────────────
@@ -183,6 +174,8 @@ void Post_Process_Manager::initialize()
 	ssr_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	lens_flare_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	lens_flare_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[0] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[1] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	D3D11_BUFFER_DESC ssao_cb_desc{};
@@ -199,6 +192,8 @@ void Post_Process_Manager::initialize()
 	device->CreateBuffer(&ssao_cb_desc, nullptr, taa_constant_buffer.GetAddressOf());
 	ssao_cb_desc.ByteWidth = sizeof(SsgiConstants);
 	device->CreateBuffer(&ssao_cb_desc, nullptr, ssgi_constant_buffer.GetAddressOf());
+	ssao_cb_desc.ByteWidth = sizeof(LensFlareConstants);
+	device->CreateBuffer(&ssao_cb_desc, nullptr, lens_flare_constant_buffer.GetAddressOf());
 	ResetTemporalHistory();
 	render_width = w;
 	render_height = h;
@@ -247,6 +242,8 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	ssr_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_buffer = Framebuffer(device, (std::max)(1u, width / 2), (std::max)(1u, height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	lens_flare_buffer = Framebuffer(device, (std::max)(1u, width / 2), (std::max)(1u, height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	lens_flare_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[0] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[1] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ResetTemporalHistory();
@@ -487,6 +484,28 @@ void Post_Process_Manager::draw()
 			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Bloom");
 			bloomer->make(ctx, current); current = bloomer->getColorMap(); break;
 		}
+		case EffectId::LensFlare: {
+			if (!lens_flare_constant_buffer) break;
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Lens Flare");
+			ctx->UpdateSubresource(lens_flare_constant_buffer.Get(), 0, nullptr, &lens_flare_constants, 0, 0);
+			ctx->PSSetConstantBuffers(12, 1, lens_flare_constant_buffer.GetAddressOf());
+			lens_flare_buffer.Clear(ctx);
+			lens_flare_buffer.Activate(ctx);
+			Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, &current, 0, 1,
+				Resource_Manager::instance().get_native_shader<Pixel_Shader>("LENS_FLARE_PS"));
+			lens_flare_buffer.Deactivate(ctx);
+			ID3D11ShaderResourceView* null_flare_inputs[2]{};
+			ctx->PSSetShaderResources(0, 1, null_flare_inputs);
+			ID3D11ShaderResourceView* flare_composite_inputs[2] = { current, lens_flare_buffer.GetColorMap() };
+			lens_flare_composite_buffer.Clear(ctx);
+			lens_flare_composite_buffer.Activate(ctx);
+			Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, flare_composite_inputs, 0, 2,
+				Resource_Manager::instance().get_native_shader<Pixel_Shader>("LENS_FLARE_COMPOSITE_PS"));
+			lens_flare_composite_buffer.Deactivate(ctx);
+			ctx->PSSetShaderResources(0, 2, null_flare_inputs);
+			current = lens_flare_composite_buffer.GetColorMap();
+			break;
+		}
 		case EffectId::VolumetricFog: {
 			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Volumetric Fog");
 			vol_fog->make(ctx, current); current = vol_fog->get_color_map(); break;
@@ -662,12 +681,12 @@ void Post_Process_Manager::drawFogGUI()
 // ─── 既存 GUI（変更なし）────────────────────────────────────────
 void Post_Process_Manager::drawPipelineGUI()
 {
-	static const char* names[] = { "Sky", "Bloom", "Adaptation", "Volumetric Fog", "Height Fog", "Distance Fog", "Exponential Fog", "DoF", "Exposure", "Chromatic Aberration", "Lens Distortion", "Vignetting", "Tone Mapping" };
+	static const char* names[] = { "Sky", "Bloom", "Adaptation", "Volumetric Fog", "Height Fog", "Distance Fog", "Exponential Fog", "DoF", "Exposure", "Chromatic Aberration", "Lens Distortion", "Vignetting", "Tone Mapping", "Lens Flare" };
 	bool taa_enabled_ui = taa_enabled;
 	if (ImGui::Checkbox("Enable TAA", &taa_enabled_ui)) SetTAAEnabled(taa_enabled_ui);
 	if (taa_enabled) {
 		ImGui::SliderFloat("TAA History Weight", &taa_history_weight, 0.5f, 0.97f, "%.2f");
-		ImGui::TextDisabled("Halton 2,3 jitter; temporal accumulation is bypassed while DLSS is enabled.");
+		ImGui::TextDisabled("Stable projection; temporal accumulation is bypassed while DLSS is enabled.");
 	}
 	ImGui::Checkbox("Enable SSAO (Alchemy AO)", &ssao_enabled);
 	if (ssao_enabled) {
@@ -700,6 +719,12 @@ void Post_Process_Manager::drawPipelineGUI()
 		ImGui::RadioButton("Before SSGI", &ssgi_debug_view, 2);
 		ssgi_constants.debug_view = static_cast<float>(ssgi_debug_view);
 	}
+	ImGui::TextDisabled("Lens flare");
+	ImGui::Checkbox("Enable Lens Flare", &effect_enabled[static_cast<size_t>(EffectId::LensFlare)]);
+	ImGui::SliderFloat("Flare Threshold", &lens_flare_constants.threshold, 0.5f, 8.0f, "%.2f HDR");
+	ImGui::SliderFloat("Flare Intensity", &lens_flare_constants.intensity, 0.0f, 1.0f, "%.2f");
+	ImGui::SliderFloat("Ghost Spacing", &lens_flare_constants.ghost_spacing, 0.1f, 1.2f, "%.2f");
+	ImGui::SliderFloat("Streak Intensity", &lens_flare_constants.streak_intensity, 0.0f, 1.0f, "%.2f");
 	ImGui::TextDisabled("The order below is the execution order.");
 	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Saved to data/post_process_settings.json" : "Could not save settings.");
 	ImGui::SameLine();
@@ -727,6 +752,7 @@ bool Post_Process_Manager::savePipelineSettings() const
 	for (bool enabled : effect_enabled) j["enabled"].push_back(enabled);
 	#define SAVE_PARAM(group, field, value) j[group][field] = value
 	SAVE_PARAM("bloom", "enabled", bloomer->is_bloom); SAVE_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); SAVE_PARAM("bloom", "intensity", bloomer->bloom_intensity);
+	SAVE_PARAM("lens_flare", "enabled", effect_enabled[static_cast<size_t>(EffectId::LensFlare)]); SAVE_PARAM("lens_flare", "threshold", lens_flare_constants.threshold); SAVE_PARAM("lens_flare", "intensity", lens_flare_constants.intensity); SAVE_PARAM("lens_flare", "ghost_spacing", lens_flare_constants.ghost_spacing); SAVE_PARAM("lens_flare", "streak_intensity", lens_flare_constants.streak_intensity);
 	SAVE_PARAM("adaptation", "target_lum", adaptation->target_lum); SAVE_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); SAVE_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
 	SAVE_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); SAVE_PARAM("tone_mapping", "mapping_type", static_cast<int>(tone_mapper->mapping_type)); SAVE_PARAM("tone_mapping", "exposure", tone_mapper->exposure); SAVE_PARAM("tone_mapping", "gamma", tone_mapper->gamma); SAVE_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); SAVE_PARAM("tone_mapping", "max_white", tone_mapper->max_white); SAVE_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); SAVE_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); SAVE_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); SAVE_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
 	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("dof", "blur_strength", dofer->blur_strength); SAVE_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); SAVE_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled);
@@ -755,14 +781,49 @@ bool Post_Process_Manager::loadPipelineSettings()
 	json j;
 	try { file >> j; } catch (...) { return false; }
 	if (!j.is_object() || j.value("version", 0) != 1) return false;
-	if (j.contains("order") && j["order"].is_array() && j["order"].size() == effect_order.size()) {
-		std::array<bool, 13> seen{}; bool valid = true;
-		for (size_t i = 0; i < effect_order.size(); ++i) { int id = j["order"][i].get<int>(); if (id < 0 || id >= 13 || seen[id]) { valid = false; break; } seen[id] = true; effect_order[i] = static_cast<EffectId>(id); }
+	if (j.contains("order") && j["order"].is_array()) {
+		const auto& saved_order = j["order"];
+		std::array<bool, 14> seen{};
+		bool valid = true;
+		if (saved_order.size() == effect_order.size()) {
+			for (size_t i = 0; i < effect_order.size(); ++i) {
+				const int id = saved_order[i].get<int>();
+				if (id < 0 || id >= static_cast<int>(effect_order.size()) || seen[id]) { valid = false; break; }
+				seen[id] = true;
+				effect_order[i] = static_cast<EffectId>(id);
+			}
+		}
+		else if (saved_order.size() == 13) {
+			// Migrate the old pipeline order and insert Lens Flare before Bloom.
+			std::array<EffectId, 14> migrated{};
+			size_t output = 0;
+			for (size_t i = 0; i < saved_order.size(); ++i) {
+				const int id = saved_order[i].get<int>();
+				if (id < 0 || id >= 13 || seen[id]) { valid = false; break; }
+				seen[id] = true;
+				if (id == static_cast<int>(EffectId::Bloom))
+					migrated[output++] = EffectId::LensFlare;
+				migrated[output++] = static_cast<EffectId>(id);
+			}
+			if (valid) effect_order = migrated;
+		}
 		if (!valid) return false;
 	}
-	if (j.contains("enabled") && j["enabled"].is_array() && j["enabled"].size() == effect_enabled.size()) for (size_t i = 0; i < effect_enabled.size(); ++i) effect_enabled[i] = j["enabled"][i].get<bool>();
+	if (j.contains("enabled") && j["enabled"].is_array()) {
+		if (j["enabled"].size() == effect_enabled.size()) {
+			for (size_t i = 0; i < effect_enabled.size(); ++i) effect_enabled[i] = j["enabled"][i].get<bool>();
+		}
+		else if (j["enabled"].size() == 13) {
+			for (size_t i = 0; i < 13; ++i) effect_enabled[i] = j["enabled"][i].get<bool>();
+		}
+	}
 	#define LOAD_PARAM(group, field, target) do { if (j.contains(group) && j[group].is_object()) target = j[group].value(field, target); } while (false)
 	LOAD_PARAM("bloom", "enabled", bloomer->is_bloom); LOAD_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); LOAD_PARAM("bloom", "intensity", bloomer->bloom_intensity);
+	LOAD_PARAM("lens_flare", "enabled", effect_enabled[static_cast<size_t>(EffectId::LensFlare)]); LOAD_PARAM("lens_flare", "threshold", lens_flare_constants.threshold); LOAD_PARAM("lens_flare", "intensity", lens_flare_constants.intensity); LOAD_PARAM("lens_flare", "ghost_spacing", lens_flare_constants.ghost_spacing); LOAD_PARAM("lens_flare", "streak_intensity", lens_flare_constants.streak_intensity);
+	lens_flare_constants.threshold = std::clamp(lens_flare_constants.threshold, 0.5f, 8.0f);
+	lens_flare_constants.intensity = std::clamp(lens_flare_constants.intensity, 0.0f, 1.0f);
+	lens_flare_constants.ghost_spacing = std::clamp(lens_flare_constants.ghost_spacing, 0.1f, 1.2f);
+	lens_flare_constants.streak_intensity = std::clamp(lens_flare_constants.streak_intensity, 0.0f, 1.0f);
 	LOAD_PARAM("adaptation", "target_lum", adaptation->target_lum); LOAD_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); LOAD_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
 	LOAD_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); { int type = static_cast<int>(tone_mapper->mapping_type); LOAD_PARAM("tone_mapping", "mapping_type", type); if (type >= 0 && type < 34) tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(type); } LOAD_PARAM("tone_mapping", "exposure", tone_mapper->exposure); LOAD_PARAM("tone_mapping", "gamma", tone_mapper->gamma); LOAD_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); LOAD_PARAM("tone_mapping", "max_white", tone_mapper->max_white); LOAD_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); LOAD_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); LOAD_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); LOAD_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
 	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("dof", "blur_strength", dofer->blur_strength); LOAD_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); LOAD_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled);

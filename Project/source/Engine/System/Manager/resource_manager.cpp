@@ -199,6 +199,8 @@ void Resource_Manager::load_shaders() {
 	load_shader<Pixel_Shader>("GAUSSIAN_BLUR_UPSAMPLING_PS", "gaussian_blur_upsampling_ps.cso");
 	load_shader<Pixel_Shader>("GAUSSIAN_BLUR_VERTICAL_PS", "gaussian_blur_vertical_ps.cso");
 	load_shader<Pixel_Shader>("GLOW_EXTRACTION_PS", "glow_extraction_ps.cso");
+	load_shader<Pixel_Shader>("LENS_FLARE_PS", "lens_flare_ps.cso");
+	load_shader<Pixel_Shader>("LENS_FLARE_COMPOSITE_PS", "lens_flare_composite_ps.cso");
 	load_shader<Pixel_Shader>("HEIGHT_FOG_PS", "height_fog_ps.cso");
 	load_shader<Pixel_Shader>("LENS_DISTORTION_PS", "lens_distortion_ps.cso");
 	load_shader<Pixel_Shader>("LOADING_BACKGROUND_PS", "loading_background_ps.cso");
