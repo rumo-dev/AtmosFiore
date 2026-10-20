@@ -112,6 +112,14 @@ void Resource_Manager::load_shaders() {
 		"SSAO_PS",
 		"ssao_ps"
 	);
+	load_shader<Pixel_Shader>(
+		"SSAO_BILATERAL_BLUR_PS",
+		"ssao_bilateral_blur_ps"
+	);
+	load_shader<Pixel_Shader>(
+		"SSAO_UPSAMPLE_PS",
+		"ssao_upsample_ps"
+	);
 	//shadow
 	load_shader<Pixel_Shader>(
 		"SHADOW_PS",

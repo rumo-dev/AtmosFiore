@@ -182,7 +182,7 @@ void Scene_Indoor::update(float elapsedTime)
 // 描画処理
 void Scene_Indoor::render(float elapsedTime)
 {
-	// メイン描画パスカテゴリ (ロイヤルブルー)
+	// メイン描画パスカテゴリ (
 	TRACY_CPU_ZONE_C("Scene_Indoor::render_CPU", TracyCategory::RenderPass);
 	TRACY_GPU_ZONE_C("Scene_Indoor::render_GPU", TracyCategory::RenderPass);
 

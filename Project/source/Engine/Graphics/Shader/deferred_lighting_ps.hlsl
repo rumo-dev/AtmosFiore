@@ -17,6 +17,7 @@ Texture2D<float4> gbuffer3 : register(t3);
 Texture2D<float> point_shadow_front_map : register(t4);
 Texture2D<float> point_shadow_back_map : register(t5);
 Texture2D<float> directional_shadow_map : register(t6);
+Texture2D<float4> ssao_texture : register(t7);
 
 //// ==========================================
 //// 3Dノイズ生成関数 (Value Noise & FBM)
@@ -380,8 +381,10 @@ float4 main(VS_OUT pin) : SV_TARGET
     diffuse += ibl_radiance_lambertian(N, V, roughness, c_diff, f0);
     specular += ibl_radiance_ggx(N, V, roughness, f0);
 
-    diffuse *= occlusion;
-    specular *= occlusion;
+    // Material AO and SSAO attenuate the accumulated lighting.
+    float ssao = ssao_texture.SampleLevel(sampler_states[POINT_CLAMP], pin.texcoord, 0).r;
+    diffuse *= occlusion * ssao;
+    specular *= occlusion * ssao;
 
     float3 Lo = diffuse + specular + emissive;
    //float4 fog = ComputeVolumetricFog(pin.position.xy, camera_position.xyz, position, L, Li);

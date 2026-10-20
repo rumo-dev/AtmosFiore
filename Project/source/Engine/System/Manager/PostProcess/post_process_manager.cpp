@@ -13,8 +13,28 @@
 #include <fstream>
 #include <limits>
 
+namespace {
+	struct alignas(16) SsaoConstants {
+		float radius = 0.5f;
+	float bias = 1.0e-4f;
+	float intensity = 1.0f;
+	float contrast = 1.0f;
+	float spatial_sigma = 3.0f;
+	float position_sigma = 8.0f;
+	float blur_direction_x = 1.0f;
+	float blur_direction_y = 0.0f;
+	};
+	SsaoConstants ssao_constants;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> ssao_constant_buffer;
+}
+
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
+Framebuffer                  Post_Process_Manager::ssao_buffer;
+Framebuffer                  Post_Process_Manager::ssao_blur_buffer;
+Framebuffer                  Post_Process_Manager::ssao_vertical_buffer;
+Framebuffer                  Post_Process_Manager::ssao_filtered_buffer;
+bool                         Post_Process_Manager::ssao_enabled = true;
 Framebuffer                  Post_Process_Manager::adaptation_input;
 std::unique_ptr<DLSSManager> Post_Process_Manager::dlss = nullptr;
 bool Post_Process_Manager::dlss_applied_this_frame = false;
@@ -53,6 +73,20 @@ void Post_Process_Manager::initialize()
 	auto  h = static_cast<uint32_t>(Graphics_Core::instance().get_screen_height());
 
 	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	const uint32_t ssao_width = (std::max)(1u, w / 2);
+	const uint32_t ssao_height = (std::max)(1u, h / 2);
+	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	D3D11_BUFFER_DESC ssao_cb_desc{};
+	ssao_cb_desc.ByteWidth = sizeof(SsaoConstants);
+	ssao_cb_desc.Usage = D3D11_USAGE_DEFAULT;
+	ssao_cb_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	if (SUCCEEDED(device->CreateBuffer(&ssao_cb_desc, nullptr, ssao_constant_buffer.GetAddressOf()))) {
+		Graphics_Core::instance().get_device_context()->UpdateSubresource(
+			ssao_constant_buffer.Get(), 0, nullptr, &ssao_constants, 0, 0);
+	}
 	render_width = w;
 	render_height = h;
 	dlss = std::make_unique<DLSSManager>();
@@ -90,6 +124,12 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 
 	// Reduce geometry, deferred-lighting, and forward-transparent pixel work.
 	fsquad = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	const UINT ssao_width = (std::max)(1u, width / 2);
+	const UINT ssao_height = (std::max)(1u, height / 2);
+	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	render_width = width;
 	render_height = height;
 	Graphics_Core::instance().resize_geometry_buffer(width, height);
@@ -116,22 +156,78 @@ void Post_Process_Manager::begin()
 	fsquad.Activate(ctx, Graphics_Core::instance().get_geometry_buffer()->GetDepthStencilView());
 	Render_State::instance().set_blend_state(ctx, Blend_State::Alpha);
 
-	ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 3]{};
+	if (ssao_enabled && ssao_constant_buffer) {
+		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
+		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
+		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
+		ID3D11ShaderResourceView* ssao_inputs[2] = { gbuffer_srvs[0], gbuffer_srvs[2] };
+		ssao_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		ssao_buffer.Activate(ctx);
+		ctx->UpdateSubresource(ssao_constant_buffer.Get(), 0, nullptr, &ssao_constants, 0, 0);
+		ctx->PSSetConstantBuffers(12, 1, ssao_constant_buffer.GetAddressOf());
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			ctx, ssao_inputs, 0, 2,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSAO_PS"));
+		ssao_buffer.Deactivate(ctx);
+		ID3D11ShaderResourceView* null_ssao_inputs[2]{};
+		ctx->PSSetShaderResources(0, 2, null_ssao_inputs);
+
+		// The paper filters raw obscurance with two 13-tap cross-bilateral passes.
+		ssao_constants.blur_direction_x = 1.0f;
+		ssao_constants.blur_direction_y = 0.0f;
+		ctx->UpdateSubresource(ssao_constant_buffer.Get(), 0, nullptr, &ssao_constants, 0, 0);
+		ssao_blur_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		ssao_blur_buffer.Activate(ctx);
+		ID3D11ShaderResourceView* horizontal_inputs[2] = { ssao_buffer.GetColorMap(), gbuffer_srvs[2] };
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			ctx, horizontal_inputs, 0, 2,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSAO_BILATERAL_BLUR_PS"));
+		ssao_blur_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 2, null_ssao_inputs);
+
+		ssao_constants.blur_direction_x = 0.0f;
+		ssao_constants.blur_direction_y = 1.0f;
+		ctx->UpdateSubresource(ssao_constant_buffer.Get(), 0, nullptr, &ssao_constants, 0, 0);
+		ssao_vertical_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		ssao_vertical_buffer.Activate(ctx);
+		ID3D11ShaderResourceView* vertical_inputs[2] = { ssao_blur_buffer.GetColorMap(), gbuffer_srvs[2] };
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			ctx, vertical_inputs, 0, 2,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSAO_BILATERAL_BLUR_PS"));
+		ssao_vertical_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 2, null_ssao_inputs);
+
+		ssao_filtered_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		ssao_filtered_buffer.Activate(ctx);
+		ID3D11ShaderResourceView* upsample_inputs[2] = { ssao_vertical_buffer.GetColorMap(), gbuffer_srvs[2] };
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			ctx, upsample_inputs, 0, 2,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSAO_UPSAMPLE_PS"));
+		ssao_filtered_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 2, null_ssao_inputs);
+	}
+	else {
+		// A white AO mask makes the disabled path neutral in the lighting shader.
+		ssao_filtered_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+	}
+
+	ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 4]{};
 	Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
 	srvs[GBUFFER_COUNT + 0] = shadower->get_point_shadow_front_map();
 	srvs[GBUFFER_COUNT + 1] = shadower->get_point_shadow_back_map();
 	srvs[GBUFFER_COUNT + 2] = shadower->get_directional_shadow_map();
+	srvs[GBUFFER_COUNT + 3] = ssao_filtered_buffer.GetColorMap();
 
 	DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Lighting Pass"); {
 		Graphics_Core::instance().get_fullscreen_quad()->Blit(
-			ctx, srvs, 0, GBUFFER_COUNT + 3,
+			ctx, srvs, 0, GBUFFER_COUNT + 4,
 			Resource_Manager::instance().get_native_shader<Pixel_Shader>("DEFERRED_LIGHTING_PS")
 		);
 	}
 	// The directional shadow map occupies PS slot 6. Release every lighting
 	// input before the shadow pass binds that texture as a depth output next frame.
-	ID3D11ShaderResourceView* null_lighting_srvs[GBUFFER_COUNT + 3]{};
-	ctx->PSSetShaderResources(0, GBUFFER_COUNT + 3, null_lighting_srvs);
+	ID3D11ShaderResourceView* null_lighting_srvs[GBUFFER_COUNT + 4]{};
+	ctx->PSSetShaderResources(0, GBUFFER_COUNT + 4, null_lighting_srvs);
 }
 
 // ─── 終了 ─────────────────────────────────────────────────────────
@@ -361,6 +457,15 @@ void Post_Process_Manager::drawFogGUI()
 void Post_Process_Manager::drawPipelineGUI()
 {
 	static const char* names[] = { "Sky", "Bloom", "Adaptation", "Volumetric Fog", "Height Fog", "Distance Fog", "Exponential Fog", "DoF", "Exposure", "Chromatic Aberration", "Lens Distortion", "Vignetting", "Tone Mapping" };
+	ImGui::Checkbox("Enable SSAO (Alchemy AO)", &ssao_enabled);
+	if (ssao_enabled) {
+		ImGui::SliderFloat("SSAO Radius (world units)", &ssao_constants.radius, 0.01f, 3.0f, "%.2f");
+		ImGui::SliderFloat("SSAO Bias", &ssao_constants.bias, 1.0e-6f, 0.01f, "%.5f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("SSAO Intensity", &ssao_constants.intensity, 0.0f, 4.0f, "%.2f");
+		ImGui::SliderFloat("SSAO Contrast", &ssao_constants.contrast, 0.25f, 4.0f, "%.2f");
+		ImGui::SliderFloat("SSAO Filter Width", &ssao_constants.spatial_sigma, 0.5f, 6.0f, "%.1f px");
+		ImGui::SliderFloat("SSAO Edge Preservation", &ssao_constants.position_sigma, 0.5f, 32.0f, "%.1f");
+	}
 	ImGui::TextDisabled("The order below is the execution order.");
 	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Saved to data/post_process_settings.json" : "Could not save settings.");
 	ImGui::SameLine();
