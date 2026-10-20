@@ -3,6 +3,7 @@
 #include "Engine/system/graphics_core.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 #include "Engine/Utilities/math_util.h"
+#include "Engine/System/job_system.h"
 #include "Game/World/camera/camera_manager.h"
 #include "Game/Effect/shadow/shadow.h"
 
@@ -130,85 +131,80 @@ void ModelManager::remove_all_instances()
 
 void ModelManager::update(float delta_time)
 {
-	for (auto& [key, inst] : instances_)
+	struct AnimationWork
 	{
-		Gltf_Model* model = get_model(inst.model_key);
+		Gltf_Model* model;
+		ModelInstance* instance;
+	};
+	std::vector<AnimationWork> animation_work;
+	animation_work.reserve(instances_.size());
 
-		if (!inst.is_animation || !model || model->animations.empty())
+	for (auto& [key, instance] : instances_)
+	{
+		Gltf_Model* model = get_model(instance.model_key);
+		if (!instance.is_animation || !model || model->animations.empty())
 		{
-			// アニメーションなし：スタテぅ1回分のノードをキャッシュ
-			// (render内でノード参照するてことがあるので空にする)
-			inst.cached_animated_nodes.clear();
-			inst.cached_joint_matrices.clear();
-
-			if (!inst.is_animation) continue;
+			instance.cached_animated_nodes.clear();
+			instance.cached_joint_matrices.clear();
 			continue;
 		}
+		animation_work.push_back({ model, &instance });
+	}
 
+	// Model animation data is read-only here and each job writes to a distinct
+	// instance. Keep small scenes serial to avoid scheduling overhead.
+	auto update_animation = [&animation_work, delta_time](size_t work_index)
+	{
+		AnimationWork& work = animation_work[work_index];
+		Gltf_Model& model = *work.model;
+		ModelInstance& inst = *work.instance;
 		float duration = 0.0f;
 
 		if (inst.anim_mode == Gltf_Model::animation_mode::single)
 		{
 			if (inst.animation_index < 0 ||
-				inst.animation_index >= static_cast<int>(model->animations.size()))
+				inst.animation_index >= static_cast<int>(model.animations.size()))
 			{
-				// 無効なアニメーションインデックス：以前は何もせず continue していたため、
-				// cached_animated_nodes が直前の有効な姿勢のまま残り続け、
-				// render_with_nodes() がそれを毎フレーム使い回す結果
-				// 「モーションが固まって見える」バグになっていた。
-				// キャッシュを明示的にクリアしてバインドポーズへフォールバックする。
 				inst.cached_animated_nodes.clear();
 				inst.cached_joint_matrices.clear();
-				continue;
+				return;
 			}
-			duration = model->animations[inst.animation_index].duration;
+			duration = model.animations[inst.animation_index].duration;
 		}
-		else // all
+		else
 		{
-			// Use max duration for all animations loop
-			for (const auto& anim : model->animations)
-				duration = std::max(duration, anim.duration);
+			for (const auto& animation : model.animations)
+				duration = std::max(duration, animation.duration);
 		}
 
 		if (duration <= 0.0f)
 		{
-			// duration 0（不正/空のクリップ）だと std::fmod(x, 0) が NaN になり、
-			// 以降ずっとポーズが崩れた/固まったままになるため、ここで弾く。
 			inst.cached_animated_nodes.clear();
 			inst.cached_joint_matrices.clear();
-			continue;
+			return;
 		}
 
 		inst.animation_time += delta_time * inst.animation_speed;
-
 		if (inst.loop_animation)
 			inst.animation_time = std::fmod(inst.animation_time, duration);
 		else
 			inst.animation_time = std::min(inst.animation_time, duration);
 
-		// --- アニメーション計算をキャッシュ（ここでで1回だけ行う）---
-		inst.cached_animated_nodes = model->nodes; // ノードをコピー
+		inst.cached_animated_nodes = model.nodes;
 		if (inst.anim_mode == Gltf_Model::animation_mode::single)
-		{
-			model->animate(
-				static_cast<size_t>(inst.animation_index),
-				inst.animation_time,
-				inst.cached_animated_nodes);
-		}
+			model.animate(static_cast<size_t>(inst.animation_index), inst.animation_time, inst.cached_animated_nodes);
 		else
-		{
-			model->animate_all(inst.animation_time, inst.cached_animated_nodes);
-		}
+			model.animate_all(inst.animation_time, inst.cached_animated_nodes);
 
-		// --- スキン行列（ジョイント行列）もここで1回だけ計算してキャッシュ ---
-		// (以前は render_with_nodes() 内で描画パスのたびに再計算していたため、
-		//  1フレームに5回（deferred/shadow x2/directional/forward）も
-		//  同じ計算を繰り返しており、これがアニメーション付きモデル
-		//  （プレイヤー等）描画時のFPS低下の主因だった)
-		model->compute_joint_matrices(inst.cached_animated_nodes, inst.cached_joint_matrices);
-	}
+		model.compute_joint_matrices(inst.cached_animated_nodes, inst.cached_joint_matrices);
+	};
+
+	if (animation_work.size() >= 4)
+		JobSystem::instance().parallel_for(animation_work.size(), 4, update_animation);
+	else
+		for (size_t index = 0; index < animation_work.size(); ++index)
+			update_animation(index);
 }
-
 void ModelManager::render_all(pass_mode pass)
 {
 	// Prepare frustum from active camera
