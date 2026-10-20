@@ -24,8 +24,16 @@ namespace {
 	float blur_direction_x = 1.0f;
 	float blur_direction_y = 0.0f;
 	};
+	struct alignas(16) SsrConstants {
+		float max_distance = 20.0f;
+		float surface_thickness = 0.2f;
+		float reflection_strength = 1.0f;
+		float roughness_cutoff = 0.8f;
+	};
 	SsaoConstants ssao_constants;
+	SsrConstants ssr_constants;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssao_constant_buffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> ssr_constant_buffer;
 }
 
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
@@ -34,7 +42,9 @@ Framebuffer                  Post_Process_Manager::ssao_buffer;
 Framebuffer                  Post_Process_Manager::ssao_blur_buffer;
 Framebuffer                  Post_Process_Manager::ssao_vertical_buffer;
 Framebuffer                  Post_Process_Manager::ssao_filtered_buffer;
+Framebuffer                  Post_Process_Manager::ssr_buffer;
 bool                         Post_Process_Manager::ssao_enabled = true;
+bool                         Post_Process_Manager::ssr_enabled = false;
 Framebuffer                  Post_Process_Manager::adaptation_input;
 std::unique_ptr<DLSSManager> Post_Process_Manager::dlss = nullptr;
 bool Post_Process_Manager::dlss_applied_this_frame = false;
@@ -79,6 +89,7 @@ void Post_Process_Manager::initialize()
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssr_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	D3D11_BUFFER_DESC ssao_cb_desc{};
 	ssao_cb_desc.ByteWidth = sizeof(SsaoConstants);
 	ssao_cb_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -87,6 +98,8 @@ void Post_Process_Manager::initialize()
 		Graphics_Core::instance().get_device_context()->UpdateSubresource(
 			ssao_constant_buffer.Get(), 0, nullptr, &ssao_constants, 0, 0);
 	}
+	ssao_cb_desc.ByteWidth = sizeof(SsrConstants);
+	device->CreateBuffer(&ssao_cb_desc, nullptr, ssr_constant_buffer.GetAddressOf());
 	render_width = w;
 	render_height = h;
 	dlss = std::make_unique<DLSSManager>();
@@ -130,6 +143,7 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssr_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	render_width = width;
 	render_height = height;
 	Graphics_Core::instance().resize_geometry_buffer(width, height);
@@ -257,6 +271,23 @@ void Post_Process_Manager::draw()
 	auto* ctx = Graphics_Core::instance().get_device_context();
 	dlss_applied_this_frame = false;
 	ID3D11ShaderResourceView* current = fsquad.GetColorMap();
+	if (ssr_enabled && ssr_constant_buffer) {
+		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
+		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
+		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
+		ID3D11ShaderResourceView* ssr_inputs[4] = { current, gbuffer_srvs[0], gbuffer_srvs[1], gbuffer_srvs[2] };
+		ctx->UpdateSubresource(ssr_constant_buffer.Get(), 0, nullptr, &ssr_constants, 0, 0);
+		ctx->PSSetConstantBuffers(12, 1, ssr_constant_buffer.GetAddressOf());
+		ssr_buffer.Clear(ctx);
+		ssr_buffer.Activate(ctx);
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(
+			ctx, ssr_inputs, 0, 4,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSR_PS"));
+		ssr_buffer.Deactivate(ctx);
+		ID3D11ShaderResourceView* null_ssr_inputs[4]{};
+		ctx->PSSetShaderResources(0, 4, null_ssr_inputs);
+		current = ssr_buffer.GetColorMap();
+	}
 	final_color_map = current;
 	for (size_t i = 0; i < effect_order.size(); ++i) {
 		const size_t effect_index = static_cast<size_t>(effect_order[i]);
@@ -465,6 +496,13 @@ void Post_Process_Manager::drawPipelineGUI()
 		ImGui::SliderFloat("SSAO Contrast", &ssao_constants.contrast, 0.25f, 4.0f, "%.2f");
 		ImGui::SliderFloat("SSAO Filter Width", &ssao_constants.spatial_sigma, 0.5f, 6.0f, "%.1f px");
 		ImGui::SliderFloat("SSAO Edge Preservation", &ssao_constants.position_sigma, 0.5f, 32.0f, "%.1f");
+	}
+	ImGui::Checkbox("Enable SSR", &ssr_enabled);
+	if (ssr_enabled) {
+		ImGui::SliderFloat("SSR Max Distance", &ssr_constants.max_distance, 1.0f, 100.0f, "%.1f");
+		ImGui::SliderFloat("SSR Surface Thickness", &ssr_constants.surface_thickness, 0.01f, 2.0f, "%.2f");
+		ImGui::SliderFloat("SSR Strength", &ssr_constants.reflection_strength, 0.0f, 2.0f, "%.2f");
+		ImGui::SliderFloat("SSR Roughness Cutoff", &ssr_constants.roughness_cutoff, 0.05f, 1.0f, "%.2f");
 	}
 	ImGui::TextDisabled("The order below is the execution order.");
 	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Saved to data/post_process_settings.json" : "Could not save settings.");

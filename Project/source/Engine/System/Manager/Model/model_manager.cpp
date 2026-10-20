@@ -100,12 +100,12 @@ void ModelManager::add_instance(const std::string& key, ModelInstance instance)
 	if (get_model(instance.model_key) == nullptr) {
 		// ここが呼ばれるなら、モデルのロード漏れ
 		// c_str() を使わず、std::string 同士として結合してから c_str() を呼ぶ
-		log_printf((instance.model_key + " model not loaded!\n").c_str(), LogLevel::Error);
+		log_printf("%s model not loaded!\n", LogLevel::Error, instance.model_key.c_str());
 		instance.model_key = "Error";
 	}
 	else {
 
-		log_printf((instance.model_key + "  model loaded successfully\n").c_str(), LogLevel::Success);
+		log_printf("%s model loaded successfully\n", LogLevel::Success, instance.model_key.c_str());
 	}
 
 	instances_.emplace(key, std::move(instance));
@@ -251,10 +251,6 @@ void ModelManager::render_all(pass_mode pass)
 			continue;
 		}
 
-		if (!model->has_bbox) {
-			continue;
-		}
-
 		// ===== Frustum Culling =====
 		bool is_visible = true;
 		DirectX::XMFLOAT3 aabb_min, aabb_max;
@@ -262,7 +258,8 @@ void ModelManager::render_all(pass_mode pass)
 		bool aabb_computed = false;
 
 		// Compute AABB once if needed
-		if ((have_frustum || point_shadow_pass) && model->has_bbox) {
+		if (!inst.disable_frustum_culling && model->has_bbox &&
+			(have_frustum || point_shadow_pass)) {
 			model->compute_instance_aabb(
 				inst.world_transform,
 				inst.is_animation,
@@ -311,7 +308,12 @@ void ModelManager::render_all(pass_mode pass)
 			size_t convertedChars = 0;
 
 			// char* から wchar_t* へ変換
-			mbstowcs_s(&convertedChars, w_buffer, marker_name.c_str(), _TRUNCATE);
+			const errno_t conversion_result = mbstowcs_s(
+				&convertedChars, w_buffer, _countof(w_buffer), marker_name.c_str(), _TRUNCATE);
+			if (conversion_result != 0 || convertedChars == 0)
+			{
+				w_buffer[0] = L'\0';
+			}
 
 			// 変換したワイド文字列ポインタを渡す
 			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, w_buffer);

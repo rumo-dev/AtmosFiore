@@ -82,6 +82,15 @@
     <FxCompile Include="source\Engine\Graphics\Shader\ssao_ps.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ssao_bilateral_blur_ps.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ssao_upsample_ps.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ssr_ps.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\adaptation_cs.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>

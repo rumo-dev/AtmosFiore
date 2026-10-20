@@ -18,6 +18,9 @@ struct ModelInstance
 	std::string model_key;
 	DirectX::XMFLOAT4X4 world_transform;
 	bool visible = true;
+	// Useful for glTF scenes whose node transforms spread meshes beyond the
+	// mesh-local bounds currently used by the model-level frustum culler.
+	bool disable_frustum_culling = false;
 
 	// アニメーション共通
 	bool is_animation = false;

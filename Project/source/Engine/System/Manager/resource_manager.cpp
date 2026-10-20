@@ -120,6 +120,10 @@ void Resource_Manager::load_shaders() {
 		"SSAO_UPSAMPLE_PS",
 		"ssao_upsample_ps"
 	);
+	load_shader<Pixel_Shader>(
+		"SSR_PS",
+		"ssr_ps"
+	);
 	//shadow
 	load_shader<Pixel_Shader>(
 		"SHADOW_PS",

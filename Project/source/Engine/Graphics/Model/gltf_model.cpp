@@ -290,6 +290,13 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 		{
 			mesh::primitive& primitive{ mesh.primitives.emplace_back() };
 			primitive.material = gltf_primitive.material;
+			if (primitive.material < 0 ||
+				static_cast<size_t>(primitive.material) >= materials.size() - 1)
+			{
+				// The final entry is the explicit glTF default material added by
+				// fetch_materials(). In particular, -1 means the asset omitted it.
+				primitive.material = static_cast<int>(materials.size()) - 1;
+			}
 
 			const tinygltf::Accessor& gltf_accessor{ Gltf_Model.accessors.at(gltf_primitive.indices) };
 			const tinygltf::BufferView& gltf_buffer_view{ Gltf_Model.bufferViews.at(gltf_accessor.bufferView) };
@@ -469,6 +476,13 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 			}
 		}
 	}
+
+	// glTF permits primitives to omit the material property. Such a primitive
+	// uses the glTF default material, so keep an explicit fallback in the GPU
+	// material table for those primitives (and for malformed out-of-range IDs).
+	material default_material;
+	default_material.name = "__gltf_default_material";
+	materials.emplace_back(std::move(default_material));
 
 	std::vector<material::cbuffer> material_data;
 	for (std::vector<material>::const_reference material : materials)

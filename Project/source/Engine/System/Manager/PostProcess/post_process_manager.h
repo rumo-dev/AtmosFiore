@@ -58,6 +58,8 @@ public:
 	static void end();
 	static void draw();
 	static void render();
+	static void SetSSREnabled(bool enabled) { ssr_enabled = enabled; }
+	static bool IsSSREnabled() { return ssr_enabled; }
 	static void SetDLSSRenderResolution(UINT width, UINT height);
 	static void renderGUI();
 	void drawPipelineGUI();
@@ -105,7 +107,9 @@ private:
 	static Framebuffer ssao_blur_buffer;
 	static Framebuffer ssao_vertical_buffer;
 	static Framebuffer ssao_filtered_buffer;
+	static Framebuffer ssr_buffer;
 	static bool ssao_enabled;
+	static bool ssr_enabled;
 	static std::unique_ptr<DLSSManager> dlss;
 	static bool dlss_applied_this_frame;
 	static UINT render_width;
