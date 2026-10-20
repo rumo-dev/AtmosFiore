@@ -166,6 +166,7 @@ void Post_Process_Manager::draw()
 		const size_t effect_index = static_cast<size_t>(effect_order[i]);
 		if (!effect_enabled[effect_index]) continue;
 		if (effect_order[i] == EffectId::Adaptation) {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Adaptation");
 			adaptation_input.Clear(ctx);
 			adaptation_input.Activate(ctx);
 			Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, &current, 0, 1);
@@ -176,18 +177,52 @@ void Post_Process_Manager::draw()
 			continue;
 		}
 		switch (effect_order[i]) {
-		case EffectId::Sky: skyer->make(ctx, current); current = skyer->get_color_map(); break;
-		case EffectId::Bloom: bloomer->make(ctx, current); current = bloomer->getColorMap(); break;
-		case EffectId::VolumetricFog: vol_fog->make(ctx, current); current = vol_fog->get_color_map(); break;
-		case EffectId::HeightFog: hgt_fog->make(ctx, current); current = hgt_fog->get_color_map(); break;
-		case EffectId::DistanceFog: dst_fog->make(ctx, current); current = dst_fog->get_color_map(); break;
-		case EffectId::ExponentialFog: exp_fog->make(ctx, current); current = exp_fog->get_color_map(); break;
-		case EffectId::DoF: dofer->make(ctx, current); current = dofer->GetColorMap(); break;
-		case EffectId::Exposure: exposurer->make(ctx, current); current = exposurer->GetColorMap(); break;
-		case EffectId::ChromaticAberration: ca_effect->make(ctx, current); current = ca_effect->GetColorMap(); break;
-		case EffectId::LensDistortion: lens_distortion->make(ctx, current); current = lens_distortion->GetColorMap(); break;
-		case EffectId::Vignetting: vignetting->make(ctx, current); current = vignetting->GetColorMap(); break;
-		case EffectId::ToneMapping:
+		case EffectId::Sky: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Sky");
+			skyer->make(ctx, current); current = skyer->get_color_map(); break;
+		}
+		case EffectId::Bloom: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Bloom");
+			bloomer->make(ctx, current); current = bloomer->getColorMap(); break;
+		}
+		case EffectId::VolumetricFog: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Volumetric Fog");
+			vol_fog->make(ctx, current); current = vol_fog->get_color_map(); break;
+		}
+		case EffectId::HeightFog: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Height Fog");
+			hgt_fog->make(ctx, current); current = hgt_fog->get_color_map(); break;
+		}
+		case EffectId::DistanceFog: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Distance Fog");
+			dst_fog->make(ctx, current); current = dst_fog->get_color_map(); break;
+		}
+		case EffectId::ExponentialFog: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Exponential Fog");
+			exp_fog->make(ctx, current); current = exp_fog->get_color_map(); break;
+		}
+		case EffectId::DoF: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Depth of Field");
+			dofer->make(ctx, current); current = dofer->GetColorMap(); break;
+		}
+		case EffectId::Exposure: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Exposure");
+			exposurer->make(ctx, current); current = exposurer->GetColorMap(); break;
+		}
+		case EffectId::ChromaticAberration: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Chromatic Aberration");
+			ca_effect->make(ctx, current); current = ca_effect->GetColorMap(); break;
+		}
+		case EffectId::LensDistortion: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Lens Distortion");
+			lens_distortion->make(ctx, current); current = lens_distortion->GetColorMap(); break;
+		}
+		case EffectId::Vignetting: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Vignetting");
+			vignetting->make(ctx, current); current = vignetting->GetColorMap(); break;
+		}
+		case EffectId::ToneMapping: {
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: Tone Mapping and DLSS");
 			if (dlss && dlss->IsEnabled() && dlss->Process(ctx, current,
 				Graphics_Core::instance().get_geometry_buffer()->GetDepth(),
 				Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors())) {
@@ -197,17 +232,21 @@ void Post_Process_Manager::draw()
 			tone_mapper->make(ctx, current);
 			current = tone_mapper->get_color_map();
 			break;
+		}
 		case EffectId::Adaptation: break;
 		}
 		final_color_map = current;
 	}
 	// Keep DLSS available when Tone Mapping is disabled or removed from the
 	// configurable post-process order. In the normal path it runs before tone mapping.
-	if (!dlss_applied_this_frame && dlss && dlss->IsEnabled() && dlss->Process(ctx, current,
-		Graphics_Core::instance().get_geometry_buffer()->GetDepth(),
-		Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors())) {
-		current = dlss->GetOutput();
-		dlss_applied_this_frame = true;
+	if (!dlss_applied_this_frame && dlss && dlss->IsEnabled()) {
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: DLSS");
+		if (dlss->Process(ctx, current,
+			Graphics_Core::instance().get_geometry_buffer()->GetDepth(),
+			Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors())) {
+			current = dlss->GetOutput();
+			dlss_applied_this_frame = true;
+		}
 	}
 	final_color_map = current;
 }
