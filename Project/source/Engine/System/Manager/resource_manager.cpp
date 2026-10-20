@@ -124,6 +124,22 @@ void Resource_Manager::load_shaders() {
 		"SSR_PS",
 		"ssr_ps"
 	);
+	load_shader<Pixel_Shader>(
+		"SSR_COMPOSITE_PS",
+		"ssr_composite_ps"
+	);
+	load_shader<Pixel_Shader>(
+		"SSGI_PS",
+		"ssgi_ps"
+	);
+	load_shader<Pixel_Shader>(
+		"SSGI_COMPOSITE_PS",
+		"ssgi_composite_ps"
+	);
+	load_shader<Pixel_Shader>(
+		"TAA_PS",
+		"taa_ps"
+	);
 	//shadow
 	load_shader<Pixel_Shader>(
 		"SHADOW_PS",

@@ -51,10 +51,13 @@ float4 main(VS_OUT pin) : SV_TARGET
         if (any(sample_uv <= 0.0f) || any(sample_uv >= 1.0f))
             continue;
 
-        float3 sample_normal = gbuffer_normal.SampleLevel(sampler_states[POINT_CLAMP], sample_uv, 0).xyz;
-        if (dot(sample_normal, sample_normal) < 1.0e-4f)
+        float4 hit_data = gbuffer_position.SampleLevel(sampler_states[POINT_CLAMP], sample_uv, 0);
+        float3 hit_world_position = hit_data.xyz;
+        // GBuffer position alpha is material AO and is cleared to zero for
+        // background pixels, so avoid a second texture read for each sample.
+        float sample_ao = hit_data.w;
+        if (sample_ao <= 1.0e-4f)
             continue;
-        float3 hit_world_position = gbuffer_position.SampleLevel(sampler_states[POINT_CLAMP], sample_uv, 0).xyz;
         float3 hit_position = mul(float4(hit_world_position, 1.0f), view).xyz;
         float3 v = hit_position - position;
         float distance_squared = dot(v, v);

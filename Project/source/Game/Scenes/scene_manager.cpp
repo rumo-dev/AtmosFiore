@@ -15,7 +15,7 @@ namespace
 {
 	constexpr float TransitionPhaseDuration = 0.8f;
 
-	enum class RenderTestKind { Reflections, Materials, Occlusion };
+	enum class RenderTestKind { Reflections, Materials, Occlusion, SSGI };
 
 	class Scene_RenderTest final : public Scene_Base
 	{
@@ -51,6 +51,24 @@ namespace
 					instance->disable_frustum_culling = true;
 			ssr_was_enabled_ = Post_Process_Manager::IsSSREnabled();
 			Post_Process_Manager::SetSSREnabled(true);
+			Post_Process_Manager::SetSSRPerformanceMode(true);
+			}
+			else if (kind_ == RenderTestKind::SSGI) {
+				modelKey = "Library"; modelPath = "./data/model/Library/library_OneMesh.gltf";
+				label = L"SSGI Color Bleeding / TAA Test";
+				resources.load_model(modelKey, modelPath);
+				add_instance("RenderTest_Main", modelKey, 1.0f, { 0.0f, 3.5f, 0.0f }, 0.0f);
+				// Colored lights make diffuse color transfer easy to inspect while
+				// the furnished room provides corners, occlusion, and varied materials.
+				graphics.get_point_light_manager().add_light({ -3.0f, 2.5f, 0.0f }, 8.0f, 12000.0f,
+					{ 1.0f, 0.12f, 0.08f, 1.0f });
+				graphics.get_point_light_manager().add_light({ 3.0f, 2.5f, 0.0f }, 8.0f, 12000.0f,
+					{ 0.08f, 0.3f, 1.0f, 1.0f });
+				graphics.get_point_light_manager().add_light({ 0.0f, 2.5f, 3.0f }, 8.0f, 12000.0f,
+					{ 0.12f, 1.0f, 0.18f, 1.0f });
+				graphics.get_area_light_manager().add_light();
+				ssgi_was_enabled_ = Post_Process_Manager::IsSSGIEnabled();
+				Post_Process_Manager::SetSSGIEnabled(true);
 			}
 			else if (kind_ == RenderTestKind::Materials) {
 				modelKey = "RenderTest_Helmet"; modelPath = "./data/model/glTF/DamagedHelmet/DamagedHelmet.gltf";
@@ -83,7 +101,8 @@ namespace
 			const HWND hwnd = graphics.get_window_handle();
 			auto camera = std::make_shared<SpectatorCamera>(hwnd);
 			const bool reflectionTest = kind_ == RenderTestKind::Reflections;
-			const float cameraDistance = reflectionTest ? 12.0f : (kind_ == RenderTestKind::Materials ? 4.5f : 7.0f);
+			const bool ssgiTest = kind_ == RenderTestKind::SSGI;
+			const float cameraDistance = reflectionTest ? 12.0f : (kind_ == RenderTestKind::Materials ? 4.5f : (ssgiTest ? 9.0f : 7.0f));
 			const float cameraHeight = reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 1.3f : 2.5f);
 			const float targetHeight = reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 0.55f : 1.5f);
 			const float pitch = reflectionTest ? 0.0f : (kind_ == RenderTestKind::Materials ? -9.5f : -8.0f);
@@ -103,7 +122,12 @@ namespace
 			Graphics_Core::instance().get_spot_light_manager().clear_light();
 			Graphics_Core::instance().get_area_light_manager().clear_light();
 			if (kind_ == RenderTestKind::Reflections)
+			{
 				Post_Process_Manager::SetSSREnabled(ssr_was_enabled_);
+				Post_Process_Manager::SetSSRPerformanceMode(false);
+			}
+			if (kind_ == RenderTestKind::SSGI)
+				Post_Process_Manager::SetSSGIEnabled(ssgi_was_enabled_);
 		}
 		void update(float elapsedTime) override
 		{
@@ -172,6 +196,7 @@ namespace
 		DirectionalLight light_;
 		std::wstring label_;
 		bool ssr_was_enabled_ = false;
+		bool ssgi_was_enabled_ = false;
 	};
 }
 
@@ -187,6 +212,7 @@ void Scene_Manager::update(float elapsedTime)
 		if (_next_scene != nullptr && !_transition_switched && _transition_time >= TransitionPhaseDuration)
 		{
 			TRACY_CPU_ZONE_N("Scene_Manager::update::SceneSwitch");
+			Post_Process_Manager::ResetTemporalHistory();
 			if (_current_scene) { _current_scene->finalize(); delete _current_scene; }
 			_current_scene = _next_scene;
 			_next_scene = nullptr;
@@ -252,6 +278,7 @@ void Scene_Manager::draw_gui()
 		if (ImGui::Button("SSR Reflections")) change_scene(new Scene_RenderTest(RenderTestKind::Reflections));
 		if (ImGui::Button("PBR Materials")) change_scene(new Scene_RenderTest(RenderTestKind::Materials));
 		if (ImGui::Button("AO / Lighting")) change_scene(new Scene_RenderTest(RenderTestKind::Occlusion));
+		if (ImGui::Button("SSGI Color Bleed")) change_scene(new Scene_RenderTest(RenderTestKind::SSGI));
 		ImGui::Separator();
 	}
 

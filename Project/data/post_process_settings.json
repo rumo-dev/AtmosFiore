@@ -97,6 +97,13 @@
     2,
     12
   ],
+  "ssgi": {
+    "enabled": true,
+    "radius": 2.5,
+    "intensity": 0.25,
+    "thickness": 0.2
+  },
+
   "tone_mapping": {
     "enabled": 1,
     "exposure": 1.0,
@@ -110,6 +117,10 @@
     "toe_strength": 0.20000000298023224
   },
   "version": 1,
+  "taa": {
+    "enabled": true,
+    "history_weight": 0.9
+  },
   "vignetting": {
     "enabled": true,
     "inner_radius": 0.3499999940395355,

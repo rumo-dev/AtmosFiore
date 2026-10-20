@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <DirectXMath.h>
 #include "Engine/Graphics/FrameBuffer/frame_buffer.h"
 #include "Engine/Graphics/DLSS/dlss_manager.h"
 #include "Engine/Graphics/Shader/shader.h"
@@ -60,6 +61,14 @@ public:
 	static void render();
 	static void SetSSREnabled(bool enabled) { ssr_enabled = enabled; }
 	static bool IsSSREnabled() { return ssr_enabled; }
+	static void SetSSGIEnabled(bool enabled) { ssgi_enabled = enabled; }
+	static bool IsSSGIEnabled() { return ssgi_enabled; }
+	static void SetSSRPerformanceMode(bool enabled);
+	static void SetTAAEnabled(bool enabled);
+	static bool IsTAAEnabled() { return taa_enabled; }
+	static void ResetTemporalHistory();
+	// Returns the current Halton jitter in NDC and advances the sequence once per frame.
+	static DirectX::XMFLOAT2 GetTAAJitterNdc();
 	static void SetDLSSRenderResolution(UINT width, UINT height);
 	static void renderGUI();
 	void drawPipelineGUI();
@@ -100,6 +109,8 @@ private:
 	enum class EffectId { Sky, Bloom, Adaptation, VolumetricFog, HeightFog, DistanceFog, ExponentialFog, DoF, Exposure, ChromaticAberration, LensDistortion, Vignetting, ToneMapping };
 	static std::array<EffectId, 13> effect_order;
 	static std::array<bool, 13> effect_enabled;
+	static std::array<bool, 13> saved_effect_enabled;
+	static bool ssr_performance_mode;
 	static Framebuffer adaptation_input;
 	static ID3D11ShaderResourceView* final_color_map;
 	static Framebuffer fsquad;
@@ -108,8 +119,20 @@ private:
 	static Framebuffer ssao_vertical_buffer;
 	static Framebuffer ssao_filtered_buffer;
 	static Framebuffer ssr_buffer;
+	static Framebuffer ssr_composite_buffer;
+	static Framebuffer ssgi_buffer;
+	static Framebuffer ssgi_composite_buffer;
+	static std::array<Framebuffer, 2> taa_history;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> taa_constant_buffer;
+	static bool taa_enabled;
+	static bool taa_history_valid;
+	static UINT taa_history_index;
+	static UINT taa_jitter_index;
+	static float taa_history_weight;
 	static bool ssao_enabled;
 	static bool ssr_enabled;
+	static bool ssgi_enabled;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> ssgi_constant_buffer;
 	static std::unique_ptr<DLSSManager> dlss;
 	static bool dlss_applied_this_frame;
 	static UINT render_width;

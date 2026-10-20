@@ -29,9 +29,26 @@ namespace {
 		float surface_thickness = 0.2f;
 		float reflection_strength = 1.0f;
 		float roughness_cutoff = 0.8f;
+		float metallic_cutoff = 0.05f;
+		int max_steps = 32;
+		float padding[2]{};
+	};
+	struct alignas(16) TaaConstants {
+		float history_weight = 0.90f;
+		float history_valid = 0.0f;
+		float inverse_width = 1.0f;
+		float inverse_height = 1.0f;
+	};
+	struct alignas(16) SsgiConstants {
+		float radius = 2.5f;
+		float intensity = 0.25f;
+		float thickness = 0.2f;
+		float debug_view = 0.0f;
 	};
 	SsaoConstants ssao_constants;
 	SsrConstants ssr_constants;
+	TaaConstants taa_constants;
+	SsgiConstants ssgi_constants;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssao_constant_buffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssr_constant_buffer;
 }
@@ -43,8 +60,21 @@ Framebuffer                  Post_Process_Manager::ssao_blur_buffer;
 Framebuffer                  Post_Process_Manager::ssao_vertical_buffer;
 Framebuffer                  Post_Process_Manager::ssao_filtered_buffer;
 Framebuffer                  Post_Process_Manager::ssr_buffer;
+Framebuffer                  Post_Process_Manager::ssr_composite_buffer;
+Framebuffer                  Post_Process_Manager::ssgi_buffer;
+Framebuffer                  Post_Process_Manager::ssgi_composite_buffer;
+std::array<Framebuffer, 2>   Post_Process_Manager::taa_history;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Post_Process_Manager::taa_constant_buffer;
+bool                         Post_Process_Manager::taa_enabled = true;
+bool                         Post_Process_Manager::taa_history_valid = false;
+UINT                         Post_Process_Manager::taa_history_index = 0;
+UINT                         Post_Process_Manager::taa_jitter_index = 0;
+float                        Post_Process_Manager::taa_history_weight = 0.90f;
 bool                         Post_Process_Manager::ssao_enabled = true;
 bool                         Post_Process_Manager::ssr_enabled = false;
+bool                         Post_Process_Manager::ssgi_enabled = true;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Post_Process_Manager::ssgi_constant_buffer;
+namespace { int ssgi_debug_view = 0; }
 Framebuffer                  Post_Process_Manager::adaptation_input;
 std::unique_ptr<DLSSManager> Post_Process_Manager::dlss = nullptr;
 bool Post_Process_Manager::dlss_applied_this_frame = false;
@@ -57,6 +87,8 @@ std::array<Post_Process_Manager::EffectId, 13> Post_Process_Manager::effect_orde
 	EffectId::LensDistortion, EffectId::Vignetting, EffectId::Bloom, EffectId::Adaptation, EffectId::ToneMapping
 };
 std::array<bool, 13> Post_Process_Manager::effect_enabled{};
+std::array<bool, 13> Post_Process_Manager::saved_effect_enabled{};
+bool Post_Process_Manager::ssr_performance_mode = false;
 std::unique_ptr<bloom>       Post_Process_Manager::bloomer = nullptr;
 std::unique_ptr<Fog>         Post_Process_Manager::fogger = nullptr;
 std::unique_ptr<shadow>      Post_Process_Manager::shadower = nullptr;
@@ -75,6 +107,64 @@ std::unique_ptr<HeightFog>           Post_Process_Manager::hgt_fog = nullptr;
 std::unique_ptr<DistanceFog>         Post_Process_Manager::dst_fog = nullptr;
 std::unique_ptr<ExponentialFog>      Post_Process_Manager::exp_fog = nullptr;
 
+namespace {
+	float halton(UINT index, UINT base)
+	{
+		float result = 0.0f;
+		float fraction = 1.0f;
+		while (index > 0) {
+			fraction /= static_cast<float>(base);
+			result += fraction * static_cast<float>(index % base);
+			index /= base;
+		}
+		return result;
+	}
+}
+
+void Post_Process_Manager::SetTAAEnabled(bool enabled)
+{
+	if (taa_enabled != enabled) {
+		taa_enabled = enabled;
+		ResetTemporalHistory();
+	}
+}
+
+void Post_Process_Manager::ResetTemporalHistory()
+{
+	taa_history_valid = false;
+	taa_history_index = 0;
+	taa_jitter_index = 0;
+}
+
+void Post_Process_Manager::SetSSRPerformanceMode(bool enabled)
+{
+	if (enabled == ssr_performance_mode) return;
+	ssr_performance_mode = enabled;
+	if (enabled) {
+		saved_effect_enabled = effect_enabled;
+		effect_enabled.fill(false);
+		// Keep only the sky background and final display transform in the SSR
+		// validation scene; secondary full-screen effects obscure the reflection
+		// result and add several complete-resolution passes.
+		effect_enabled[static_cast<size_t>(EffectId::Sky)] = true;
+		effect_enabled[static_cast<size_t>(EffectId::ToneMapping)] = true;
+	}
+	else {
+		effect_enabled = saved_effect_enabled;
+	}
+}
+
+DirectX::XMFLOAT2 Post_Process_Manager::GetTAAJitterNdc()
+{
+	if (!taa_enabled || (dlss && dlss->IsEnabled()) || render_width == 0 || render_height == 0)
+		return { 0.0f, 0.0f };
+	const UINT sample = (taa_jitter_index++ % 8) + 1;
+	const float pixel_x = halton(sample, 2) - 0.5f;
+	const float pixel_y = halton(sample, 3) - 0.5f;
+	return { 2.0f * pixel_x / static_cast<float>(render_width),
+		-2.0f * pixel_y / static_cast<float>(render_height) };
+}
+
 // ─── 初期化 ───────────────────────────────────────────────────────
 void Post_Process_Manager::initialize()
 {
@@ -89,7 +179,12 @@ void Post_Process_Manager::initialize()
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssr_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssr_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssr_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssgi_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssgi_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	taa_history[0] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	taa_history[1] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	D3D11_BUFFER_DESC ssao_cb_desc{};
 	ssao_cb_desc.ByteWidth = sizeof(SsaoConstants);
 	ssao_cb_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -100,6 +195,11 @@ void Post_Process_Manager::initialize()
 	}
 	ssao_cb_desc.ByteWidth = sizeof(SsrConstants);
 	device->CreateBuffer(&ssao_cb_desc, nullptr, ssr_constant_buffer.GetAddressOf());
+	ssao_cb_desc.ByteWidth = sizeof(TaaConstants);
+	device->CreateBuffer(&ssao_cb_desc, nullptr, taa_constant_buffer.GetAddressOf());
+	ssao_cb_desc.ByteWidth = sizeof(SsgiConstants);
+	device->CreateBuffer(&ssao_cb_desc, nullptr, ssgi_constant_buffer.GetAddressOf());
+	ResetTemporalHistory();
 	render_width = w;
 	render_height = h;
 	dlss = std::make_unique<DLSSManager>();
@@ -143,7 +243,13 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssr_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssr_buffer = Framebuffer(device, (std::max)(1u, width / 2), (std::max)(1u, height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssr_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssgi_buffer = Framebuffer(device, (std::max)(1u, width / 2), (std::max)(1u, height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssgi_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	taa_history[0] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	taa_history[1] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ResetTemporalHistory();
 	render_width = width;
 	render_height = height;
 	Graphics_Core::instance().resize_geometry_buffer(width, height);
@@ -275,18 +381,87 @@ void Post_Process_Manager::draw()
 		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
 		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
 		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
-		ID3D11ShaderResourceView* ssr_inputs[4] = { current, gbuffer_srvs[0], gbuffer_srvs[1], gbuffer_srvs[2] };
+		ID3D11ShaderResourceView* ssr_inputs[5] = {
+			current, gbuffer_srvs[0], gbuffer_srvs[1], gbuffer_srvs[2], geometry_buffer->GetDepth()
+		};
 		ctx->UpdateSubresource(ssr_constant_buffer.Get(), 0, nullptr, &ssr_constants, 0, 0);
 		ctx->PSSetConstantBuffers(12, 1, ssr_constant_buffer.GetAddressOf());
 		ssr_buffer.Clear(ctx);
 		ssr_buffer.Activate(ctx);
 		Graphics_Core::instance().get_fullscreen_quad()->Blit(
-			ctx, ssr_inputs, 0, 4,
+			ctx, ssr_inputs, 0, 5,
 			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSR_PS"));
 		ssr_buffer.Deactivate(ctx);
-		ID3D11ShaderResourceView* null_ssr_inputs[4]{};
-		ctx->PSSetShaderResources(0, 4, null_ssr_inputs);
-		current = ssr_buffer.GetColorMap();
+		ID3D11ShaderResourceView* null_ssr_inputs[5]{};
+		ctx->PSSetShaderResources(0, 5, null_ssr_inputs);
+		ID3D11ShaderResourceView* composite_inputs[2] = { current, ssr_buffer.GetColorMap() };
+		ssr_composite_buffer.Clear(ctx);
+		ssr_composite_buffer.Activate(ctx);
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, composite_inputs, 0, 2,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSR_COMPOSITE_PS"));
+		ssr_composite_buffer.Deactivate(ctx);
+		ID3D11ShaderResourceView* null_composite_inputs[2]{};
+		ctx->PSSetShaderResources(0, 2, null_composite_inputs);
+		current = ssr_composite_buffer.GetColorMap();
+	}
+	if (ssgi_enabled && ssgi_constant_buffer) {
+		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
+		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
+		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
+		ID3D11ShaderResourceView* ssgi_inputs[4] = {
+			current, gbuffer_srvs[0], gbuffer_srvs[1], gbuffer_srvs[2]
+		};
+		ctx->UpdateSubresource(ssgi_constant_buffer.Get(), 0, nullptr, &ssgi_constants, 0, 0);
+		ctx->PSSetConstantBuffers(12, 1, ssgi_constant_buffer.GetAddressOf());
+		ssgi_buffer.Clear(ctx);
+		ssgi_buffer.Activate(ctx);
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, ssgi_inputs, 0, 4,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSGI_PS"));
+		ssgi_buffer.Deactivate(ctx);
+		ID3D11ShaderResourceView* null_ssgi_inputs[4]{};
+		ctx->PSSetShaderResources(0, 4, null_ssgi_inputs);
+		ID3D11ShaderResourceView* composite_inputs[4] = {
+			current, ssgi_buffer.GetColorMap(), gbuffer_srvs[0], gbuffer_srvs[2]
+		};
+		ssgi_composite_buffer.Clear(ctx);
+		ssgi_composite_buffer.Activate(ctx);
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, composite_inputs, 0, 4,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("SSGI_COMPOSITE_PS"));
+		ssgi_composite_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 4, null_ssgi_inputs);
+		current = ssgi_composite_buffer.GetColorMap();
+	}
+	if (taa_enabled && !(dlss && dlss->IsEnabled()) && taa_constant_buffer) {
+		ID3D11ShaderResourceView* null_taa_inputs[3]{};
+		ctx->PSSetShaderResources(0, 3, null_taa_inputs);
+		if (!taa_history_valid) {
+			taa_history[0].Clear(ctx);
+			taa_history[1].Clear(ctx);
+		}
+		const UINT write_index = 1u - taa_history_index;
+		taa_constants.history_weight = taa_history_weight;
+		taa_constants.history_valid = taa_history_valid ? 1.0f : 0.0f;
+		taa_constants.inverse_width = 1.0f / static_cast<float>(render_width);
+		taa_constants.inverse_height = 1.0f / static_cast<float>(render_height);
+		ctx->UpdateSubresource(taa_constant_buffer.Get(), 0, nullptr, &taa_constants, 0, 0);
+		ctx->PSSetConstantBuffers(12, 1, taa_constant_buffer.GetAddressOf());
+		ID3D11ShaderResourceView* taa_inputs[3] = {
+			current,
+		taa_history[taa_history_index].GetColorMap(),
+		Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors()
+		};
+		taa_history[write_index].Clear(ctx);
+		taa_history[write_index].Activate(ctx);
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, taa_inputs, 0, 3,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("TAA_PS"));
+		taa_history[write_index].Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 3, null_taa_inputs);
+		current = taa_history[write_index].GetColorMap();
+		taa_history_index = write_index;
+		taa_history_valid = true;
+	}
+	else {
+		taa_history_valid = false;
 	}
 	final_color_map = current;
 	for (size_t i = 0; i < effect_order.size(); ++i) {
@@ -488,6 +663,12 @@ void Post_Process_Manager::drawFogGUI()
 void Post_Process_Manager::drawPipelineGUI()
 {
 	static const char* names[] = { "Sky", "Bloom", "Adaptation", "Volumetric Fog", "Height Fog", "Distance Fog", "Exponential Fog", "DoF", "Exposure", "Chromatic Aberration", "Lens Distortion", "Vignetting", "Tone Mapping" };
+	bool taa_enabled_ui = taa_enabled;
+	if (ImGui::Checkbox("Enable TAA", &taa_enabled_ui)) SetTAAEnabled(taa_enabled_ui);
+	if (taa_enabled) {
+		ImGui::SliderFloat("TAA History Weight", &taa_history_weight, 0.5f, 0.97f, "%.2f");
+		ImGui::TextDisabled("Halton 2,3 jitter; temporal accumulation is bypassed while DLSS is enabled.");
+	}
 	ImGui::Checkbox("Enable SSAO (Alchemy AO)", &ssao_enabled);
 	if (ssao_enabled) {
 		ImGui::SliderFloat("SSAO Radius (world units)", &ssao_constants.radius, 0.01f, 3.0f, "%.2f");
@@ -503,6 +684,21 @@ void Post_Process_Manager::drawPipelineGUI()
 		ImGui::SliderFloat("SSR Surface Thickness", &ssr_constants.surface_thickness, 0.01f, 2.0f, "%.2f");
 		ImGui::SliderFloat("SSR Strength", &ssr_constants.reflection_strength, 0.0f, 2.0f, "%.2f");
 		ImGui::SliderFloat("SSR Roughness Cutoff", &ssr_constants.roughness_cutoff, 0.05f, 1.0f, "%.2f");
+		ImGui::SliderFloat("SSR Metallic Cutoff", &ssr_constants.metallic_cutoff, 0.0f, 0.5f, "%.2f");
+		ImGui::SliderInt("SSR Max Steps", &ssr_constants.max_steps, 16, 64);
+	}
+	ImGui::Checkbox("Enable SSGI", &ssgi_enabled);
+	if (ssgi_enabled) {
+		ImGui::SliderFloat("SSGI Radius (world units)", &ssgi_constants.radius, 0.25f, 8.0f, "%.2f");
+		ImGui::SliderFloat("SSGI Intensity", &ssgi_constants.intensity, 0.0f, 2.0f, "%.2f");
+		ImGui::SliderFloat("SSGI Surface Thickness", &ssgi_constants.thickness, 0.01f, 1.0f, "%.2f");
+		ImGui::TextDisabled("Compare these views in the SSGI Color Bleed test scene.");
+		ImGui::RadioButton("Final Composite", &ssgi_debug_view, 0);
+		ImGui::SameLine();
+		ImGui::RadioButton("Indirect Light Only", &ssgi_debug_view, 1);
+		ImGui::SameLine();
+		ImGui::RadioButton("Before SSGI", &ssgi_debug_view, 2);
+		ssgi_constants.debug_view = static_cast<float>(ssgi_debug_view);
 	}
 	ImGui::TextDisabled("The order below is the execution order.");
 	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Saved to data/post_process_settings.json" : "Could not save settings.");
@@ -537,6 +733,8 @@ bool Post_Process_Manager::savePipelineSettings() const
 	SAVE_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); SAVE_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); SAVE_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
 	SAVE_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); SAVE_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); SAVE_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
 	SAVE_PARAM("vignetting", "enabled", vignetting->is_enabled); SAVE_PARAM("vignetting", "physical_link", vignetting->physical_link); SAVE_PARAM("vignetting", "intensity", vignetting->intensity); SAVE_PARAM("vignetting", "inner_radius", vignetting->inner_radius); SAVE_PARAM("vignetting", "outer_radius", vignetting->outer_radius); SAVE_PARAM("vignetting", "smoothness", vignetting->smoothness);
+	SAVE_PARAM("taa", "enabled", taa_enabled); SAVE_PARAM("taa", "history_weight", taa_history_weight);
+	SAVE_PARAM("ssgi", "enabled", ssgi_enabled); SAVE_PARAM("ssgi", "radius", ssgi_constants.radius); SAVE_PARAM("ssgi", "intensity", ssgi_constants.intensity); SAVE_PARAM("ssgi", "thickness", ssgi_constants.thickness);
 	SAVE_PARAM("volumetric_fog", "enabled", vol_fog->config.is_enabled); SAVE_PARAM("volumetric_fog", "density", vol_fog->config.density_base); SAVE_PARAM("volumetric_fog", "scattering", vol_fog->config.scattering); SAVE_PARAM("volumetric_fog", "absorption", vol_fog->config.absorption); SAVE_PARAM("volumetric_fog", "anisotropy", vol_fog->config.anisotropy); SAVE_PARAM("volumetric_fog", "noise_scale", vol_fog->config.noise_scale); SAVE_PARAM("volumetric_fog", "intensity", vol_fog->config.intensity); SAVE_PARAM("volumetric_fog", "fog_near", vol_fog->config.fog_near); SAVE_PARAM("volumetric_fog", "fog_far", vol_fog->config.fog_far);
 	SAVE_PARAM("volumetric_fog", "grid_width", vol_fog->config.grid_width); SAVE_PARAM("volumetric_fog", "grid_height", vol_fog->config.grid_height); SAVE_PARAM("volumetric_fog", "grid_depth", vol_fog->config.grid_depth);
 	SAVE_PARAM("height_fog", "enabled", hgt_fog->config.is_enabled); SAVE_PARAM("height_fog", "base_height", hgt_fog->config.base_height); SAVE_PARAM("height_fog", "falloff", hgt_fog->config.falloff); SAVE_PARAM("height_fog", "density", hgt_fog->config.density_max); SAVE_PARAM("height_fog", "intensity", hgt_fog->config.intensity); SAVE_PARAM("height_fog", "noise_scale", hgt_fog->config.noise_scale); SAVE_PARAM("height_fog", "noise_strength", hgt_fog->config.noise_strength); SAVE_PARAM("height_fog", "wind_velocity", json::array({hgt_fog->config.wind_velocity.x, hgt_fog->config.wind_velocity.y, hgt_fog->config.wind_velocity.z})); SAVE_PARAM("height_fog", "color", json::array({hgt_fog->config.fog_color.x, hgt_fog->config.fog_color.y, hgt_fog->config.fog_color.z}));
@@ -573,6 +771,17 @@ bool Post_Process_Manager::loadPipelineSettings()
 	LOAD_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); LOAD_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); LOAD_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
 	LOAD_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); LOAD_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); LOAD_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
 	LOAD_PARAM("vignetting", "enabled", vignetting->is_enabled); LOAD_PARAM("vignetting", "physical_link", vignetting->physical_link); LOAD_PARAM("vignetting", "intensity", vignetting->intensity); LOAD_PARAM("vignetting", "inner_radius", vignetting->inner_radius); LOAD_PARAM("vignetting", "outer_radius", vignetting->outer_radius); LOAD_PARAM("vignetting", "smoothness", vignetting->smoothness);
+	{
+		const bool was_enabled = taa_enabled;
+		LOAD_PARAM("taa", "enabled", taa_enabled);
+		LOAD_PARAM("taa", "history_weight", taa_history_weight);
+		taa_history_weight = std::clamp(taa_history_weight, 0.5f, 0.97f);
+		if (was_enabled != taa_enabled) ResetTemporalHistory();
+	}
+	LOAD_PARAM("ssgi", "enabled", ssgi_enabled); LOAD_PARAM("ssgi", "radius", ssgi_constants.radius); LOAD_PARAM("ssgi", "intensity", ssgi_constants.intensity); LOAD_PARAM("ssgi", "thickness", ssgi_constants.thickness);
+	ssgi_constants.radius = std::clamp(ssgi_constants.radius, 0.25f, 8.0f);
+	ssgi_constants.intensity = std::clamp(ssgi_constants.intensity, 0.0f, 2.0f);
+	ssgi_constants.thickness = std::clamp(ssgi_constants.thickness, 0.01f, 1.0f);
 	LOAD_PARAM("volumetric_fog", "enabled", vol_fog->config.is_enabled); LOAD_PARAM("volumetric_fog", "density", vol_fog->config.density_base); LOAD_PARAM("volumetric_fog", "scattering", vol_fog->config.scattering); LOAD_PARAM("volumetric_fog", "absorption", vol_fog->config.absorption); LOAD_PARAM("volumetric_fog", "anisotropy", vol_fog->config.anisotropy); LOAD_PARAM("volumetric_fog", "noise_scale", vol_fog->config.noise_scale); LOAD_PARAM("volumetric_fog", "intensity", vol_fog->config.intensity); LOAD_PARAM("volumetric_fog", "fog_near", vol_fog->config.fog_near); LOAD_PARAM("volumetric_fog", "fog_far", vol_fog->config.fog_far); LOAD_PARAM("volumetric_fog", "grid_width", vol_fog->config.grid_width); LOAD_PARAM("volumetric_fog", "grid_height", vol_fog->config.grid_height); LOAD_PARAM("volumetric_fog", "grid_depth", vol_fog->config.grid_depth);
 	LOAD_PARAM("height_fog", "enabled", hgt_fog->config.is_enabled); LOAD_PARAM("height_fog", "base_height", hgt_fog->config.base_height); LOAD_PARAM("height_fog", "falloff", hgt_fog->config.falloff); LOAD_PARAM("height_fog", "density", hgt_fog->config.density_max); LOAD_PARAM("height_fog", "intensity", hgt_fog->config.intensity); LOAD_PARAM("height_fog", "noise_scale", hgt_fog->config.noise_scale); LOAD_PARAM("height_fog", "noise_strength", hgt_fog->config.noise_strength); { auto color = j.value("height_fog", json::object()).value("color", json::array()); if (color.is_array() && color.size() == 3) hgt_fog->config.fog_color = DirectX::XMFLOAT3(color[0].get<float>(), color[1].get<float>(), color[2].get<float>()); auto wind = j.value("height_fog", json::object()).value("wind_velocity", json::array()); if (wind.is_array() && wind.size() == 3) hgt_fog->config.wind_velocity = DirectX::XMFLOAT3(wind[0].get<float>(), wind[1].get<float>(), wind[2].get<float>()); }
 	LOAD_PARAM("distance_fog", "enabled", dst_fog->config.is_enabled); LOAD_PARAM("distance_fog", "start", dst_fog->config.fog_start); LOAD_PARAM("distance_fog", "end", dst_fog->config.fog_end); LOAD_PARAM("distance_fog", "density", dst_fog->config.density); LOAD_PARAM("distance_fog", "intensity", dst_fog->config.intensity); { auto color = j.value("distance_fog", json::object()).value("color", json::array()); if (color.is_array() && color.size() == 3) for (int i = 0; i < 3; ++i) dst_fog->config.fog_color[i] = color[i].get<float>(); }

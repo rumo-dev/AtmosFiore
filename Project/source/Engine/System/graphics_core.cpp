@@ -260,11 +260,7 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	TRACY_CB_ZONE("Graphics_Core::update_scene_constants");
 
 	using namespace DirectX;
-	D3D11_VIEWPORT viewport;
-	UINT num_viewports{ 1 };
-	_immediate_context->RSGetViewports(&num_viewports, &viewport);
 	Camera_Constants data{};
-	//float aspect_ratio = viewport.Width / viewport.Height;
 	//{
 	//	dx::XMFLOAT4 light_view_focus = post_procss.GetShadow().get_light_view_focus();
 	//	float light_view_distance = post_procss.GetShadow().get_light_view_distance();
@@ -281,18 +277,24 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	//dx::XMMATRIX V = camera.view;
 	//dx::XMMATRIX P = camera.projection;
 	XMStoreFloat4(&data.camera_position, camera.position);
-	const DirectX::XMMATRIX current_view_projection = camera.view * camera.projection;
+	XMFLOAT2 jitter_ndc = Post_Process_Manager::GetTAAJitterNdc();
+	XMFLOAT4X4 jittered_projection;
+	XMStoreFloat4x4(&jittered_projection, camera.projection);
+	jittered_projection._31 += jitter_ndc.x;
+	jittered_projection._32 += jitter_ndc.y;
+	const XMMATRIX projection = XMLoadFloat4x4(&jittered_projection);
+	const XMMATRIX current_view_projection = camera.view * projection;
 	dx::XMStoreFloat4x4(&data.view_projection, current_view_projection);
 	data.previous_view_projection = _has_previous_view_projection
 		? _previous_view_projection
 		: data.view_projection;
 	dx::XMStoreFloat4x4(&_previous_view_projection, current_view_projection);
 	_has_previous_view_projection = true;
-	dx::XMStoreFloat4x4(&data.inv_view_projection, camera.inv_view * camera.inv_projection);
+	dx::XMStoreFloat4x4(&data.inv_view_projection, XMMatrixInverse(nullptr, current_view_projection));
 	dx::XMStoreFloat4x4(&data.view, camera.view);
-	dx::XMStoreFloat4x4(&data.projection, camera.projection);
+	dx::XMStoreFloat4x4(&data.projection, projection);
 	dx::XMStoreFloat4x4(&data.inv_view, camera.inv_view);
-	dx::XMStoreFloat4x4(&data.inv_projection, camera.inv_projection);
+	dx::XMStoreFloat4x4(&data.inv_projection, XMMatrixInverse(nullptr, projection));
 	data.light_view_projection = post_procss.GetShadow().light_view_projection;
 	data.fov = camera.fov;
 	data.near_z = camera.near_z;

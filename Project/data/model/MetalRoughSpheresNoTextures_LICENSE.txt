@@ -1,0 +1,5 @@
+Asset: Metal-Rough Spheres (textureless)
+Author: Krill Gavrilov and Open CASCADE Technology
+Source: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MetalRoughSpheresNoTextures
+License: CC0 1.0 Universal
+Downloaded as a self-contained glTF Binary (GLB) for the SSR test scene.
