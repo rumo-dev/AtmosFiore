@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
 class DirectionalLight : public LightBase
 {
@@ -81,7 +82,17 @@ public:
 	void update() override
 	{
 		auto photometric_color = diffuseColor;
-		photometric_color.w = illuminance_lux;
+		float daylight = 1.0f;
+		if (auto_rotate)
+		{
+			const float sun_height = -direction.y; // light direction points away from the sun
+			const float x = std::clamp((sun_height + 0.12f) / 0.22f, 0.0f, 1.0f);
+			daylight = 0.015f + 0.985f * x * x * (3.0f - 2.0f * x);
+			const float warm = 1.0f - std::clamp((sun_height + 0.08f) / 0.55f, 0.0f, 1.0f);
+			photometric_color.y *= 1.0f - warm * 0.22f;
+			photometric_color.z *= 1.0f - warm * 0.48f;
+		}
+		photometric_color.w = illuminance_lux * daylight;
 		Graphics_Core::instance().set_directional_light(
 			ambientColor,
 			direction,
