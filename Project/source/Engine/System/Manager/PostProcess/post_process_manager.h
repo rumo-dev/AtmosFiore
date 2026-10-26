@@ -106,10 +106,10 @@ public:
 	void drawDOFGUI();
 
 private:
-	enum class EffectId { Sky, Bloom, Adaptation, VolumetricFog, HeightFog, DistanceFog, ExponentialFog, DoF, Exposure, ChromaticAberration, LensDistortion, Vignetting, ToneMapping, LensFlare };
-	static std::array<EffectId, 14> effect_order;
-	static std::array<bool, 14> effect_enabled;
-	static std::array<bool, 14> saved_effect_enabled;
+	enum class EffectId { Sky, Bloom, Adaptation, VolumetricFog, HeightFog, DistanceFog, ExponentialFog, DoF, Exposure, ChromaticAberration, LensDistortion, Vignetting, ToneMapping };
+	static std::array<EffectId, 13> effect_order;
+	static std::array<bool, 13> effect_enabled;
+	static std::array<bool, 13> saved_effect_enabled;
 	static bool ssr_performance_mode;
 	static Framebuffer adaptation_input;
 	static ID3D11ShaderResourceView* final_color_map;
@@ -122,8 +122,6 @@ private:
 	static Framebuffer ssr_composite_buffer;
 	static Framebuffer ssgi_buffer;
 	static Framebuffer ssgi_composite_buffer;
-	static Framebuffer lens_flare_buffer;
-	static Framebuffer lens_flare_composite_buffer;
 	static std::array<Framebuffer, 2> taa_history;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> taa_constant_buffer;
 	static bool taa_enabled;
@@ -134,7 +132,6 @@ private:
 	static bool ssr_enabled;
 	static bool ssgi_enabled;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> ssgi_constant_buffer;
-	static Microsoft::WRL::ComPtr<ID3D11Buffer> lens_flare_constant_buffer;
 	static std::unique_ptr<DLSSManager> dlss;
 	static bool dlss_applied_this_frame;
 	static UINT render_width;

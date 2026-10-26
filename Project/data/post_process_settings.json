@@ -82,13 +82,6 @@
     "physical_link": true,
     "scale": 1.0
   },
-  "lens_flare": {
-    "enabled": true,
-    "threshold": 0.7,
-    "intensity": 0.8,
-    "ghost_spacing": 0.55,
-    "streak_intensity": 0.85
-  },
   "order": [
     0,
     1,
