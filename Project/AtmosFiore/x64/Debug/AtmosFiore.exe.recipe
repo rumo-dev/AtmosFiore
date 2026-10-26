@@ -145,12 +145,6 @@
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\glow_extraction_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\lens_flare_ps.cso</FullPath>
-    </ContentFile>
-    <ContentFile>
-      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\lens_flare_composite_ps.cso</FullPath>
-    </ContentFile>
-    <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\ssao_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>

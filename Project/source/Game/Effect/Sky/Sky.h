@@ -33,4 +33,18 @@ private:
 	std::unique_ptr<Framebuffer>     color_map;
 	// 定数バッファ
 	Microsoft::WRL::ComPtr<ID3D11Buffer> constants;
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> atmosphere_lut;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> atmosphere_lut_srv;
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> transmittance_lut;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> transmittance_lut_srv;
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> multiscattering_lut;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> multiscattering_lut_srv;
+	Microsoft::WRL::ComPtr<ID3D11Texture3D> aerial_perspective_lut;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> aerial_perspective_lut_srv;
+	Microsoft::WRL::ComPtr<ID3D11Texture3D> cloud_base_noise;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cloud_base_noise_srv;
+	Microsoft::WRL::ComPtr<ID3D11Texture3D> cloud_detail_noise;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cloud_detail_noise_srv;
+	void create_atmosphere_luts(ID3D11Device* device);
+	void create_cloud_noise_textures(ID3D11Device* device);
 };
