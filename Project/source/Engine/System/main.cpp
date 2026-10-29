@@ -1,4 +1,5 @@
 #include <time.h>
+#include <string>
 
 #include "framework.h"
 #include "graphics_core.h"
@@ -20,6 +21,40 @@ int WINAPI WinMain(
 	LPSTR cmd_line,
 	int cmd_show)
 {
+	// Assets are loaded with paths relative to the working directory.  Explorer,
+	// shortcuts and launchers do not necessarily start us in the exe directory.
+	std::wstring executable_path(MAX_PATH, L'\0');
+	for (;;)
+	{
+		const DWORD length = GetModuleFileNameW(nullptr, executable_path.data(),
+			static_cast<DWORD>(executable_path.size()));
+		if (length == 0)
+		{
+			MessageBoxW(nullptr, L"実行ファイルの場所を取得できません。", APPLICATION_NAME, MB_OK | MB_ICONERROR);
+			return -1;
+		}
+		if (length < executable_path.size())
+		{
+			executable_path.resize(length);
+			break;
+		}
+		executable_path.resize(executable_path.size() * 2);
+	}
+	const size_t separator = executable_path.find_last_of(L"\\/");
+	if (separator == std::wstring::npos ||
+		!SetCurrentDirectoryW(executable_path.substr(0, separator).c_str()))
+	{
+		MessageBoxW(nullptr, L"実行ファイルのフォルダーに移動できません。", APPLICATION_NAME, MB_OK | MB_ICONERROR);
+		return -1;
+	}
+	if (GetFileAttributesW(L"data\\shaders\\cso") == INVALID_FILE_ATTRIBUTES ||
+		GetFileAttributesW(L"data\\AtmosFioreLogo.png") == INVALID_FILE_ATTRIBUTES)
+	{
+		MessageBoxW(nullptr, L"data フォルダーが見つかりません。ZIP をすべて展開し、exe と data を同じフォルダーに置いてください。",
+			APPLICATION_NAME, MB_OK | MB_ICONERROR);
+		return -1;
+	}
+
 	srand(static_cast<unsigned int>(time(nullptr)));
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -33,7 +68,7 @@ int WINAPI WinMain(
 	wcex.hInstance = instance;
 	wcex.hIcon = LoadIcon(instance, MAKEINTRESOURCE(333));
 	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcex.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
 	wcex.lpszClassName = APPLICATION_NAME;
 
 	if (!RegisterClassExW(&wcex))
@@ -103,10 +138,7 @@ int WINAPI WinMain(
 		return -1;
 	}
 
-	ShowWindow(hwnd, cmd_show);
-	UpdateWindow(hwnd);
-
-	Frame_Work framework(hwnd);
+	Frame_Work framework(hwnd, cmd_show);
 
 	SetWindowLongPtrW(
 		hwnd,

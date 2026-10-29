@@ -273,7 +273,7 @@ void Scene_Manager::draw_gui()
 	if (ImGui::CollapsingHeader("Render Test Scenes", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::TextDisabled("Select a scene to inspect rendering conditions.");
-		if (ImGui::Button("Indoor")) change_scene(new Scene_Indoor());
+		if (ImGui::Button("Indoor")) change_scene(new Scene_Loading(new Scene_Indoor()));
 		ImGui::SameLine();
 		if (ImGui::Button("SSR Reflections")) change_scene(new Scene_RenderTest(RenderTestKind::Reflections));
 		if (ImGui::Button("PBR Materials")) change_scene(new Scene_RenderTest(RenderTestKind::Materials));
@@ -304,7 +304,15 @@ void Scene_Manager::change_scene(Scene_Base* scene)
 {
 	TRACY_CPU_ZONE_N("Scene_Manager::change_scene");
 
-	//Clear();
+	// The first scene has nothing to fade out. Initialize it immediately so the
+	// first visible frame can render the splash screen.
+	if (!_current_scene && !_next_scene)
+	{
+		_current_scene = scene;
+		if (!_current_scene->is_ready()) _current_scene->initialize();
+		return;
+	}
+
 	//新しいシーンを設定
 	if (_next_scene)
 	{

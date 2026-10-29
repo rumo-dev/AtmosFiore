@@ -120,7 +120,7 @@ public:
 	}
 
 	// 初期化
-	void initialize(HWND hwnd);
+	bool initialize(HWND hwnd);
 
 	// クリア
 	void clear(Color_Utils::Color color);

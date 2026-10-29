@@ -4,7 +4,7 @@
 #include "Engine/utilities/color_util.h"
 #include "tracy_util.h"
 
-void Graphics_Core::initialize(HWND hwnd) {
+bool Graphics_Core::initialize(HWND hwnd) {
 	log_printf("グラフィックスコアの初期化開始\n", LogLevel::Info);
 	_hwnd = hwnd;
 	// 画面のサイズを取得する。
@@ -24,10 +24,10 @@ void Graphics_Core::initialize(HWND hwnd) {
 #endif // _DEBUG
 
 
-	create_device();
+	if (!create_device()) return false;
 	Resource_Manager::instance().load_shaders();
-	create_swap_chain();
-	create_render_target_view();
+	if (!create_swap_chain()) return false;
+	if (!create_render_target_view()) return false;
 	set_viewport();
 	create_constant_buffer();
 	_render_state = std::make_unique<Render_State>();
@@ -39,6 +39,7 @@ void Graphics_Core::initialize(HWND hwnd) {
 
 	g_MarkerUtil.Initialize(_immediate_context.Get());
 	log_printf("グラフィックスコアの初期化終了\n", LogLevel::Info);
+	return true;
 }
 
 void Graphics_Core::clear(Color_Utils::Color color) {
@@ -214,6 +215,10 @@ bool Graphics_Core::create_swap_chain() {
 	hr = dxgi_factory->CreateSwapChain(_device.Get(), &desc, _swapchain.GetAddressOf());
 	dxgi_factory->Release();
 
+	if (FAILED(hr)) {
+		log_printf("スワップチェーンの生成 >> 失敗. HRESULT = 0x%08X\n", LogLevel::Error, hr);
+		return false;
+	}
 	log_printf("スワップチェーンの生成 >> 成功. HRESULT = 0x%08X\n", LogLevel::Success, hr);
 	return true;
 }

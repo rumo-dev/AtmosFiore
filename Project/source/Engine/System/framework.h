@@ -86,7 +86,7 @@ public:
 	 * @brief コンストラクタ
 	 * @param hwnd ウィンドウハンドル
 	 */
-	Frame_Work(HWND hwnd);
+	Frame_Work(HWND hwnd, int show_command);
 
 	/**
 	 * @brief デストラクタ
@@ -171,6 +171,8 @@ public:
 		ns.LinkThickness = 2.0f;
 		ns.GridSpacing = 20.0f;
 #endif
+		ShowWindow(hwnd, _show_command);
+		UpdateWindow(hwnd);
 
 		while (WM_QUIT != msg.message)
 		{
@@ -276,6 +278,7 @@ private:
 	bool uninitialize();
 
 private:
+	int _show_command;
 
 	high_resolution_timer _tictoc; ///< 高精度タイマー
 

@@ -4,14 +4,18 @@
 #include "Engine/Utilities/misc.h"
 #include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 #include "Engine/Extentions/Tracy/tracy/Tracy.hpp"
-Frame_Work::Frame_Work(HWND hwnd) : hwnd(hwnd)
+Frame_Work::Frame_Work(HWND hwnd, int show_command) : hwnd(hwnd), _show_command(show_command)
 {
 }
 
 bool Frame_Work::initialize()
 
 {
-	Graphics_Core::instance().initialize(hwnd);
+	if (!Graphics_Core::instance().initialize(hwnd)) {
+		MessageBoxW(hwnd, L"Direct3D 11 の初期化に失敗しました。GPU ドライバーと DirectX 11 の対応状況を確認してください。",
+			APPLICATION_NAME, MB_OK | MB_ICONERROR);
+		return false;
+	}
 	Graphics_Core::instance().set_borderless_window();
 
 	//static ImGui_Util::ThemeType theme = ImGui_Util::ThemeType::seeing;
