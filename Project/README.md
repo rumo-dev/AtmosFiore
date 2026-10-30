@@ -59,3 +59,7 @@ MSBuild .\AtmosFiore.sln /p:Configuration=Debug /p:Platform=x64 /m
 - ImGui、Tracy など: ソースが `source/` 以下に含まれる
 
 `DirectXTK.lib` が見つからない場合は、ソリューション全体をビルドし、DirectXTK プロジェクトの同じ構成とプラットフォームのビルド結果を確認してください。`data` が見つからないエラーでは、上記の必須ファイルと実行ファイルからのフォルダー配置を確認してください。
+
+## リリース ZIP の作成
+
+`Release|x64` をビルドした後、`package_release.bat` を実行します。バッチはビルド済みの `x64/Release/AtmosFiore.exe`、現在の `data/`、DLSS DLL、Visual Studio の x64 再頒布用 DLL を集め、`ReleasePackage/AtmosFiore_Release_<日時>_<識別子>.zip` を作成します。バッチ自体はビルドしません。ZIP には PDB や開発用ソースは含めません。
