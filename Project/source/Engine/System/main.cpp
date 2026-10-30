@@ -41,14 +41,52 @@ int WINAPI WinMain(
 		executable_path.resize(executable_path.size() * 2);
 	}
 	const size_t separator = executable_path.find_last_of(L"\\/");
-	if (separator == std::wstring::npos ||
-		!SetCurrentDirectoryW(executable_path.substr(0, separator).c_str()))
+	if (separator == std::wstring::npos)
 	{
-		MessageBoxW(nullptr, L"実行ファイルのフォルダーに移動できません。", APPLICATION_NAME, MB_OK | MB_ICONERROR);
+		MessageBoxW(nullptr, L"実行ファイルのフォルダーを取得できません。", APPLICATION_NAME, MB_OK | MB_ICONERROR);
 		return -1;
 	}
-	if (GetFileAttributesW(L"data\\shaders\\cso") == INVALID_FILE_ATTRIBUTES ||
-		GetFileAttributesW(L"data\\AtmosFioreLogo.png") == INVALID_FILE_ATTRIBUTES)
+
+	// Look for the data folder next to the exe first (distributed build), then in
+	// parent folders (Visual Studio puts the exe in x64\Debug etc. while data
+	// lives in the project folder).  Whichever folder holds data becomes the
+	// working directory.
+	auto has_data = [](const std::wstring& dir)
+	{
+		const std::wstring prefix = dir.empty() ? L"" : dir + L"\\";
+		return GetFileAttributesW((prefix + L"data\\shaders\\cso").c_str()) != INVALID_FILE_ATTRIBUTES &&
+			GetFileAttributesW((prefix + L"data\\AtmosFioreLogo.png").c_str()) != INVALID_FILE_ATTRIBUTES;
+	};
+
+	std::wstring base_dir = executable_path.substr(0, separator);
+	bool found = false;
+	for (int depth = 0; depth < 6 && !base_dir.empty(); ++depth)
+	{
+		if (has_data(base_dir))
+		{
+			found = true;
+			break;
+		}
+		const size_t parent = base_dir.find_last_of(L"\\/");
+		if (parent == std::wstring::npos)
+		{
+			break;
+		}
+		base_dir.resize(parent);
+	}
+
+	// Fall back to the current working directory (e.g. VS "Working Directory").
+	if (!found && has_data(L""))
+	{
+		found = true;
+	}
+	else if (found && !SetCurrentDirectoryW(base_dir.c_str()))
+	{
+		MessageBoxW(nullptr, L"data フォルダーのある場所に移動できません。", APPLICATION_NAME, MB_OK | MB_ICONERROR);
+		return -1;
+	}
+
+	if (!found)
 	{
 		MessageBoxW(nullptr, L"data フォルダーが見つかりません。ZIP をすべて展開し、exe と data を同じフォルダーに置いてください。",
 			APPLICATION_NAME, MB_OK | MB_ICONERROR);

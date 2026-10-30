@@ -3,6 +3,7 @@
 #include "Engine/utilities/misc.h"
 #include "Engine/utilities/color_util.h"
 #include "tracy_util.h"
+#include <dxgi1_6.h>
 
 bool Graphics_Core::initialize(HWND hwnd) {
 	log_printf("グラフィックスコアの初期化開始\n", LogLevel::Info);
@@ -91,18 +92,46 @@ bool Graphics_Core::create_device() {
 	D3D_FEATURE_LEVEL feature_level;
 	D3D_FEATURE_LEVEL feature_levels[] = { D3D_FEATURE_LEVEL_11_0 };
 
-	hr = D3D11CreateDevice(
-		nullptr,                    // Adapter
-		D3D_DRIVER_TYPE_HARDWARE,   // DriverType
-		nullptr,                    // Software
-		flags,                      // Flags
-		feature_levels,             // Feature levels
-		1,
-		D3D11_SDK_VERSION,
-		_device.GetAddressOf(),
-		&feature_level,
-		_immediate_context.GetAddressOf()
-	);
+	// Prefer a discrete GPU on hybrid systems. Keep the default path as a
+	// fallback for older DXGI versions or machines without a usable adapter.
+	ComPtr<IDXGIFactory1> adapter_factory;
+	if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(adapter_factory.GetAddressOf())))) {
+		ComPtr<IDXGIFactory6> preferred_factory;
+		if (SUCCEEDED(adapter_factory.As(&preferred_factory))) {
+			for (UINT index = 0; ; ++index) {
+				ComPtr<IDXGIAdapter1> adapter;
+				const HRESULT enum_result = preferred_factory->EnumAdapterByGpuPreference(
+					index, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+					IID_PPV_ARGS(adapter.GetAddressOf()));
+				if (enum_result == DXGI_ERROR_NOT_FOUND) break;
+				if (FAILED(enum_result)) break;
+
+				DXGI_ADAPTER_DESC1 description{};
+				if (FAILED(adapter->GetDesc1(&description)) ||
+					(description.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) continue;
+
+				hr = D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN,
+					nullptr, flags, feature_levels, 1, D3D11_SDK_VERSION,
+					_device.GetAddressOf(), &feature_level,
+					_immediate_context.GetAddressOf());
+				if (SUCCEEDED(hr)) {
+					char gpu_name[128]{};
+					if (WideCharToMultiByte(CP_UTF8, 0, description.Description, -1,
+						gpu_name, sizeof(gpu_name), nullptr, nullptr)) {
+						log_printf("選択したGPU: %s\n", LogLevel::Info, gpu_name);
+					}
+					break;
+				}
+			}
+		}
+	}
+	if (!_device) {
+		hr = D3D11CreateDevice(
+			nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
+			feature_levels, 1, D3D11_SDK_VERSION,
+			_device.GetAddressOf(), &feature_level,
+			_immediate_context.GetAddressOf());
+	}
 	{
 		char buf[256];
 		sprintf_s(buf, "Caller: immediate_context=%p \n", _immediate_context.Get());
