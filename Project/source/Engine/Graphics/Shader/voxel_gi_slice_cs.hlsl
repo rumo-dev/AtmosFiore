@@ -8,7 +8,9 @@ cbuffer VOXEL_GI_CONSTANTS : register(b0)
     uint resolution;
     uint slice;
     float strength;
-    float padding;
+    float emissive_multiplier;
+    float environment_fill;
+    float3 padding;
 };
 
 [numthreads(8, 8, 1)]

@@ -27,7 +27,9 @@ cbuffer VOXEL_GI_CONSTANTS : register(b8)
     uint voxel_resolution;
     uint voxel_slice;
     float voxel_strength;
-    float voxel_padding;
+    float voxel_emissive_multiplier;
+    float voxel_environment_fill;
+    float3 voxel_padding;
 };
 
 float3 trace_voxel_cone(float3 origin, float3 direction)

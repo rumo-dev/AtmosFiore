@@ -8,6 +8,7 @@
 #include "Engine/Utilities/math_util.h"
 #include "Engine/Utilities/color_util.h"
 #include "Engine/Graphics/IBL/ibl.h"
+#include "Game/Effect/VoxelGI/VoxelGI.h"
 #include <memory>
 #include <algorithm>
 
@@ -15,7 +16,7 @@ namespace
 {
 	constexpr float TransitionPhaseDuration = 0.8f;
 
-	enum class RenderTestKind { Reflections, Materials, Occlusion, SSGI };
+	enum class RenderTestKind { Reflections, Materials, Occlusion, SSGI, VoxelGI };
 
 	class Scene_RenderTest final : public Scene_Base
 	{
@@ -70,6 +71,21 @@ namespace
 				ssgi_was_enabled_ = Post_Process_Manager::IsSSGIEnabled();
 				Post_Process_Manager::SetSSGIEnabled(true);
 			}
+			else if (kind_ == RenderTestKind::VoxelGI) {
+				modelKey = "VoxelGITest"; modelPath = "./data/model/VoxelGITest/scene.gltf";
+				label = L"Voxel GI Test - Red / Blue Emission";
+				auto* model = resources.load_model(modelKey, modelPath);
+				add_instance("RenderTest_Main", modelKey, 1.0f, { 0.0f, 0.0f, 0.0f }, 0.0f);
+				if (auto* instance = resources.get_model_instance("RenderTest_Main"))
+				{
+					voxel_gi_ = std::make_unique<VoxelGI>();
+					if (!voxel_gi_->initialize(graphics.get_device(), model, instance->world_transform))
+						voxel_gi_.reset();
+					else voxel_gi_->set_emissive_multiplier(8.0f);
+				}
+				ssgi_was_enabled_ = Post_Process_Manager::IsSSGIEnabled();
+				Post_Process_Manager::SetSSGIEnabled(false);
+			}
 			else if (kind_ == RenderTestKind::Materials) {
 				modelKey = "RenderTest_Helmet"; modelPath = "./data/model/glTF/DamagedHelmet/DamagedHelmet.gltf";
 				label = L"PBR Material Test";
@@ -102,10 +118,11 @@ namespace
 			auto camera = std::make_shared<SpectatorCamera>(hwnd);
 			const bool reflectionTest = kind_ == RenderTestKind::Reflections;
 			const bool ssgiTest = kind_ == RenderTestKind::SSGI;
-			const float cameraDistance = reflectionTest ? 12.0f : (kind_ == RenderTestKind::Materials ? 4.5f : (ssgiTest ? 9.0f : 7.0f));
-			const float cameraHeight = reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 1.3f : 2.5f);
-			const float targetHeight = reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 0.55f : 1.5f);
-			const float pitch = reflectionTest ? 0.0f : (kind_ == RenderTestKind::Materials ? -9.5f : -8.0f);
+			const bool voxelTest = kind_ == RenderTestKind::VoxelGI;
+			const float cameraDistance = voxelTest ? 6.5f : (reflectionTest ? 12.0f : (kind_ == RenderTestKind::Materials ? 4.5f : (ssgiTest ? 9.0f : 7.0f)));
+			const float cameraHeight = voxelTest ? 1.8f : (reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 1.3f : 2.5f));
+			const float targetHeight = voxelTest ? 1.0f : (reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 0.55f : 1.5f));
+			const float pitch = voxelTest ? -8.0f : (reflectionTest ? 0.0f : (kind_ == RenderTestKind::Materials ? -9.5f : -8.0f));
 			camera->set_rotation(90.0f, pitch,
 				dx::XMVectorSet(0.0f, cameraHeight, -cameraDistance, 1.0f),
 				dx::XMVectorSet(0.0f, targetHeight, 0.0f, 1.0f));
@@ -115,6 +132,7 @@ namespace
 		}
 		void finalize() override
 		{
+			voxel_gi_.reset();
 			auto& resources = Resource_Manager::instance();
 			resources.remove_model_instance("RenderTest_Main");
 			resources.remove_model_instance("RenderTest_Secondary");
@@ -126,7 +144,7 @@ namespace
 				Post_Process_Manager::SetSSREnabled(ssr_was_enabled_);
 				Post_Process_Manager::SetSSRPerformanceMode(false);
 			}
-			if (kind_ == RenderTestKind::SSGI)
+			if (kind_ == RenderTestKind::SSGI || kind_ == RenderTestKind::VoxelGI)
 				Post_Process_Manager::SetSSGIEnabled(ssgi_was_enabled_);
 		}
 		void update(float elapsedTime) override
@@ -154,6 +172,12 @@ namespace
 			Resource_Manager::instance().render_models(pass_mode::directional_shadow);
 			shadow.make_shadow_end();
 			g.update_constants();
+			if (voxel_gi_)
+			{
+				if (auto* instance = Resource_Manager::instance().get_model_instance("RenderTest_Main"))
+					voxel_gi_->render(context, Resource_Manager::instance().get_model("VoxelGITest"),
+						instance->world_transform);
+			}
 			g.get_geometry_buffer()->Clear(context);
 			g.get_geometry_buffer()->Activate(context);
 			Render_State::instance().set_deferred_render_states(context, Rasterizer_State::Cull_None_CCW);
@@ -162,6 +186,14 @@ namespace
 			Resource_Manager::instance().issue_model_occlusion_queries(context);
 			Resource_Manager::instance().end_model_profile(context);
 			g.get_geometry_buffer()->Deactivate(context);
+			if (voxel_gi_) voxel_gi_->bind_lighting(context);
+			else
+			{
+				ID3D11ShaderResourceView* null_srv = nullptr;
+				ID3D11Buffer* null_buffer = nullptr;
+				context->PSSetShaderResources(13, 1, &null_srv);
+				context->PSSetConstantBuffers(8, 1, &null_buffer);
+			}
 			context->OMSetRenderTargets(1, g.get_render_target_view().GetAddressOf(), nullptr);
 			Render_State::instance().set_2d_render_states(context);
 			g.clear(Color_Utils::from_hex("#202632"));
@@ -171,10 +203,15 @@ namespace
 			g.post_procss.end();
 			g.post_procss.draw();
 			g.post_procss.render();
+			if (voxel_gi_) voxel_gi_->render_debug_3d(context);
 			Text::text_data.Color = Color_Utils::hex_to_colorF("#FFFFFF");
 			Text::draw(label_, D2D1_RECT_F(g.get_screen_width(), g.get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 		}
-		void draw_gui() override { light_.draw_imgui("Test Directional Light"); }
+		void draw_gui() override
+		{
+			light_.draw_imgui("Test Directional Light");
+			if (voxel_gi_) voxel_gi_->draw_gui();
+		}
 	private:
 		void add_instance(const std::string& instanceKey, const std::string& modelKey, float scale,
 			const dx::XMFLOAT3& position, float rotationY,
@@ -197,6 +234,7 @@ namespace
 		}
 		RenderTestKind kind_;
 		DirectionalLight light_;
+		std::unique_ptr<VoxelGI> voxel_gi_;
 		std::wstring label_;
 		bool ssr_was_enabled_ = false;
 		bool ssgi_was_enabled_ = false;
@@ -282,6 +320,7 @@ void Scene_Manager::draw_gui()
 		if (ImGui::Button("PBR Materials")) change_scene(new Scene_RenderTest(RenderTestKind::Materials));
 		if (ImGui::Button("AO / Lighting")) change_scene(new Scene_RenderTest(RenderTestKind::Occlusion));
 		if (ImGui::Button("SSGI Color Bleed")) change_scene(new Scene_RenderTest(RenderTestKind::SSGI));
+		if (ImGui::Button("Voxel GI Emission")) change_scene(new Scene_RenderTest(RenderTestKind::VoxelGI));
 		ImGui::Separator();
 	}
 

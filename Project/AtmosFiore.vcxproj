@@ -1175,6 +1175,10 @@ if exist export rmdir /s /q export</Command>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_debug_ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

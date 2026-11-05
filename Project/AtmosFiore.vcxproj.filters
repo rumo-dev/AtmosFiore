@@ -8,6 +8,7 @@
     <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_gs.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_ps.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_slice_cs.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_debug_ps.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\deferred_lighting_ps.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>

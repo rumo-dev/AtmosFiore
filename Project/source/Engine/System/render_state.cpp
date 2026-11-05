@@ -417,8 +417,8 @@ bool Render_State::create_rasterizer_state(ID3D11Device* device)
 	device->CreateRasterizerState(&rasterizer_desc, &_rasterizer_states[static_cast<int>(Rasterizer_State::Cull_Back_CW)]);
 	rasterizer_desc.FrontCounterClockwise = TRUE;
 	device->CreateRasterizerState(&rasterizer_desc, &_rasterizer_states[static_cast<int>(Rasterizer_State::Cull_Back_CCW)]);
-	//裏面カリング
-	rasterizer_desc.CullMode = D3D11_CULL_BACK;
+	// カリングなし
+	rasterizer_desc.CullMode = D3D11_CULL_NONE;
 	rasterizer_desc.FrontCounterClockwise = FALSE;
 	device->CreateRasterizerState(&rasterizer_desc, &_rasterizer_states[static_cast<int>(Rasterizer_State::Cull_None_CW)]);
 	rasterizer_desc.FrontCounterClockwise = TRUE;

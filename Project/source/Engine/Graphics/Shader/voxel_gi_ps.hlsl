@@ -27,6 +27,7 @@ struct material_constants
 StructuredBuffer<material_constants> materials : register(t0);
 Texture2D<float4> material_textures[5] : register(t1);
 #define BASECOLOR_TEXTURE 0
+#define EMISSIVE_TEXTURE 3
 
 cbuffer VOXEL_GI_CONSTANTS : register(b8)
 {
@@ -35,7 +36,9 @@ cbuffer VOXEL_GI_CONSTANTS : register(b8)
     uint resolution;
     uint slice;
     float strength;
-    float padding;
+    float emissive_multiplier;
+    float environment_fill;
+    float3 padding;
 };
 
 RWTexture3D<float4> voxel_radiance : register(u0);
@@ -53,14 +56,22 @@ void main(VS_OUT input)
         albedo *= float4(pow(saturate(texel.rgb), 2.2), texel.a);
     }
     if (m.alpha_mode == 1) clip(albedo.a - m.alpha_cutoff);
+    // Translucent geometry must not become a fully opaque light blocker.
+    if (m.alpha_mode == 2) return;
 
-    float3 N = normalize(input.w_normal.xyz);
-    float3 L = normalize(-directional_light_direction.xyz);
-    float irradiance = directional_light_color.w / 683.0;
-    // A small sky term keeps unlit surfaces from making the first bounce black.
-    float3 radiance = albedo.rgb * (0.08 +
-        directional_light_color.rgb * irradiance * saturate(dot(N, L))) / 3.14159265;
-    radiance += m.emissive_factor;
+    // Static material-only bake: diffuse environment fill and self-emission.
+    // Dynamic scene lights are handled by the regular deferred lighting pass.
+    float3 radiance = albedo.rgb * (environment_fill / 3.14159265);
+    // Match the glTF G-buffer: emissiveFactor * linearized emissive texture.
+    // Emission is independent of surface normal.
+    float3 emissive = m.emissive_factor;
+    if (m.emissive_texture.index >= 0)
+    {
+        float3 texel = material_textures[EMISSIVE_TEXTURE].Sample(
+            sampler_states[ANISOTROPIC_WRAP], input.texcoord).rgb;
+        emissive *= pow(saturate(texel), 2.2);
+    }
+    radiance += emissive * emissive_multiplier;
     uint3 cell = min((uint3)(p * resolution), resolution - 1);
     voxel_radiance[cell] = float4(radiance, 1);
 }

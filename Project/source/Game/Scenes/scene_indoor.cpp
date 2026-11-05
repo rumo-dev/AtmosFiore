@@ -335,6 +335,7 @@ void Scene_Indoor::render_UI(float elapsedTime) {
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Present");
 		Graphics_Core::instance().post_procss.render();
 	}
+	if (_voxel_gi) _voxel_gi->render_debug_3d(immediate_context);
 
 	// テキスト等のUI描画はUIカテゴリに変更してプロファイリング
 	{

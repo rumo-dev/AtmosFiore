@@ -3,6 +3,7 @@
 #include "Engine/Graphics/Model/gltf_model.h"
 #include "Engine/System/Manager/resource_manager.h"
 #include "Engine/System/render_state.h"
+#include "Engine/System/graphics_core.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 
 #include <algorithm>
@@ -14,6 +15,9 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
     const DirectX::XMFLOAT4X4& world)
 {
     if (!device || !model || !model->has_bbox) return false;
+    baked_ = false;
+    bake_settings_dirty_ = false;
+    slice_dirty_ = true;
     device_ = device;
 
     DirectX::XMFLOAT3 lower, upper;
@@ -67,24 +71,26 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
         slice_uav_.GetAddressOf()))) return false;
     if (FAILED(device->CreateShaderResourceView(slice_texture_.Get(), nullptr,
         slice_srv_.GetAddressOf()))) return false;
+
     return true;
 }
 
 void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
     const DirectX::XMFLOAT4X4& world)
 {
-    if (!volume_uav_ || !model || !enabled_) return;
-    ++frame_;
-    if ((frame_ & 3u) != 1u && !show_slice_) return;
-
+    if (!volume_uav_ || !constants_buffer_) return;
     auto& resources = Resource_Manager::instance();
+    ctx->UpdateSubresource(constants_buffer_.Get(), 0, nullptr, &constants_, 0, 0);
+    ID3D11Buffer* cb = constants_buffer_.Get();
+    ID3D11ShaderResourceView* null_srv = nullptr;
+
+    if (!baked_ && model)
+    {
     auto* vs = resources.get_native_shader<Vertex_Shader>("VOXEL_GI_VS");
     auto* gs = resources.get_native_shader<Geometry_Shader>("VOXEL_GI_GS");
     auto* ps = resources.get_native_shader<Pixel_Shader>("VOXEL_GI_PS");
     if (!vs || !gs || !ps) return;
 
-    ctx->UpdateSubresource(constants_buffer_.Get(), 0, nullptr, &constants_, 0, 0);
-    ID3D11Buffer* cb = constants_buffer_.Get();
     ctx->GSSetConstantBuffers(8, 1, &cb);
     ctx->PSSetConstantBuffers(8, 1, &cb);
 
@@ -96,7 +102,6 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
     ctx->RSGetViewports(&viewport_count, &old_viewport);
 
     // The previous lighting pass may still have sampled the volume.
-    ID3D11ShaderResourceView* null_srv = nullptr;
     ctx->PSSetShaderResources(13, 1, &null_srv);
     const float empty[4] = { 0, 0, 0, 0 };
     ctx->ClearUnorderedAccessViewFloat(volume_uav_.Get(), empty);
@@ -119,8 +124,12 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
     ctx->OMSetRenderTargets(1, old_rtv.GetAddressOf(), old_dsv.Get());
     if (viewport_count) ctx->RSSetViewports(1, &old_viewport);
     ctx->GenerateMips(volume_srv_.Get());
+    baked_ = true;
+    bake_settings_dirty_ = false;
+    slice_dirty_ = true;
+    }
 
-    if (show_slice_)
+    if (show_slice_ && baked_ && slice_dirty_)
     {
         auto* cs = resources.get_native_shader<Compute_Shader>("VOXEL_GI_SLICE_CS");
         if (cs)
@@ -136,16 +145,45 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
             ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
             ctx->CSSetShaderResources(0, 1, &null_srv);
             ctx->CSSetShader(nullptr, nullptr, 0);
+            slice_dirty_ = false;
         }
     }
 }
 
 void VoxelGI::bind_lighting(ID3D11DeviceContext* ctx) const
 {
-    ID3D11ShaderResourceView* srv = enabled_ ? volume_srv_.Get() : nullptr;
+    ID3D11ShaderResourceView* srv = enabled_ && baked_ ? volume_srv_.Get() : nullptr;
     ctx->PSSetShaderResources(13, 1, &srv);
     ID3D11Buffer* cb = constants_buffer_.Get();
     ctx->PSSetConstantBuffers(8, 1, &cb);
+}
+
+void VoxelGI::render_debug_3d(ID3D11DeviceContext* ctx) const
+{
+    if (!show_3d_ || !baked_ || !volume_srv_) return;
+    auto* shader = Resource_Manager::instance().get_native_shader<Pixel_Shader>(
+        "VOXEL_GI_DEBUG_PS");
+    if (!shader) return;
+
+    auto& graphics = Graphics_Core::instance();
+    ID3D11RenderTargetView* back_buffer = graphics.get_render_target_view().Get();
+    ctx->OMSetRenderTargets(1, &back_buffer, nullptr);
+    D3D11_VIEWPORT viewport{};
+    graphics.get_viewport(viewport);
+    ctx->RSSetViewports(1, &viewport);
+    // Use the same rasterizer state as the working fullscreen post-process passes.
+    Render_State::instance().set_2d_render_states(ctx);
+    Render_State::instance().set_blend_state(ctx, Blend_State::Opaque);
+
+    ID3D11Buffer* camera_cb = graphics.get_constant_buffer(
+        Graphics_Core::Conastant_Buffer_Type::Camera);
+    ID3D11Buffer* voxel_cb = constants_buffer_.Get();
+    ctx->PSSetConstantBuffers(1, 1, &camera_cb);
+    ctx->PSSetConstantBuffers(8, 1, &voxel_cb);
+    ID3D11ShaderResourceView* srv = volume_srv_.Get();
+    graphics.get_fullscreen_quad()->Blit(ctx, &srv, 13, 1, shader);
+    ID3D11ShaderResourceView* null_srv = nullptr;
+    ctx->PSSetShaderResources(13, 1, &null_srv);
 }
 
 void VoxelGI::draw_gui()
@@ -154,10 +192,23 @@ void VoxelGI::draw_gui()
     if (!ImGui::CollapsingHeader("Voxel GI")) return;
     ImGui::Checkbox("Enabled##VoxelGI", &enabled_);
     ImGui::SliderFloat("Strength##VoxelGI", &constants_.strength, 0.0f, 2.0f);
-    ImGui::Checkbox("Show volume slice", &show_slice_);
+    bake_settings_dirty_ |= ImGui::SliderFloat("Emissive multiplier##VoxelGI",
+        &constants_.emissive_multiplier, 0.0f, 20.0f);
+    bake_settings_dirty_ |= ImGui::SliderFloat("Environment fill##VoxelGI",
+        &constants_.environment_fill, 0.0f, 1.0f);
+    if (ImGui::Button("Rebake static volume##VoxelGI")) baked_ = false;
+    ImGui::TextDisabled(!baked_ ? "Static volume pending" :
+        (bake_settings_dirty_ ? "Rebake to apply settings" : "Static volume baked"));
+    if (ImGui::Checkbox("Show volume slice", &show_slice_)) slice_dirty_ = true;
+    ImGui::Checkbox("Show 3D volume", &show_3d_);
+    if (show_3d_)
+        ImGui::TextDisabled("Shown on the main screen; follows the active camera");
     int selected_slice = static_cast<int>(constants_.slice);
     if (ImGui::SliderInt("Y slice", &selected_slice, 0, Resolution - 1))
+    {
         constants_.slice = static_cast<UINT>(selected_slice);
+        slice_dirty_ = true;
+    }
     if (show_slice_)
         ImGui::Image(reinterpret_cast<ImTextureID>(slice_srv_.Get()), ImVec2(256, 256));
 }
