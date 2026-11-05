@@ -4,6 +4,7 @@
 #include <wrl.h>
 #include <directxmath.h>
 #include <cfloat>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -17,6 +18,8 @@
 #include "Engine/Graphics/shader/shader.h"
 #include "Engine/Graphics/texture/texture.h"
 
+struct Frustum;
+
 /**
  * @brief 描画パス種別
  */
@@ -25,6 +28,7 @@ enum class pass_mode
 	deferred_geometry,      ///< GBuffer書き込み
 	forward_opaque,         ///< 不透明フォワード描画
 	forward_transparency,   ///< 透明描画
+	voxel_gi,               ///< 静的な不透明ジオメトリのボクセル化
 	directional_shadow,     ///< 平行光源シャドウマップ生成
 	shadow                  ///< シャドウマップ生成
 };
@@ -50,6 +54,7 @@ public:
 		std::string name;
 		int skin{ -1 };  // index of skin referenced by this node
 		int mesh{ -1 };  // index of mesh referenced by this node
+		UINT occlusion_slot_base = 0;
 
 		std::vector<int> children; // An array of indices of child nodes of this node
 
@@ -90,13 +95,35 @@ private:
 	struct mesh
 	{
 		std::string name;
+		UINT occlusion_slot_base = 0;
+		UINT occlusion_group_count = 0;
 		struct primitive
 		{
+			struct meshlet
+			{
+				UINT first_index = 0;
+				UINT index_count = 0;
+				UINT occlusion_group = 0;
+				DirectX::XMFLOAT3 bounds_min{};
+				DirectX::XMFLOAT3 bounds_max{};
+			};
+			struct occlusion_group
+			{
+				UINT slot = 0;
+				UINT first_meshlet = 0;
+				UINT meshlet_count = 0;
+				DirectX::XMFLOAT3 bounds_min{};
+				DirectX::XMFLOAT3 bounds_max{};
+			};
 			int material;
 			std::map<std::string, buffer_view> vertex_buffer_views;
 			buffer_view index_buffer_view;
 			std::vector<DirectX::XMFLOAT3> cpu_positions;
 			std::vector<uint32_t> cpu_indices;
+			std::vector<meshlet> meshlets;
+			std::vector<occlusion_group> occlusion_groups;
+			DirectX::XMFLOAT3 meshlet_bounds_min{};
+			DirectX::XMFLOAT3 meshlet_bounds_max{};
 
 			// 高速化用キャッシュ
 			std::vector<ID3D11Buffer*> cached_vertex_buffers;
@@ -107,6 +134,8 @@ private:
 		std::vector<primitive> primitives;
 	};
 	std::vector<mesh> meshes;
+	UINT occlusion_group_count_ = 0;
+	UINT total_occlusion_slots_ = 0;
 
 	buffer_view make_buffer_view(const tinygltf::Accessor& accessor);
 	void fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_Model);
@@ -242,6 +271,36 @@ public:
 	void fetch_animations(const tinygltf::Model& Gltf_Model);
 
 public:
+	struct meshlet_culling_stats
+	{
+		uint64_t tested = 0;
+		uint64_t culled = 0;
+		uint64_t skipped_triangles = 0;
+		uint64_t draw_calls = 0;
+		uint64_t whole_primitive_fast_paths = 0;
+		uint64_t fragmented_fallbacks = 0;
+		uint64_t occlusion_tested = 0;
+		uint64_t occlusion_culled = 0;
+		uint64_t occlusion_skipped_triangles = 0;
+	};
+	struct occlusion_state
+	{
+		struct query_slot
+		{
+			Microsoft::WRL::ComPtr<ID3D11Query> query;
+			bool pending = false;
+			bool visible = true;
+			uint64_t generation = 0;
+		};
+		std::vector<query_slot> slots;
+		DirectX::XMFLOAT4X4 view_projection{};
+		DirectX::XMFLOAT4X4 world{};
+		bool valid = false;
+		uint64_t generation = 0;
+		const Gltf_Model* model = nullptr;
+		UINT query_cursor = 0;
+	};
+
 	void compute_instance_aabb(
 		const DirectX::XMFLOAT4X4& world,
 		bool is_animation,
@@ -268,7 +327,11 @@ private:
 		const DirectX::XMFLOAT4X4& world,
 		pass_mode pass,
 		int& last_bound_material,
-		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr
+		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr,
+		const Frustum* frustum = nullptr,
+		meshlet_culling_stats* culling_stats = nullptr,
+		occlusion_state* occlusion = nullptr,
+		bool use_occlusion = false
 	);
 
 private:
@@ -300,7 +363,11 @@ public:
 		bool is_animation,
 		float delta_time,
 		animation_mode anim_mode = animation_mode::single,
-		int animation_index = 0
+		int animation_index = 0,
+		const Frustum* frustum = nullptr,
+		meshlet_culling_stats* culling_stats = nullptr,
+		occlusion_state* occlusion = nullptr,
+		bool use_occlusion = false
 	);
 
 	void render_with_nodes(
@@ -308,8 +375,22 @@ public:
 		const DirectX::XMFLOAT4X4& world,
 		pass_mode pass,
 		const std::vector<node>* precomputed_nodes,
-		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr
+		const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices = nullptr,
+		const Frustum* frustum = nullptr,
+		meshlet_culling_stats* culling_stats = nullptr,
+		occlusion_state* occlusion = nullptr,
+		bool use_occlusion = false
 	);
+
+	UINT issue_occlusion_queries(
+		ID3D11DeviceContext* context,
+		const DirectX::XMFLOAT4X4& world,
+		const DirectX::XMMATRIX& view_projection,
+		const DirectX::XMVECTOR& camera_position,
+		const Frustum& frustum,
+		occlusion_state& state,
+		ID3D11Buffer* box_cbuffer,
+		UINT query_slot_budget);
 
 	void animate_all(float time, std::vector<node>& animated_nodes);
 	void animate(size_t animation_index, float time, std::vector<node>& animated_nodes);
@@ -324,6 +405,7 @@ public:
 		{
 		case pass_mode::deferred_geometry:
 		case pass_mode::forward_opaque:
+		case pass_mode::voxel_gi:
 			return alpha_mode == 0 || alpha_mode == 1;
 		case pass_mode::forward_transparency:
 			return alpha_mode == 2;

@@ -4,6 +4,10 @@
     <FxCompile Include="source\Engine\Graphics\Shader\adaptation_ps.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_vs.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_gs.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_ps.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_slice_cs.hlsl"><Filter>source\Engine\Graphics\Shader</Filter></FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\deferred_lighting_ps.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
@@ -62,6 +66,9 @@
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\bloomfinal.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\bloom_blur_cs.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\gaussian_blur_downsampling_ps.hlsl">
@@ -240,6 +247,7 @@
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp">
       <Filter>source\Game\Scenes</Filter>
     </ClCompile>
+    <ClCompile Include="source\Game\Effect\VoxelGI\VoxelGI.cpp"><Filter>source\Game\Effect</Filter></ClCompile>
     <ClCompile Include="source\Game\Scenes\scene_title.cpp">
       <Filter>source\Game\Scenes</Filter>
     </ClCompile>
@@ -490,6 +498,7 @@
     <ClInclude Include="source\Game\Scenes\scene_indoor.h">
       <Filter>source\Game\Scenes</Filter>
     </ClInclude>
+    <ClInclude Include="source\Game\Effect\VoxelGI\VoxelGI.h"><Filter>source\Game\Effect</Filter></ClInclude>
     <ClInclude Include="source\Game\Scenes\scene_title.h">
       <Filter>source\Game\Scenes</Filter>
     </ClInclude>

@@ -71,6 +71,10 @@ void Scene_Indoor::initialize()
 
 	auto& mgr = Resource_Manager::instance();
 	mgr.add_model_instance("Library", library);
+	_library_world = library.world_transform;
+	_voxel_gi = std::make_unique<VoxelGI>();
+	if (!_voxel_gi->initialize(device, mgr.get_model("Library"), _library_world))
+		_voxel_gi.reset();
 
 	IBL::Initialize(device, L"./data/ibl");
 
@@ -106,6 +110,7 @@ void Scene_Indoor::initialize()
 
 // 終了化
 void Scene_Indoor::finalize() {
+	_voxel_gi.reset();
 	Graphics_Core::instance().get_point_light_manager().clear_light();
 	Graphics_Core::instance().get_spot_light_manager().clear_light();
 	log_printf("ゲームシーン終了\n", LogLevel::Info);
@@ -141,12 +146,12 @@ void Scene_Indoor::update(float elapsedTime)
 	// -----------------------------------------------------------------
 	// プレイヤー更新
 	// -----------------------------------------------------------------
-	_player.update(elapsedTime, cam_yaw_deg, cam_pitch_deg);
+	// デバッグカメラ操作中は同じ WASD 入力でプレイヤーを動かさない。
+	const std::string& active_name = camera_mgr.get_active_camera_name();
+	if (active_name != "Meshlet Debug")
+		_player.update(elapsedTime, cam_yaw_deg, cam_pitch_deg);
 
 	dx::XMVECTOR player_pos = _player.get_position();
-
-	// 毎フレーム string をコピー生成しないよう、const std::string& で参照
-	const std::string& active_name = camera_mgr.get_active_camera_name();
 
 	if (active_name == "ThirdPerson") {
 		auto tp_cam = std::dynamic_pointer_cast<ThirdPersonCamera>(camera_mgr.get_active_camera());
@@ -192,6 +197,10 @@ void Scene_Indoor::render(float elapsedTime)
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Scene Indoor");
 		render_shadowmap(elapsedTime);
+		Graphics_Core::instance().update_constants();
+		if (_voxel_gi)
+			_voxel_gi->render(immediate_context,
+				Resource_Manager::instance().get_model("Library"), _library_world);
 		render_defferd(elapsedTime);
 
 		render_forward(elapsedTime);
@@ -221,22 +230,41 @@ void Scene_Indoor::render_shadowmap(float elapsedTime) {
 
 	// Keep exactly two dual-paraboloid textures and pack enabled point lights into 4x4 atlas cells.
 	auto& pointLights = Graphics_Core::instance().get_point_light_manager().get_lights();
+	const Camera& camera = CameraManager::instance().get_active_camera()->get_camera();
+	const Frustum camera_frustum = ExtractFrustum(camera.view, camera.projection);
 	bool clearFrontAtlas = true;
 	bool clearBackAtlas = true;
 	for (int lightIndex = 0; shadower.point_shadow_enabled && lightIndex < static_cast<int>(pointLights.size()); ++lightIndex)
 	{
-		if (pointLights[lightIndex].shadow_tile < 0)
+		const auto& light = pointLights[lightIndex];
+		if (light.shadow_tile < 0)
+			continue;
+		// No visible surface can be lit by a light whose entire influence
+		// volume lies outside the current camera frustum.
+		const dx::XMVECTOR light_min = dx::XMVectorSet(
+			light.position.x - light.radius, light.position.y - light.radius,
+			light.position.z - light.radius, 0.0f);
+		const dx::XMVECTOR light_max = dx::XMVectorSet(
+			light.position.x + light.radius, light.position.y + light.radius,
+			light.position.z + light.radius, 0.0f);
+		if (!AABBIntersectsFrustum(camera_frustum, light_min, light_max))
 			continue;
 
-		shadower.make_shadow_begin(shadow::PointShadowFace::Front, lightIndex, clearFrontAtlas);
-		clearFrontAtlas = false;
-		Resource_Manager::instance().render_models(pass_mode::shadow);
-		shadower.make_shadow_end();
-
-		shadower.make_shadow_begin(shadow::PointShadowFace::Back, lightIndex, clearBackAtlas);
-		clearBackAtlas = false;
-		Resource_Manager::instance().render_models(pass_mode::shadow);
-		shadower.make_shadow_end();
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Point Shadow Light");
+		{
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Point Shadow Front");
+			shadower.make_shadow_begin(shadow::PointShadowFace::Front, lightIndex, clearFrontAtlas);
+			clearFrontAtlas = false;
+			Resource_Manager::instance().render_models(pass_mode::shadow);
+			shadower.make_shadow_end();
+		}
+		{
+			DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Point Shadow Back");
+			shadower.make_shadow_begin(shadow::PointShadowFace::Back, lightIndex, clearBackAtlas);
+			clearBackAtlas = false;
+			Resource_Manager::instance().render_models(pass_mode::shadow);
+			shadower.make_shadow_end();
+		}
 	}
 }
 
@@ -248,17 +276,16 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 
 	DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Deferred");
 	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
-	{
-		TRACY_GPU_ZONE_C("Scene_Indoor::update_deferred_cb", TracyCategory::ConstantBuffer);
-		Graphics_Core::instance().update_constants();
-	}
-
 	Graphics_Core::instance().get_geometry_buffer()->Clear(immediate_context);
 	Graphics_Core::instance().get_geometry_buffer()->Activate(immediate_context);
 	Render_State::instance().set_deferred_render_states(immediate_context, Rasterizer_State::Cull_None_CCW);
 
+	Resource_Manager::instance().begin_model_profile(immediate_context);
 	Resource_Manager::instance().render_models(pass_mode::deferred_geometry);
+	Resource_Manager::instance().issue_model_occlusion_queries(immediate_context);
+	Resource_Manager::instance().end_model_profile(immediate_context);
 	Graphics_Core::instance().get_geometry_buffer()->Deactivate(immediate_context);
+	if (_voxel_gi) _voxel_gi->bind_lighting(immediate_context);
 }
 
 // 3. 前方描画（フォワード・不透明/半透明）
@@ -296,13 +323,23 @@ void Scene_Indoor::render_UI(float elapsedTime) {
 	ID3D11DeviceContext* immediate_context = Graphics_Core::instance().get_device_context();
 	Render_State::instance().set_2d_render_states(immediate_context);
 
-	Graphics_Core::instance().post_procss.end();
-	Graphics_Core::instance().post_procss.draw();
-	Graphics_Core::instance().post_procss.render();
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process End");
+		Graphics_Core::instance().post_procss.end();
+	}
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Effects");
+		Graphics_Core::instance().post_procss.draw();
+	}
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Present");
+		Graphics_Core::instance().post_procss.render();
+	}
 
 	// テキスト等のUI描画はUIカテゴリに変更してプロファイリング
 	{
 		TRACY_CPU_ZONE_C("Text_Draw_CPU", TracyCategory::UI);
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Text Draw");
 		Text::text_data.Color = Color_Utils::hex_to_colorF("#F2D7EE");
 		Text::draw(L"Indoor", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 	}
@@ -333,4 +370,5 @@ void Scene_Indoor::draw_gui() {
 	ImGui::Spacing();
 
 	_player.draw_imgui();
+	if (_voxel_gi) _voxel_gi->draw_gui();
 }

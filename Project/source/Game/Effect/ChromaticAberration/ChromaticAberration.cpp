@@ -44,7 +44,7 @@ ChromaticAberration::ChromaticAberration(ID3D11Device* device,
     ca_buffer = std::make_unique<Framebuffer>(
         device, width, height,
         DXGI_FORMAT_R16G16B16A16_FLOAT,
-        false
+        1, false
     );
 
     create_ps_from_cso(device, "chromatic_aberration_ps.cso", ca_ps.GetAddressOf());

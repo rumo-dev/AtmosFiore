@@ -12,7 +12,7 @@ Exposure::Exposure(ID3D11Device* device, uint32_t width, uint32_t height)
 	exposure_buffer = std::make_unique<Framebuffer>(
 		device, width, height,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		false
+		1, false
 	);
 
 	create_ps_from_cso(device, "exposure_ps.cso", exposure_ps.GetAddressOf());

@@ -1,11 +1,149 @@
 #include "gltf_model.h"
 
 #include <cstring>
+#include <cmath>
 #include <stack>
+#include <algorithm>
+#include <unordered_set>
 #include "Engine/Utilities/misc.h"
+#include "Engine/Utilities/math_util.h"
 #include "Engine/System/graphics_core.h"
 #include "Engine/System/Manager/resource_manager.h"
 #define TINYGLTF_IMPLEMENTATION
+
+namespace
+{
+	constexpr size_t meshlet_max_vertices = 64;
+	constexpr size_t meshlet_max_triangles = 126;
+	constexpr size_t occlusion_meshlets_per_group = 64;
+
+	void transform_bounds(
+		const DirectX::XMFLOAT3& bounds_min, const DirectX::XMFLOAT3& bounds_max,
+		DirectX::FXMMATRIX transform,
+		DirectX::XMVECTOR& world_min, DirectX::XMVECTOR& world_max)
+	{
+		using namespace DirectX;
+		const XMVECTOR center = XMVectorSet(
+			(bounds_min.x + bounds_max.x) * 0.5f,
+			(bounds_min.y + bounds_max.y) * 0.5f,
+			(bounds_min.z + bounds_max.z) * 0.5f, 1.0f);
+		const float hx = (bounds_max.x - bounds_min.x) * 0.5f;
+		const float hy = (bounds_max.y - bounds_min.y) * 0.5f;
+		const float hz = (bounds_max.z - bounds_min.z) * 0.5f;
+		XMFLOAT4X4 m;
+		XMStoreFloat4x4(&m, transform);
+		const XMVECTOR extent = XMVectorSet(
+			std::abs(m._11) * hx + std::abs(m._21) * hy + std::abs(m._31) * hz,
+			std::abs(m._12) * hx + std::abs(m._22) * hy + std::abs(m._32) * hz,
+			std::abs(m._13) * hx + std::abs(m._23) * hy + std::abs(m._33) * hz, 0.0f);
+		const XMVECTOR world_center = XMVector3TransformCoord(center, transform);
+		world_min = XMVectorSubtract(world_center, extent);
+		world_max = XMVectorAdd(world_center, extent);
+	}
+
+	// 0: outside, 1: intersects, 2: fully inside.
+	uint8_t classify_frustum_bounds(const Frustum& frustum,
+		DirectX::FXMVECTOR world_min, DirectX::FXMVECTOR world_max)
+	{
+		using namespace DirectX;
+		bool fully_inside = true;
+		for (const auto& plane : frustum.planes)
+		{
+			const XMVECTOR positive = XMVectorSelect(world_min, world_max,
+				XMVectorGreater(plane.normal, XMVectorZero()));
+			if (XMVectorGetX(XMVector3Dot(plane.normal, positive)) + plane.distance < 0.0f)
+				return 0;
+			const XMVECTOR negative = XMVectorSelect(world_max, world_min,
+				XMVectorGreater(plane.normal, XMVectorZero()));
+			if (XMVectorGetX(XMVector3Dot(plane.normal, negative)) + plane.distance < 0.0f)
+				fully_inside = false;
+		}
+		return fully_inside ? 2 : 1;
+	}
+
+	bool meshlet_intersects_frustum(const Frustum& frustum,
+		const DirectX::XMFLOAT3& bounds_min, const DirectX::XMFLOAT3& bounds_max,
+		DirectX::FXMMATRIX transform)
+	{
+		DirectX::XMVECTOR world_min, world_max;
+		transform_bounds(bounds_min, bounds_max, transform, world_min, world_max);
+		return classify_frustum_bounds(frustum, world_min, world_max) != 0;
+	}
+
+	uint32_t morton_key(uint32_t x, uint32_t y, uint32_t z)
+	{
+		uint32_t key = 0;
+		for (uint32_t bit = 0; bit < 10; ++bit)
+		{
+			key |= ((x >> bit) & 1u) << (bit * 3);
+			key |= ((y >> bit) & 1u) << (bit * 3 + 1);
+			key |= ((z >> bit) & 1u) << (bit * 3 + 2);
+		}
+		return key;
+	}
+
+	bool spatially_order_triangles(std::vector<uint32_t>& indices,
+		const std::vector<DirectX::XMFLOAT3>& positions)
+	{
+		if (indices.size() < 12288 || indices.size() % 3 != 0 || positions.empty()) return false;
+		std::vector<DirectX::XMFLOAT3> centers;
+		centers.reserve(indices.size() / 3);
+		DirectX::XMFLOAT3 minimum{ FLT_MAX, FLT_MAX, FLT_MAX };
+		DirectX::XMFLOAT3 maximum{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		for (size_t first = 0; first < indices.size(); first += 3)
+		{
+			if (indices[first] >= positions.size() || indices[first + 1] >= positions.size() ||
+				indices[first + 2] >= positions.size()) return false;
+			const auto& a = positions[indices[first]];
+			const auto& b = positions[indices[first + 1]];
+			const auto& c = positions[indices[first + 2]];
+			const DirectX::XMFLOAT3 center{
+				(a.x + b.x + c.x) / 3.0f,
+				(a.y + b.y + c.y) / 3.0f,
+				(a.z + b.z + c.z) / 3.0f };
+			if (!std::isfinite(center.x) || !std::isfinite(center.y) || !std::isfinite(center.z)) return false;
+			centers.push_back(center);
+			minimum.x = std::min(minimum.x, center.x);
+			minimum.y = std::min(minimum.y, center.y);
+			minimum.z = std::min(minimum.z, center.z);
+			maximum.x = std::max(maximum.x, center.x);
+			maximum.y = std::max(maximum.y, center.y);
+			maximum.z = std::max(maximum.z, center.z);
+		}
+		struct triangle_key { uint32_t morton; uint32_t triangle; };
+		std::vector<triangle_key> order;
+		order.reserve(centers.size());
+		auto quantize = [](float value, float min_value, float max_value) -> uint32_t
+		{
+			if (max_value <= min_value) return 0;
+			return static_cast<uint32_t>(std::clamp((value - min_value) / (max_value - min_value),
+				0.0f, 1.0f) * 1023.0f);
+		};
+		for (uint32_t triangle = 0; triangle < centers.size(); ++triangle)
+		{
+			const auto& p = centers[triangle];
+			order.push_back({ morton_key(
+				quantize(p.x, minimum.x, maximum.x),
+				quantize(p.y, minimum.y, maximum.y),
+				quantize(p.z, minimum.z, maximum.z)), triangle });
+		}
+		std::sort(order.begin(), order.end(), [](const triangle_key& a, const triangle_key& b)
+		{
+			return a.morton < b.morton || (a.morton == b.morton && a.triangle < b.triangle);
+		});
+		std::vector<uint32_t> sorted(indices.size());
+		for (size_t triangle = 0; triangle < order.size(); ++triangle)
+		{
+			const size_t source = static_cast<size_t>(order[triangle].triangle) * 3;
+			const size_t destination = triangle * 3;
+			sorted[destination] = indices[source];
+			sorted[destination + 1] = indices[source + 1];
+			sorted[destination + 2] = indices[source + 2];
+		}
+		indices.swap(sorted);
+		return true;
+	}
+}
 
 bool null_load_image_data(tinygltf::Image*, const int, std::string*, std::string*,
 	int, int, const unsigned char*, int, void*)
@@ -88,6 +226,12 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 	fetch_textures(Graphics_Core::instance().get_device(), Gltf_Model);
 	fetch_materials(Graphics_Core::instance().get_device(), Gltf_Model); // textures の後に実行
 	fetch_meshes(Graphics_Core::instance().get_device(), Gltf_Model);
+	for (auto& node : nodes)
+	{
+		if (node.mesh < 0) continue;
+		node.occlusion_slot_base = total_occlusion_slots_;
+		total_occlusion_slots_ += meshes[node.mesh].occlusion_group_count;
+	}
 	fetch_animations(Gltf_Model);
 
 	const std::map<std::string, buffer_view>& vertex_buffer_views{
@@ -258,6 +402,7 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 	{
 		mesh& mesh{ meshes.emplace_back() };
 		mesh.name = gltf_mesh.name;
+		mesh.occlusion_slot_base = occlusion_group_count_;
 
 		for (std::vector<tinygltf::Primitive>::const_reference gltf_primitive : gltf_mesh.primitives)
 		{
@@ -269,12 +414,14 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				const tinygltf::Buffer& buffer = Gltf_Model.buffers.at(pos_bv.buffer);
 				const size_t byteOffset = pos_bv.byteOffset + pos_accessor.byteOffset;
 				const size_t count = pos_accessor.count;
-				const float* data = reinterpret_cast<const float*>(buffer.data.data() + byteOffset);
+				const size_t stride = pos_bv.byteStride ? pos_bv.byteStride : sizeof(float) * 3;
 				for (size_t i = 0; i < count; ++i)
 				{
-					float x = data[i * 3 + 0];
-					float y = data[i * 3 + 1];
-					float z = data[i * 3 + 2];
+					float position[3];
+					std::memcpy(position, buffer.data.data() + byteOffset + i * stride, sizeof(position));
+					const float x = position[0];
+					const float y = position[1];
+					const float z = position[2];
 					bbox_min.x = std::min(bbox_min.x, x);
 					bbox_min.y = std::min(bbox_min.y, y);
 					bbox_min.z = std::min(bbox_min.z, z);
@@ -302,17 +449,6 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 			const tinygltf::BufferView& gltf_buffer_view{ Gltf_Model.bufferViews.at(gltf_accessor.bufferView) };
 
 			primitive.index_buffer_view = make_buffer_view(gltf_accessor);
-
-			D3D11_BUFFER_DESC buffer_desc{};
-			buffer_desc.ByteWidth = static_cast<UINT>(primitive.index_buffer_view.size_in_bytes);
-			buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-			buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-			D3D11_SUBRESOURCE_DATA subresource_data{};
-			subresource_data.pSysMem = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()
-				+ gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
-			hr = device->CreateBuffer(&buffer_desc, &subresource_data,
-				primitive.index_buffer_view.buffer.ReleaseAndGetAddressOf());
-			_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
 			{
 				const void* raw = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()
@@ -344,8 +480,19 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 				buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 				D3D11_SUBRESOURCE_DATA subresource_data{};
-				subresource_data.pSysMem = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()
+				const auto* source = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()
 					+ gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
+				const size_t element_size = vertex_buffer_view.stride_in_bytes;
+				const size_t source_stride = gltf_buffer_view.byteStride ? gltf_buffer_view.byteStride : element_size;
+				std::vector<uint8_t> packed;
+				if (source_stride != element_size)
+				{
+					packed.resize(gltf_accessor.count * element_size);
+					for (size_t i = 0; i < gltf_accessor.count; ++i)
+						std::memcpy(packed.data() + i * element_size, source + i * source_stride, element_size);
+					subresource_data.pSysMem = packed.data();
+				}
+				else subresource_data.pSysMem = source;
 				hr = device->CreateBuffer(&buffer_desc, &subresource_data,
 					vertex_buffer_view.buffer.ReleaseAndGetAddressOf());
 				_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
@@ -354,13 +501,12 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				{
 					const size_t byteOffset = gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
 					const tinygltf::Buffer& buffer = Gltf_Model.buffers.at(gltf_buffer_view.buffer);
-					const float* data = reinterpret_cast<const float*>(buffer.data.data() + byteOffset);
+					const size_t stride = gltf_buffer_view.byteStride ? gltf_buffer_view.byteStride : sizeof(float) * 3;
 					primitive.cpu_positions.resize(gltf_accessor.count);
 					for (size_t i = 0; i < gltf_accessor.count; ++i)
 					{
-						primitive.cpu_positions[i].x = data[i * 3 + 0];
-						primitive.cpu_positions[i].y = data[i * 3 + 1];
-						primitive.cpu_positions[i].z = data[i * 3 + 2];
+						std::memcpy(&primitive.cpu_positions[i], buffer.data.data() + byteOffset + i * stride,
+							sizeof(primitive.cpu_positions[i]));
 					}
 				}
 
@@ -400,7 +546,126 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 
 			// 【追加】has_tangent の初期判定とキャッシュ
 			primitive.has_tangent = (primitive.vertex_buffer_views.at("TANGENT").buffer != nullptr);
+
+			// Opaque triangles can be reordered without changing blending order.
+			// Nearby triangle centroids then produce tighter meshlet/group bounds.
+			const bool reordered = gltf_primitive.mode == TINYGLTF_MODE_TRIANGLES &&
+				(gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
+				 gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) &&
+				materials[primitive.material].data.alpha_mode != 2 &&
+				spatially_order_triangles(primitive.cpu_indices, primitive.cpu_positions);
+			D3D11_BUFFER_DESC index_desc{};
+			index_desc.ByteWidth = static_cast<UINT>(primitive.index_buffer_view.size_in_bytes);
+			index_desc.Usage = D3D11_USAGE_DEFAULT;
+			index_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			D3D11_SUBRESOURCE_DATA index_data{};
+			index_data.pSysMem = Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data() +
+				gltf_buffer_view.byteOffset + gltf_accessor.byteOffset;
+			std::vector<uint16_t> reordered_16_bit_indices;
+			if (reordered && gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+			{
+				reordered_16_bit_indices.reserve(primitive.cpu_indices.size());
+				for (uint32_t index : primitive.cpu_indices)
+					reordered_16_bit_indices.push_back(static_cast<uint16_t>(index));
+				index_data.pSysMem = reordered_16_bit_indices.data();
+			}
+			else if (reordered && gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+				index_data.pSysMem = primitive.cpu_indices.data();
+			hr = device->CreateBuffer(&index_desc, &index_data,
+				primitive.index_buffer_view.buffer.ReleaseAndGetAddressOf());
+			_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+
+			// Partition indexed triangles into contiguous meshlets. A malformed or
+			// unsupported primitive keeps the original whole-primitive draw path.
+			if (gltf_primitive.mode == TINYGLTF_MODE_TRIANGLES &&
+				(gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
+				 gltf_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) &&
+				!primitive.cpu_positions.empty() && !primitive.cpu_indices.empty() &&
+				primitive.cpu_indices.size() % 3 == 0)
+			{
+				std::unordered_set<uint32_t> vertices;
+				mesh::primitive::meshlet current{};
+				current.bounds_min = { FLT_MAX, FLT_MAX, FLT_MAX };
+				current.bounds_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+				bool valid = true;
+				for (size_t first = 0; first < primitive.cpu_indices.size(); first += 3)
+				{
+					const uint32_t a = primitive.cpu_indices[first];
+					const uint32_t b = primitive.cpu_indices[first + 1];
+					const uint32_t c = primitive.cpu_indices[first + 2];
+					if (a >= primitive.cpu_positions.size() || b >= primitive.cpu_positions.size() ||
+						c >= primitive.cpu_positions.size()) { valid = false; break; }
+					const size_t extra = static_cast<size_t>(vertices.count(a) == 0) +
+						static_cast<size_t>(b != a && vertices.count(b) == 0) +
+						static_cast<size_t>(c != a && c != b && vertices.count(c) == 0);
+					if (current.index_count &&
+						(current.index_count / 3 == meshlet_max_triangles ||
+						vertices.size() + extra > meshlet_max_vertices))
+					{
+						primitive.meshlets.push_back(current);
+						current = {};
+						current.bounds_min = { FLT_MAX, FLT_MAX, FLT_MAX };
+						current.bounds_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+						vertices.clear();
+					}
+					if (!current.index_count) current.first_index = static_cast<UINT>(first);
+					current.index_count += 3;
+					for (uint32_t index : { a, b, c })
+					{
+						vertices.insert(index);
+						const auto& p = primitive.cpu_positions[index];
+						current.bounds_min.x = std::min(current.bounds_min.x, p.x);
+						current.bounds_min.y = std::min(current.bounds_min.y, p.y);
+						current.bounds_min.z = std::min(current.bounds_min.z, p.z);
+						current.bounds_max.x = std::max(current.bounds_max.x, p.x);
+						current.bounds_max.y = std::max(current.bounds_max.y, p.y);
+						current.bounds_max.z = std::max(current.bounds_max.z, p.z);
+					}
+				}
+				if (valid && current.index_count) primitive.meshlets.push_back(current);
+				if (!valid) primitive.meshlets.clear();
+				if (!primitive.meshlets.empty())
+				{
+					primitive.meshlet_bounds_min = { FLT_MAX, FLT_MAX, FLT_MAX };
+					primitive.meshlet_bounds_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+					for (const auto& part : primitive.meshlets)
+					{
+						primitive.meshlet_bounds_min.x = std::min(primitive.meshlet_bounds_min.x, part.bounds_min.x);
+						primitive.meshlet_bounds_min.y = std::min(primitive.meshlet_bounds_min.y, part.bounds_min.y);
+						primitive.meshlet_bounds_min.z = std::min(primitive.meshlet_bounds_min.z, part.bounds_min.z);
+						primitive.meshlet_bounds_max.x = std::max(primitive.meshlet_bounds_max.x, part.bounds_max.x);
+						primitive.meshlet_bounds_max.y = std::max(primitive.meshlet_bounds_max.y, part.bounds_max.y);
+						primitive.meshlet_bounds_max.z = std::max(primitive.meshlet_bounds_max.z, part.bounds_max.z);
+					}
+				}
+				if (primitive.meshlets.size() >= 8)
+				{
+					for (size_t i = 0; i < primitive.meshlets.size(); ++i)
+					{
+						if (i % occlusion_meshlets_per_group == 0)
+						{
+							mesh::primitive::occlusion_group group{};
+							group.slot = occlusion_group_count_++;
+							group.first_meshlet = static_cast<UINT>(i);
+							group.bounds_min = { FLT_MAX, FLT_MAX, FLT_MAX };
+							group.bounds_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+							primitive.occlusion_groups.push_back(group);
+						}
+						auto& part = primitive.meshlets[i];
+						part.occlusion_group = static_cast<UINT>(primitive.occlusion_groups.size() - 1);
+						auto& group = primitive.occlusion_groups.back();
+						++group.meshlet_count;
+						group.bounds_min.x = std::min(group.bounds_min.x, part.bounds_min.x);
+						group.bounds_min.y = std::min(group.bounds_min.y, part.bounds_min.y);
+						group.bounds_min.z = std::min(group.bounds_min.z, part.bounds_min.z);
+						group.bounds_max.x = std::max(group.bounds_max.x, part.bounds_max.x);
+						group.bounds_max.y = std::max(group.bounds_max.y, part.bounds_max.y);
+						group.bounds_max.z = std::max(group.bounds_max.z, part.bounds_max.z);
+					}
+				}
+			}
 		}
+		mesh.occlusion_group_count = occlusion_group_count_ - mesh.occlusion_slot_base;
 	}
 }
 
@@ -694,7 +959,11 @@ void Gltf_Model::render_node(
 	const DirectX::XMFLOAT4X4& world,
 	pass_mode pass,
 	int& last_bound_material,
-	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices)
+	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices,
+	const Frustum* frustum,
+	meshlet_culling_stats* culling_stats,
+	occlusion_state* occlusion,
+	bool use_occlusion)
 {
 	using namespace DirectX;
 	const node& node = current_nodes[node_index];
@@ -757,8 +1026,169 @@ void Gltf_Model::render_node(
 				continue;
 			}
 
+			thread_local std::vector<std::pair<UINT, UINT>> visible_ranges;
+			visible_ranges.clear();
+			thread_local std::vector<uint8_t> occlusion_visible;
+			occlusion_visible.clear();
+			if (use_occlusion && occlusion && primitive.occlusion_groups.size() >= 2 &&
+				occlusion->slots.size() == total_occlusion_slots_ && node.skin < 0)
+			{
+				occlusion_visible.resize(primitive.occlusion_groups.size(), 1);
+				for (size_t i = 0; i < primitive.occlusion_groups.size(); ++i)
+				{
+					const UINT slot_index = node.occlusion_slot_base +
+						primitive.occlusion_groups[i].slot - mesh.occlusion_slot_base;
+					auto& slot = occlusion->slots[slot_index];
+					if (slot.pending)
+					{
+						UINT64 samples = 0;
+						const HRESULT result = immediate_context->GetData(slot.query.Get(), &samples,
+							sizeof(samples), D3D11_ASYNC_GETDATA_DONOTFLUSH);
+						if (result == S_OK)
+						{
+							slot.visible = samples != 0;
+							slot.pending = false;
+						}
+					}
+					occlusion_visible[i] = slot.generation != occlusion->generation ||
+						slot.pending || slot.visible;
+					if (culling_stats)
+					{
+						++culling_stats->occlusion_tested;
+						if (!occlusion_visible[i]) ++culling_stats->occlusion_culled;
+					}
+				}
+			}
+			// Small primitives do not need meshlet scanning, but their bounds can
+			// still reject the entire draw as the camera moves.
+			if (frustum && node.skin < 0 && !primitive.meshlets.empty() && primitive.meshlets.size() < 8)
+			{
+				const XMMATRIX transform = XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world);
+				XMVECTOR primitive_min, primitive_max;
+				transform_bounds(primitive.meshlet_bounds_min, primitive.meshlet_bounds_max,
+					transform, primitive_min, primitive_max);
+				if (classify_frustum_bounds(*frustum, primitive_min, primitive_max) == 0)
+				{
+					if (culling_stats)
+					{
+						culling_stats->tested += primitive.meshlets.size();
+						culling_stats->culled += primitive.meshlets.size();
+						culling_stats->skipped_triangles += primitive.index_buffer_view.count() / 3;
+					}
+					continue;
+				}
+			}
+			if (frustum && node.skin < 0 && primitive.meshlets.size() >= 8)
+			{
+				const XMMATRIX transform = XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world);
+				XMVECTOR primitive_min, primitive_max;
+				transform_bounds(primitive.meshlet_bounds_min, primitive.meshlet_bounds_max,
+					transform, primitive_min, primitive_max);
+				const uint8_t primitive_frustum = classify_frustum_bounds(*frustum, primitive_min, primitive_max);
+				if (primitive_frustum == 0)
+				{
+					if (culling_stats)
+					{
+						culling_stats->tested += primitive.meshlets.size();
+						culling_stats->culled += primitive.meshlets.size();
+						culling_stats->skipped_triangles += primitive.index_buffer_view.count() / 3;
+					}
+					continue;
+				}
+				const bool occlusion_rejects = !occlusion_visible.empty() &&
+					std::find(occlusion_visible.begin(), occlusion_visible.end(), 0) != occlusion_visible.end();
+				// The complete primitive needs no meshlet scan and keeps its single draw.
+				if (primitive_frustum == 2 && !occlusion_rejects && culling_stats)
+					++culling_stats->whole_primitive_fast_paths;
+				if (primitive_frustum != 2 || occlusion_rejects)
+				{
+				if (culling_stats) culling_stats->tested += primitive.meshlets.size();
+				const uint64_t culled_before = culling_stats ? culling_stats->culled : 0;
+				const uint64_t frustum_skipped_before = culling_stats ? culling_stats->skipped_triangles : 0;
+				const uint64_t occlusion_skipped_before = culling_stats ? culling_stats->occlusion_skipped_triangles : 0;
+				thread_local std::vector<uint8_t> group_frustum;
+				group_frustum.resize(primitive.occlusion_groups.size());
+				for (size_t i = 0; i < primitive.occlusion_groups.size(); ++i)
+				{
+					if (primitive_frustum == 2)
+					{
+						group_frustum[i] = 2;
+						continue;
+					}
+					XMVECTOR group_min, group_max;
+					const auto& group = primitive.occlusion_groups[i];
+					transform_bounds(group.bounds_min, group.bounds_max, transform, group_min, group_max);
+					group_frustum[i] = classify_frustum_bounds(*frustum, group_min, group_max);
+				}
+				auto append_range = [&](UINT first_index, UINT index_count)
+				{
+					if (!visible_ranges.empty() &&
+						visible_ranges.back().first + visible_ranges.back().second == first_index)
+						visible_ranges.back().second += index_count;
+					else
+						visible_ranges.emplace_back(first_index, index_count);
+				};
+				for (size_t group_index = 0; group_index < primitive.occlusion_groups.size(); ++group_index)
+				{
+					if (visible_ranges.size() > 4) break;
+					const auto& group = primitive.occlusion_groups[group_index];
+					const auto& first = primitive.meshlets[group.first_meshlet];
+					const auto& last = primitive.meshlets[group.first_meshlet + group.meshlet_count - 1];
+					const UINT group_index_count = last.first_index + last.index_count - first.first_index;
+					const uint8_t status = group_frustum[group_index];
+					if (status == 0)
+					{
+						if (culling_stats)
+						{
+							culling_stats->culled += group.meshlet_count;
+							culling_stats->skipped_triangles += group_index_count / 3;
+						}
+						continue;
+					}
+					if (!occlusion_visible.empty() && !occlusion_visible[group_index])
+					{
+						if (culling_stats) culling_stats->occlusion_skipped_triangles += group_index_count / 3;
+						continue;
+					}
+					if (status == 2)
+					{
+						append_range(first.first_index, group_index_count);
+						continue;
+					}
+					for (UINT i = group.first_meshlet; i < group.first_meshlet + group.meshlet_count; ++i)
+					{
+						if (visible_ranges.size() > 4) break;
+						const auto& part = primitive.meshlets[i];
+						if (!meshlet_intersects_frustum(*frustum, part.bounds_min, part.bounds_max, transform))
+						{
+							if (culling_stats)
+							{
+								++culling_stats->culled;
+								culling_stats->skipped_triangles += part.index_count / 3;
+							}
+							continue;
+						}
+						append_range(part.first_index, part.index_count);
+					}
+				}
+				if (visible_ranges.empty()) continue;
+				if (visible_ranges.size() > 4)
+				{
+					visible_ranges.clear();
+					if (culling_stats)
+					{
+						++culling_stats->fragmented_fallbacks;
+						culling_stats->culled = culled_before;
+						culling_stats->skipped_triangles = frustum_skipped_before;
+						culling_stats->occlusion_skipped_triangles = occlusion_skipped_before;
+					}
+				}
+				}
+			}
+
 			// マテリアルが切り替わった時のみ PSSetShaderResources を呼び出す (ステート変更スキップ)
-			if (primitive.material != last_bound_material)
+			if (pass != pass_mode::directional_shadow && pass != pass_mode::shadow &&
+				primitive.material != last_bound_material)
 			{
 				immediate_context->PSSetShaderResources(1, 5, material.cached_srvs);
 				last_bound_material = primitive.material;
@@ -785,19 +1215,30 @@ void Gltf_Model::render_node(
 
 			immediate_context->UpdateSubresource(primitive_cbuffer.Get(), 0, 0, &primitive_data, 0, 0);
 			immediate_context->VSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
-			immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
+			if (pass != pass_mode::directional_shadow && pass != pass_mode::shadow)
+				immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
 
-			immediate_context->DrawIndexed(static_cast<UINT>(primitive.index_buffer_view.count()), 0, 0);
+			if (visible_ranges.empty())
+			{
+				if (culling_stats) ++culling_stats->draw_calls;
+				immediate_context->DrawIndexed(static_cast<UINT>(primitive.index_buffer_view.count()), 0, 0);
+			}
+			else
+			{
+				if (culling_stats) culling_stats->draw_calls += visible_ranges.size();
+				for (const auto& range : visible_ranges)
+					immediate_context->DrawIndexed(range.second, range.first, 0);
+			}
 		}
 	}
 
 	for (int child_index : node.children)
 	{
-		render_node(immediate_context, child_index, current_nodes, world, pass, last_bound_material, precomputed_joint_matrices);
+		render_node(immediate_context, child_index, current_nodes, world, pass, last_bound_material, precomputed_joint_matrices, frustum, culling_stats, occlusion, use_occlusion);
 	}
 }
 
-void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::XMFLOAT4X4& world, pass_mode pass, bool is_animation, float delta_time, animation_mode anim_mode, int animation_index)
+void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::XMFLOAT4X4& world, pass_mode pass, bool is_animation, float delta_time, animation_mode anim_mode, int animation_index, const Frustum* frustum, meshlet_culling_stats* culling_stats, occlusion_state* occlusion, bool use_occlusion)
 {
 	if (pass == pass_mode::deferred_geometry)
 	{
@@ -810,6 +1251,10 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	else if (pass == pass_mode::forward_transparency)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
+	}
+	else if (pass == pass_mode::voxel_gi)
+	{
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("VOXEL_GI_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::directional_shadow)
 	{
@@ -865,20 +1310,24 @@ void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::X
 	case pass_mode::shadow:
 		vertex_shader_name = "POINT_SHADOW_VS";
 		break;
+	case pass_mode::voxel_gi:
+		vertex_shader_name = "VOXEL_GI_VS";
+		break;
 	default:
 		vertex_shader_name = "GLTF_VS";
 		break;
 	}
 
 	immediate_context->VSSetShader(Resource_Manager::instance().get_native_shader<Vertex_Shader>(vertex_shader_name), nullptr, 0);
-	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
+	if (pass != pass_mode::directional_shadow && pass != pass_mode::shadow)
+		immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
 	immediate_context->IASetInputLayout(Resource_Manager::instance().get_shader<Vertex_Shader>(vertex_shader_name)->get_input_layout());
 	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	int last_bound_material = -1;
 	for (int node_index : scenes.at(0).nodes)
 	{
-		render_node(immediate_context, node_index, target_nodes, world, pass, last_bound_material, nullptr);
+		render_node(immediate_context, node_index, target_nodes, world, pass, last_bound_material, nullptr, frustum, culling_stats, occlusion, use_occlusion);
 	}
 }
 
@@ -887,11 +1336,15 @@ void Gltf_Model::render_with_nodes(
 	const DirectX::XMFLOAT4X4& world,
 	pass_mode pass,
 	const std::vector<node>* precomputed_nodes,
-	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices)
+	const std::unordered_map<int, primitive_joint_constants>* precomputed_joint_matrices,
+	const Frustum* frustum,
+	meshlet_culling_stats* culling_stats,
+	occlusion_state* occlusion,
+	bool use_occlusion)
 {
 	if (!precomputed_nodes || precomputed_nodes->empty())
 	{
-		render(immediate_context, world, pass, false, 0.0f);
+		render(immediate_context, world, pass, false, 0.0f, animation_mode::single, 0, frustum, culling_stats, occlusion, use_occlusion);
 		return;
 	}
 
@@ -906,6 +1359,10 @@ void Gltf_Model::render_with_nodes(
 	else if (pass == pass_mode::forward_transparency)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_TRANSPARENCY_PS"), NULL, 0);
+	}
+	else if (pass == pass_mode::voxel_gi)
+	{
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("VOXEL_GI_PS"), NULL, 0);
 	}
 	else if (pass == pass_mode::directional_shadow)
 	{
@@ -929,21 +1386,134 @@ void Gltf_Model::render_with_nodes(
 	case pass_mode::shadow:
 		vertex_shader_name = "POINT_SHADOW_VS";
 		break;
+	case pass_mode::voxel_gi:
+		vertex_shader_name = "VOXEL_GI_VS";
+		break;
 	default:
 		vertex_shader_name = "GLTF_VS";
 		break;
 	}
 
 	immediate_context->VSSetShader(Resource_Manager::instance().get_native_shader<Vertex_Shader>(vertex_shader_name), nullptr, 0);
-	immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
+	if (pass != pass_mode::directional_shadow && pass != pass_mode::shadow)
+		immediate_context->PSSetShaderResources(0, 1, material_resource_view.GetAddressOf());
 	immediate_context->IASetInputLayout(Resource_Manager::instance().get_shader<Vertex_Shader>(vertex_shader_name)->get_input_layout());
 	immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	int last_bound_material = -1;
 	for (int node_index : scenes.at(0).nodes)
 	{
-		render_node(immediate_context, node_index, *precomputed_nodes, world, pass, last_bound_material, precomputed_joint_matrices);
+		render_node(immediate_context, node_index, *precomputed_nodes, world, pass, last_bound_material, precomputed_joint_matrices, frustum, culling_stats, occlusion, use_occlusion);
 	}
+}
+
+UINT Gltf_Model::issue_occlusion_queries(
+	ID3D11DeviceContext* context,
+	const DirectX::XMFLOAT4X4& world,
+	const DirectX::XMMATRIX& view_projection,
+	const DirectX::XMVECTOR& camera_position,
+	const Frustum& frustum,
+	occlusion_state& state,
+	ID3D11Buffer* box_cbuffer,
+	UINT query_slot_budget)
+{
+	using namespace DirectX;
+	if (!context || !box_cbuffer || !total_occlusion_slots_ || !query_slot_budget) return 0;
+	UINT issued = 0;
+	if (state.model != this)
+	{
+		state.slots.clear();
+		state.valid = false;
+		state.model = this;
+		state.query_cursor = 0;
+	}
+	if (state.slots.size() != total_occlusion_slots_) state.slots.resize(total_occlusion_slots_);
+	const UINT slot_window = std::min(query_slot_budget, total_occlusion_slots_);
+	const UINT window_start = state.query_cursor;
+	state.query_cursor = (state.query_cursor + slot_window) % total_occlusion_slots_;
+
+	XMFLOAT4X4 current_view_projection;
+	XMStoreFloat4x4(&current_view_projection, view_projection);
+	if (!state.valid || std::memcmp(&state.view_projection, &current_view_projection, sizeof(current_view_projection)) ||
+		std::memcmp(&state.world, &world, sizeof(world)))
+	{
+		++state.generation;
+		state.view_projection = current_view_projection;
+		state.world = world;
+		state.valid = true;
+	}
+
+	std::vector<int> pending_nodes(scenes.at(0).nodes.begin(), scenes.at(0).nodes.end());
+	D3D11_QUERY_DESC query_desc{};
+	query_desc.Query = D3D11_QUERY_OCCLUSION;
+	for (size_t node_cursor = 0; node_cursor < pending_nodes.size(); ++node_cursor)
+	{
+		const node& current_node = nodes[pending_nodes[node_cursor]];
+		pending_nodes.insert(pending_nodes.end(), current_node.children.begin(), current_node.children.end());
+		if (current_node.mesh < 0 || current_node.skin >= 0) continue;
+		const XMMATRIX node_world = XMLoadFloat4x4(&current_node.global_transform) * XMLoadFloat4x4(&world);
+		const mesh& current_mesh = meshes[current_node.mesh];
+		for (const auto& primitive : current_mesh.primitives)
+		{
+			if (primitive.occlusion_groups.size() < 2) continue;
+			if (!is_material_in_pass(materials[primitive.material].data.alpha_mode, pass_mode::deferred_geometry))
+				continue;
+			for (const auto& group : primitive.occlusion_groups)
+			{
+				const UINT slot_index = current_node.occlusion_slot_base +
+					group.slot - current_mesh.occlusion_slot_base;
+				if ((slot_index + total_occlusion_slots_ - window_start) % total_occlusion_slots_ >= slot_window)
+					continue;
+				auto& slot = state.slots[slot_index];
+				if (slot.pending)
+				{
+					UINT64 samples = 0;
+					if (context->GetData(slot.query.Get(), &samples, sizeof(samples), D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK)
+						continue;
+					slot.pending = false;
+					slot.visible = samples != 0;
+				}
+
+				// Expand the proxy so a surface coincident with its box face does
+				// not fail the strict depth test. Never reject when near/inside it.
+				const XMFLOAT3 center{
+					(group.bounds_min.x + group.bounds_max.x) * 0.5f,
+					(group.bounds_min.y + group.bounds_max.y) * 0.5f,
+					(group.bounds_min.z + group.bounds_max.z) * 0.5f };
+				const XMFLOAT3 half{
+					(group.bounds_max.x - group.bounds_min.x) * 0.51f + 0.001f,
+					(group.bounds_max.y - group.bounds_min.y) * 0.51f + 0.001f,
+					(group.bounds_max.z - group.bounds_min.z) * 0.51f + 0.001f };
+				const XMFLOAT3 box_min{ center.x - half.x, center.y - half.y, center.z - half.z };
+				const XMFLOAT3 box_max{ center.x + half.x, center.y + half.y, center.z + half.z };
+				XMVECTOR world_min, world_max;
+				transform_bounds(box_min, box_max, node_world, world_min, world_max);
+				if (!AABBIntersectsFrustum(frustum, world_min, world_max)) continue;
+				const XMVECTOR margin = XMVectorReplicate(0.25f);
+				if (XMVector3GreaterOrEqual(camera_position, XMVectorSubtract(world_min, margin)) &&
+					XMVector3LessOrEqual(camera_position, XMVectorAdd(world_max, margin)))
+				{
+					slot.visible = true;
+					continue;
+				}
+				if (!slot.query && FAILED(Graphics_Core::instance().get_device()->CreateQuery(&query_desc,
+					slot.query.GetAddressOf()))) continue;
+
+				XMFLOAT4X4 box_matrix;
+				XMStoreFloat4x4(&box_matrix,
+					XMMatrixScaling(half.x * 2.0f, half.y * 2.0f, half.z * 2.0f) *
+					XMMatrixTranslation(center.x, center.y, center.z) * node_world * view_projection);
+				context->UpdateSubresource(box_cbuffer, 0, nullptr, &box_matrix, 0, 0);
+				context->Begin(slot.query.Get());
+				context->Draw(36, 0);
+				context->End(slot.query.Get());
+				++issued;
+				slot.pending = true;
+				slot.generation = state.generation;
+			}
+		}
+	}
+	return issued;
 }
 
 void Gltf_Model::animate(size_t animation_index, float time, std::vector<node>& animated_nodes)

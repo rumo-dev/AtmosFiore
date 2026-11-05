@@ -31,6 +31,9 @@
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\directional_shadow_vs.cso</FullPath>
     </ContentFile>
     <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\occlusion_box_vs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\distance_fog_ps.cso</FullPath>
     </ContentFile>
     <ContentFile>
@@ -128,6 +131,9 @@
     </ContentFile>
     <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\bloomfinal.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\bloom_blur_cs.cso</FullPath>
     </ContentFile>
     <ContentFile>
       <FullPath>C:\Users\2240007\Documents\git-rumo\AtmosFiore\Project\data\shaders\cso\gaussian_blur_downsampling_ps.cso</FullPath>

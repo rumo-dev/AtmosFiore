@@ -157,7 +157,10 @@ namespace
 			g.get_geometry_buffer()->Clear(context);
 			g.get_geometry_buffer()->Activate(context);
 			Render_State::instance().set_deferred_render_states(context, Rasterizer_State::Cull_None_CCW);
+			Resource_Manager::instance().begin_model_profile(context);
 			Resource_Manager::instance().render_models(pass_mode::deferred_geometry);
+			Resource_Manager::instance().issue_model_occlusion_queries(context);
+			Resource_Manager::instance().end_model_profile(context);
 			g.get_geometry_buffer()->Deactivate(context);
 			context->OMSetRenderTargets(1, g.get_render_target_view().GetAddressOf(), nullptr);
 			Render_State::instance().set_2d_render_states(context);

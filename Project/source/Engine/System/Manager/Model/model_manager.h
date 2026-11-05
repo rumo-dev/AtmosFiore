@@ -2,7 +2,10 @@
 #include <unordered_map>
 #include <memory>
 #include <string>
+#include <array>
+#include <chrono>
 #include "Engine/Graphics/Model/Gltf_Model.h"
+#include "Engine/Utilities/math_util.h"
 
 /**
  * @brief モデルインスタンス状態
@@ -40,6 +43,7 @@ struct ModelInstance
 	// スキン行列（ジョイント行列）キャッシュ（update()で1回だけ計算し、
 	// 各描画パス（deferred/shadow x2/directional/forward）で使い回す）
 	std::unordered_map<int, Gltf_Model::primitive_joint_constants> cached_joint_matrices;
+	Gltf_Model::occlusion_state occlusion;
 };
 
 /**
@@ -175,6 +179,9 @@ public:
 	 * シェーダー・ライト・カメラが事前に設定されていること
 	 */
 	void render_all(pass_mode pass);
+	void issue_occlusion_queries(ID3D11DeviceContext* context);
+	void begin_profile(ID3D11DeviceContext* context);
+	void end_profile(ID3D11DeviceContext* context);
 
 	/**
 	 * @brief 単一インスタンス描画
@@ -196,6 +203,47 @@ public:
 	int last_point_face_total[6] = { 0,0,0,0,0,0 };
 
 private:
+	bool meshlet_culling_enabled_ = true;
+	bool occlusion_culling_enabled_ = true;
+	bool profile_enabled_ = false;
+	bool camera_culling_frozen_ = false;
+	Frustum frozen_camera_frustum_{};
+	Gltf_Model::meshlet_culling_stats camera_meshlet_stats_{};
+	Gltf_Model::meshlet_culling_stats directional_meshlet_stats_{};
+	UINT last_occlusion_queries_issued_ = 0;
+	DirectX::XMFLOAT4X4 previous_camera_view_projection_{};
+	bool have_previous_camera_view_projection_ = false;
+	UINT stationary_camera_frames_ = 0;
+	uint64_t frame_index_ = 0;
+	uint64_t last_query_frame_ = 0;
+	size_t query_instance_cursor_ = 0;
+	struct performance_average
+	{
+		double cpu_ms = 0.0;
+		double gpu_ms = 0.0;
+		uint64_t cpu_samples = 0;
+		uint64_t gpu_samples = 0;
+		double queries_per_frame = 0.0;
+		uint64_t skipped_triangles = 0;
+	};
+	struct gpu_timer_slot
+	{
+		Microsoft::WRL::ComPtr<ID3D11Query> disjoint;
+		Microsoft::WRL::ComPtr<ID3D11Query> begin;
+		Microsoft::WRL::ComPtr<ID3D11Query> end;
+		bool pending = false;
+		bool occlusion_enabled = false;
+		uint64_t generation = 0;
+	};
+	std::array<performance_average, 2> performance_{};
+	std::array<gpu_timer_slot, 4> gpu_timers_{};
+	std::chrono::steady_clock::time_point cpu_profile_begin_{};
+	uint64_t profile_generation_ = 0;
+	int active_gpu_timer_ = -1;
+	bool profile_active_ = false;
+	bool profile_occlusion_enabled_ = false;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> occlusion_box_cbuffer_;
+
 	/// モデルキャッシュ（共有）
 	std::unordered_map<std::string, std::unique_ptr<Gltf_Model>> model_cache_;
 

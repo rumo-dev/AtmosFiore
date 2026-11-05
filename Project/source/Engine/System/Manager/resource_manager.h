@@ -99,6 +99,9 @@ public:
 	void remove_model_instance(const std::string& key) { model_manager_.remove_instance(key); }
 	void update_models(float delta_time) { model_manager_.update(delta_time); }
 	void render_models(pass_mode pass) { model_manager_.render_all(pass); }
+	void begin_model_profile(ID3D11DeviceContext* context) { model_manager_.begin_profile(context); }
+	void end_model_profile(ID3D11DeviceContext* context) { model_manager_.end_profile(context); }
+	void issue_model_occlusion_queries(ID3D11DeviceContext* context) { model_manager_.issue_occlusion_queries(context); }
 	void draw_shader_debug() { shader_manager_.draw_imgui(); }
 	void draw_model_debug() { model_manager_.draw_imgui(); }
 	HRESULT load_texture(const std::wstring& path, ID3D11ShaderResourceView** view,

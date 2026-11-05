@@ -1,10 +1,14 @@
 #include "Model_Manager.h"
 #include <algorithm>
+#include <cstring>
 #include "Engine/system/graphics_core.h"
+#include "Engine/System/render_state.h"
+#include "Engine/System/Manager/resource_manager.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
 #include "Engine/Utilities/math_util.h"
 #include "Engine/System/job_system.h"
 #include "Game/World/camera/camera_manager.h"
+#include "Game/World/camera/spectator_camera.h"
 #include "Game/Effect/shadow/shadow.h"
 
 // ===== Models(Model Cache) Management =====
@@ -205,11 +209,122 @@ void ModelManager::update(float delta_time)
 		for (size_t index = 0; index < animation_work.size(); ++index)
 			update_animation(index);
 }
+
+void ModelManager::begin_profile(ID3D11DeviceContext* context)
+{
+	if (!context || !profile_enabled_) return;
+	for (auto& timer : gpu_timers_)
+	{
+		if (!timer.pending) continue;
+		D3D11_QUERY_DATA_TIMESTAMP_DISJOINT clock{};
+		UINT64 begin = 0, end = 0;
+		if (context->GetData(timer.disjoint.Get(), &clock, sizeof(clock), D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK ||
+			context->GetData(timer.begin.Get(), &begin, sizeof(begin), D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK ||
+			context->GetData(timer.end.Get(), &end, sizeof(end), D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK)
+			continue;
+		timer.pending = false;
+		if (timer.generation != profile_generation_ || clock.Disjoint || !clock.Frequency || end < begin)
+			continue;
+		const double gpu_ms = static_cast<double>(end - begin) * 1000.0 /
+			static_cast<double>(clock.Frequency);
+		auto& average = performance_[timer.occlusion_enabled ? 1 : 0];
+		average.gpu_ms = average.gpu_samples ? average.gpu_ms * 0.9 + gpu_ms * 0.1 : gpu_ms;
+		++average.gpu_samples;
+	}
+	profile_active_ = true;
+	profile_occlusion_enabled_ = occlusion_culling_enabled_;
+	active_gpu_timer_ = -1;
+	cpu_profile_begin_ = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < gpu_timers_.size(); ++i)
+	{
+		auto& timer = gpu_timers_[i];
+		if (timer.pending) continue;
+		D3D11_QUERY_DESC desc{};
+		if (!timer.disjoint)
+		{
+			desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+			if (FAILED(Graphics_Core::instance().get_device()->CreateQuery(&desc, timer.disjoint.GetAddressOf())))
+				continue;
+		}
+		desc.Query = D3D11_QUERY_TIMESTAMP;
+		if (!timer.begin && FAILED(Graphics_Core::instance().get_device()->CreateQuery(&desc, timer.begin.GetAddressOf())))
+			continue;
+		if (!timer.end && FAILED(Graphics_Core::instance().get_device()->CreateQuery(&desc, timer.end.GetAddressOf())))
+			continue;
+		context->Begin(timer.disjoint.Get());
+		context->End(timer.begin.Get());
+		active_gpu_timer_ = static_cast<int>(i);
+		break;
+	}
+}
+
+void ModelManager::end_profile(ID3D11DeviceContext* context)
+{
+	if (!profile_active_) return;
+	const double cpu_ms = std::chrono::duration<double, std::milli>(
+		std::chrono::steady_clock::now() - cpu_profile_begin_).count();
+	auto& average = performance_[profile_occlusion_enabled_ ? 1 : 0];
+	average.queries_per_frame = average.cpu_samples ? average.queries_per_frame * 0.9 +
+		static_cast<double>(last_occlusion_queries_issued_) * 0.1 :
+		static_cast<double>(last_occlusion_queries_issued_);
+	average.cpu_ms = average.cpu_samples ? average.cpu_ms * 0.9 + cpu_ms * 0.1 : cpu_ms;
+	++average.cpu_samples;
+	average.skipped_triangles = camera_meshlet_stats_.skipped_triangles +
+		camera_meshlet_stats_.occlusion_skipped_triangles;
+	if (context && active_gpu_timer_ >= 0)
+	{
+		auto& timer = gpu_timers_[active_gpu_timer_];
+		context->End(timer.end.Get());
+		context->End(timer.disjoint.Get());
+		timer.pending = true;
+		timer.occlusion_enabled = profile_occlusion_enabled_;
+		timer.generation = profile_generation_;
+	}
+	active_gpu_timer_ = -1;
+	profile_active_ = false;
+}
+
 void ModelManager::render_all(pass_mode pass)
 {
 	// Prepare frustum from active camera
+	if (pass == pass_mode::deferred_geometry) camera_meshlet_stats_ = {};
+	if (pass == pass_mode::directional_shadow) directional_meshlet_stats_ = {};
+	Gltf_Model::meshlet_culling_stats* meshlet_stats = nullptr;
+	if (pass == pass_mode::deferred_geometry || pass == pass_mode::forward_opaque ||
+		pass == pass_mode::forward_transparency)
+		meshlet_stats = &camera_meshlet_stats_;
+	else if (pass == pass_mode::directional_shadow)
+		meshlet_stats = &directional_meshlet_stats_;
 
 	auto active_cam = CameraManager::instance().get_active_camera();
+	if (pass == pass_mode::deferred_geometry)
+	{
+		++frame_index_;
+		if (active_cam)
+		{
+			DirectX::XMFLOAT4X4 current;
+			const Camera& camera = active_cam->get_camera();
+			DirectX::XMStoreFloat4x4(&current, camera.view * camera.projection);
+			if (have_previous_camera_view_projection_ &&
+				std::memcmp(&current, &previous_camera_view_projection_, sizeof(current)) == 0)
+				++stationary_camera_frames_;
+			else
+			{
+				stationary_camera_frames_ = 0;
+				previous_camera_view_projection_ = current;
+				have_previous_camera_view_projection_ = true;
+				for (auto& [key, instance] : instances_)
+				{
+					if (instance.occlusion.valid)
+					{
+						instance.occlusion.valid = false;
+						++instance.occlusion.generation;
+					}
+				}
+			}
+		}
+		else stationary_camera_frames_ = 0;
+	}
 	Frustum cam_frustum{};
 	bool have_frustum = false;
 	if (active_cam) {
@@ -219,6 +334,7 @@ void ModelManager::render_all(pass_mode pass)
 			pass == pass_mode::forward_transparency) {
 			const Camera& cam = active_cam->get_camera();
 			cam_frustum = ExtractFrustum(cam.view, cam.projection);
+			if (camera_culling_frozen_) cam_frustum = frozen_camera_frustum_;
 			have_frustum = true;
 		}
 	}
@@ -244,6 +360,12 @@ void ModelManager::render_all(pass_mode pass)
 	{
 		++total;
 		if (!inst.visible) continue;
+		if (pass == pass_mode::deferred_geometry && inst.occlusion.valid &&
+			std::memcmp(&inst.occlusion.world, &inst.world_transform, sizeof(inst.world_transform)) != 0)
+		{
+			inst.occlusion.valid = false;
+			++inst.occlusion.generation;
+		}
 
 		Gltf_Model* model = get_model(inst.model_key);
 		if (!model)
@@ -299,6 +421,21 @@ void ModelManager::render_all(pass_mode pass)
 		if (!is_visible) {
 			continue;
 		}
+		const Frustum* meshlet_frustum = meshlet_culling_enabled_ && have_frustum && !inst.disable_frustum_culling
+			? &cam_frustum : nullptr;
+		bool use_occlusion = false;
+		if (occlusion_culling_enabled_ && meshlet_culling_enabled_ && !camera_culling_frozen_ &&
+			pass == pass_mode::deferred_geometry && !inst.is_animation && !inst.disable_frustum_culling &&
+			inst.cached_animated_nodes.empty() && inst.occlusion.valid &&
+			inst.occlusion.model == model && active_cam)
+		{
+			DirectX::XMFLOAT4X4 camera_view_projection;
+			const Camera& camera = active_cam->get_camera();
+			DirectX::XMStoreFloat4x4(&camera_view_projection, camera.view * camera.projection);
+			use_occlusion = std::memcmp(&inst.occlusion.view_projection, &camera_view_projection,
+				sizeof(camera_view_projection)) == 0 &&
+				std::memcmp(&inst.occlusion.world, &inst.world_transform, sizeof(inst.world_transform)) == 0;
+		}
 		{
 
 			std::string marker_name = "DrawAllModel: " + key;
@@ -325,7 +462,11 @@ void ModelManager::render_all(pass_mode pass)
 					inst.world_transform,
 					pass,
 					&inst.cached_animated_nodes,
-					&inst.cached_joint_matrices);
+					&inst.cached_joint_matrices,
+					meshlet_frustum,
+					meshlet_stats,
+					&inst.occlusion,
+					use_occlusion);
 			}
 			else
 			{
@@ -336,7 +477,11 @@ void ModelManager::render_all(pass_mode pass)
 					inst.is_animation,
 					inst.animation_time,
 					inst.anim_mode,
-					inst.animation_index);
+					inst.animation_index,
+					meshlet_frustum,
+					meshlet_stats,
+					&inst.occlusion,
+					use_occlusion);
 			}
 		}
 	}
@@ -348,6 +493,95 @@ void ModelManager::render_all(pass_mode pass)
 		this->last_point_face_culled[i] = point_face_culled[i];
 		this->last_point_face_total[i] = point_face_total[i];
 	}
+}
+
+void ModelManager::issue_occlusion_queries(ID3D11DeviceContext* context)
+{
+	last_occlusion_queries_issued_ = 0;
+	if (!context || !occlusion_culling_enabled_ || !meshlet_culling_enabled_ || camera_culling_frozen_)
+		return;
+	if (stationary_camera_frames_ < 2 ||
+		(last_query_frame_ && frame_index_ - last_query_frame_ < 4)) return;
+	last_query_frame_ = frame_index_;
+	const auto active_camera = CameraManager::instance().get_active_camera();
+	if (!active_camera) return;
+	ID3D11VertexShader* box_shader = Resource_Manager::instance().get_native_shader<Vertex_Shader>("OCCLUSION_BOX_VS");
+	if (!box_shader) return;
+	if (!occlusion_box_cbuffer_)
+	{
+		D3D11_BUFFER_DESC desc{};
+		desc.ByteWidth = sizeof(DirectX::XMFLOAT4X4);
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		if (FAILED(Graphics_Core::instance().get_device()->CreateBuffer(&desc, nullptr,
+			occlusion_box_cbuffer_.GetAddressOf()))) return;
+	}
+
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> previous_vs;
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> previous_ps;
+	Microsoft::WRL::ComPtr<ID3D11InputLayout> previous_layout;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> previous_cb;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> previous_depth;
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> previous_rasterizer;
+	Microsoft::WRL::ComPtr<ID3D11Predicate> previous_predicate;
+	UINT previous_stencil_ref = 0;
+	BOOL previous_predicate_value = FALSE;
+	D3D11_PRIMITIVE_TOPOLOGY previous_topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+	context->VSGetShader(previous_vs.GetAddressOf(), nullptr, nullptr);
+	context->PSGetShader(previous_ps.GetAddressOf(), nullptr, nullptr);
+	context->IAGetInputLayout(previous_layout.GetAddressOf());
+	context->IAGetPrimitiveTopology(&previous_topology);
+	context->VSGetConstantBuffers(0, 1, previous_cb.GetAddressOf());
+	context->OMGetDepthStencilState(previous_depth.GetAddressOf(), &previous_stencil_ref);
+	context->RSGetState(previous_rasterizer.GetAddressOf());
+	context->GetPredication(previous_predicate.GetAddressOf(), &previous_predicate_value);
+
+	context->SetPredication(nullptr, FALSE);
+	context->IASetInputLayout(nullptr);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	context->VSSetShader(box_shader, nullptr, 0);
+	context->PSSetShader(nullptr, nullptr, 0);
+	context->VSSetConstantBuffers(0, 1, occlusion_box_cbuffer_.GetAddressOf());
+	Render_State::instance().set_rasterizer_state(context, Rasterizer_State::Cull_None_CCW);
+	const Camera& camera = active_camera->get_camera();
+	Render_State::instance().set_depth_stencil_state(context,
+		camera.isReversed_Z ? Depth_State::Reversed_Z_Test_Enable_Write_Disable :
+		Depth_State::Test_Enable_Write_Disable);
+	const DirectX::XMMATRIX view_projection = camera.view * camera.projection;
+	const Frustum frustum = ExtractFrustum(camera.view, camera.projection);
+	std::vector<std::pair<Gltf_Model*, ModelInstance*>> candidates;
+	for (auto& [key, instance] : instances_)
+	{
+		if (!instance.visible || instance.is_animation || instance.disable_frustum_culling ||
+			!instance.cached_animated_nodes.empty()) continue;
+		Gltf_Model* model = get_model(instance.model_key);
+		if (model) candidates.emplace_back(model, &instance);
+	}
+	if (!candidates.empty())
+	{
+		UINT remaining_budget = 128;
+		const size_t start = query_instance_cursor_ % candidates.size();
+		query_instance_cursor_ = (start + 1) % candidates.size();
+		for (size_t i = 0; i < candidates.size() && remaining_budget; ++i)
+		{
+			auto& [model, instance] = candidates[(start + i) % candidates.size()];
+			const UINT quota = std::min(remaining_budget, 32u);
+			const UINT issued = model->issue_occlusion_queries(context, instance->world_transform,
+				view_projection, camera.position, frustum, instance->occlusion,
+				occlusion_box_cbuffer_.Get(), quota);
+			last_occlusion_queries_issued_ += issued;
+			remaining_budget -= issued;
+		}
+	}
+
+	context->SetPredication(previous_predicate.Get(), previous_predicate_value);
+	context->VSSetShader(previous_vs.Get(), nullptr, 0);
+	context->PSSetShader(previous_ps.Get(), nullptr, 0);
+	context->IASetInputLayout(previous_layout.Get());
+	context->IASetPrimitiveTopology(previous_topology);
+	context->VSSetConstantBuffers(0, 1, previous_cb.GetAddressOf());
+	context->OMSetDepthStencilState(previous_depth.Get(), previous_stencil_ref);
+	context->RSSetState(previous_rasterizer.Get());
 }
 
 void ModelManager::render(const std::string& key, pass_mode pass)
@@ -371,6 +605,83 @@ void ModelManager::render(const std::string& key, pass_mode pass)
 void ModelManager::draw_imgui()
 {
 #ifdef USE_IMGUI
+	if (ImGui::CollapsingHeader("Meshlet Debug", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::Button("Activate Meshlet Debug Camera"))
+		{
+			auto& cameras = CameraManager::instance();
+			const Camera& source = cameras.get_active_camera()->get_camera();
+			auto debug_camera = std::make_shared<SpectatorCamera>(Graphics_Core::instance().get_window_handle());
+			debug_camera->get_camera() = source;
+			const DirectX::XMVECTOR direction = DirectX::XMVectorSubtract(source.target, source.position);
+			const float x = DirectX::XMVectorGetX(direction);
+			const float y = DirectX::XMVectorGetY(direction);
+			const float z = DirectX::XMVectorGetZ(direction);
+			const float yaw = DirectX::XMConvertToDegrees(atan2f(z, x));
+			const float pitch = std::clamp(DirectX::XMConvertToDegrees(atan2f(y, sqrtf(x * x + z * z))),
+				-89.0f, 89.0f);
+			debug_camera->set_rotation(yaw, pitch, source.position, source.target);
+			cameras.register_camera("Meshlet Debug", debug_camera);
+			cameras.switch_camera("Meshlet Debug");
+		}
+		ImGui::TextDisabled("Move: WASD / Q,E   Look: right mouse drag   Fast: Shift");
+		ImGui::Checkbox("Enable Meshlet Culling", &meshlet_culling_enabled_);
+		ImGui::Checkbox("Enable Occlusion Culling", &occlusion_culling_enabled_);
+		ImGui::Checkbox("Measure A/B Timings", &profile_enabled_);
+		if (ImGui::Button("Reset A/B Timings"))
+		{
+			performance_ = {};
+			++profile_generation_;
+		}
+		for (int mode = 0; mode < 2; ++mode)
+		{
+			const auto& p = performance_[mode];
+			if (!p.cpu_samples) continue;
+			ImGui::Text("Occlusion %s: CPU %.2f ms (%llu frames)", mode ? "ON" : "OFF",
+				p.cpu_ms, static_cast<unsigned long long>(p.cpu_samples));
+			if (p.gpu_samples)
+				ImGui::Text("  GPU %.2f ms (%llu samples)", p.gpu_ms,
+					static_cast<unsigned long long>(p.gpu_samples));
+			else ImGui::TextDisabled("  GPU timing pending");
+			ImGui::Text("  %.1f box queries/frame / %llu triangles skipped (latest)", p.queries_per_frame,
+				static_cast<unsigned long long>(p.skipped_triangles));
+		}
+		ImGui::TextDisabled("Timings cover deferred model drawing and box queries.");
+		ImGui::TextDisabled("Compare ON/OFF while the camera and scene stay still.");
+		if (ImGui::Button(camera_culling_frozen_ ? "Release Camera Culling Frustum" : "Freeze Camera Culling Frustum"))
+		{
+			camera_culling_frozen_ = !camera_culling_frozen_;
+			if (camera_culling_frozen_)
+			{
+				const Camera& camera = CameraManager::instance().get_active_camera()->get_camera();
+				frozen_camera_frustum_ = ExtractFrustum(camera.view, camera.projection);
+			}
+		}
+		ImGui::Text("Camera frustum: %s", camera_culling_frozen_ ? "frozen" : "live");
+		ImGui::Text("Camera: %llu tested / %llu culled",
+			static_cast<unsigned long long>(camera_meshlet_stats_.tested),
+			static_cast<unsigned long long>(camera_meshlet_stats_.culled));
+		ImGui::Text("  %llu triangles skipped / %llu draws",
+			static_cast<unsigned long long>(camera_meshlet_stats_.skipped_triangles),
+			static_cast<unsigned long long>(camera_meshlet_stats_.draw_calls));
+		ImGui::Text("  %llu whole draws / %llu fragmented fallbacks",
+			static_cast<unsigned long long>(camera_meshlet_stats_.whole_primitive_fast_paths),
+			static_cast<unsigned long long>(camera_meshlet_stats_.fragmented_fallbacks));
+		ImGui::Text("Occlusion: %llu groups tested / %llu culled",
+			static_cast<unsigned long long>(camera_meshlet_stats_.occlusion_tested),
+			static_cast<unsigned long long>(camera_meshlet_stats_.occlusion_culled));
+		ImGui::Text("  %llu triangles skipped",
+			static_cast<unsigned long long>(camera_meshlet_stats_.occlusion_skipped_triangles));
+		ImGui::Text("  %u box queries issued", last_occlusion_queries_issued_);
+		ImGui::Text("Directional shadow: %llu tested / %llu culled",
+			static_cast<unsigned long long>(directional_meshlet_stats_.tested),
+			static_cast<unsigned long long>(directional_meshlet_stats_.culled));
+		ImGui::Text("  %llu triangles skipped / %llu draws",
+			static_cast<unsigned long long>(directional_meshlet_stats_.skipped_triangles),
+			static_cast<unsigned long long>(directional_meshlet_stats_.draw_calls));
+		ImGui::TextDisabled("Occlusion uses previous-frame queries for static opaque groups; moving the camera shows all groups.");
+	}
+
 	// ===== Loaded Models List =====
 	if (ImGui::CollapsingHeader("Loaded Models"))
 	{

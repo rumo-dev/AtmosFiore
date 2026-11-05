@@ -13,7 +13,7 @@ VolumetricFog::VolumetricFog(ID3D11Device* device, uint32_t width, uint32_t heig
 	TRACY_CPU_ZONE_C("VolumetricFog::VolumetricFog", TracyCategory::System);
 
 	blit_ = std::make_unique<FullscreenQuad>(device);
-	target_ = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, false);
+	target_ = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
 
 	// シェーダーのロード
 	create_ps_from_cso(device, "volumetric_fog_ps.cso", ps_.GetAddressOf());

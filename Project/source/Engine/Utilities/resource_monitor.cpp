@@ -311,7 +311,7 @@ void Resource_Monitor::render_ui()
 	);
 
 	ImGui::Text(
-		"Memory %.1f%% Peak %.1f%%",
+		"System RAM %.1f%% Peak %.1f%%",
 		mem,
 		peak_mem
 	);
@@ -335,7 +335,7 @@ void Resource_Monitor::render_ui()
 	ImGui::Separator();
 
 	ImGui::Text(
-		"Process Memory %.1f MB",
+		"Process Working Set %.1f MB",
 		process_mem_mb
 	);
 
