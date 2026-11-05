@@ -9,6 +9,7 @@
 #include "Engine/Utilities/color_util.h"
 #include "Engine/Graphics/IBL/ibl.h"
 #include "Game/Effect/VoxelGI/VoxelGI.h"
+#include "Game/Effect/DDGI/DDGI.h"
 #include <memory>
 #include <algorithm>
 
@@ -16,7 +17,7 @@ namespace
 {
 	constexpr float TransitionPhaseDuration = 0.8f;
 
-	enum class RenderTestKind { Reflections, Materials, Occlusion, SSGI, VoxelGI };
+	enum class RenderTestKind { Reflections, Materials, Occlusion, SSGI, VoxelGI, DDGIFog };
 
 	class Scene_RenderTest final : public Scene_Base
 	{
@@ -71,9 +72,14 @@ namespace
 				ssgi_was_enabled_ = Post_Process_Manager::IsSSGIEnabled();
 				Post_Process_Manager::SetSSGIEnabled(true);
 			}
-			else if (kind_ == RenderTestKind::VoxelGI) {
-				modelKey = "VoxelGITest"; modelPath = "./data/model/VoxelGITest/scene.gltf";
-				label = L"Voxel GI Test - Red / Blue Emission";
+			else if (kind_ == RenderTestKind::VoxelGI || kind_ == RenderTestKind::DDGIFog) {
+				const bool fogTest = kind_ == RenderTestKind::DDGIFog;
+				modelKey = fogTest ? "DDGIFogTest" : "VoxelGITest";
+				modelPath = fogTest ? "./data/model/DDGIFogTest/scene.gltf" :
+					"./data/model/VoxelGITest/scene.gltf";
+				label = fogTest ? L"DDGI Fog Test - Warm / Cyan Lanes" :
+					L"Voxel GI Test - Red / Blue Emission";
+				gi_model_key_ = modelKey;
 				auto* model = resources.load_model(modelKey, modelPath);
 				add_instance("RenderTest_Main", modelKey, 1.0f, { 0.0f, 0.0f, 0.0f }, 0.0f);
 				if (auto* instance = resources.get_model_instance("RenderTest_Main"))
@@ -81,10 +87,43 @@ namespace
 					voxel_gi_ = std::make_unique<VoxelGI>();
 					if (!voxel_gi_->initialize(graphics.get_device(), model, instance->world_transform))
 						voxel_gi_.reset();
-					else voxel_gi_->set_emissive_multiplier(8.0f);
+					else voxel_gi_->set_emissive_multiplier(fogTest ? 12.0f : 8.0f);
+					if (voxel_gi_)
+					{
+						ddgi_ = std::make_unique<DDGI>();
+						if (!ddgi_->initialize(graphics.get_device())) ddgi_.reset();
+					}
 				}
 				ssgi_was_enabled_ = Post_Process_Manager::IsSSGIEnabled();
 				Post_Process_Manager::SetSSGIEnabled(false);
+				if (fogTest)
+				{
+				light_.illuminance_lux = 150.0f;
+				auto& post = graphics.post_procss;
+				auto& fog = post.GetVolumetricFog();
+				fog_was_ = fog.config;
+				fog_enabled_was_ = fog.is_enabled;
+				fog_effect_was_ = Post_Process_Manager::IsVolumetricFogEffectEnabled();
+				Post_Process_Manager::SetVolumetricFogEffectEnabled(true);
+				fog_gi_only_was_ = fog.gi_only_debug();
+				height_fog_was_ = post.GetHeightFog().is_enabled;
+				distance_fog_was_ = post.GetDistanceFog().is_enabled;
+				exponential_fog_was_ = post.GetExponentialFog().is_enabled;
+				post.GetHeightFog().is_enabled = false;
+				post.GetDistanceFog().is_enabled = false;
+				post.GetExponentialFog().is_enabled = false;
+				fog.is_enabled = true;
+				fog.config.density_base = 0.12f;
+				fog.config.scattering = 0.95f;
+				fog.config.absorption = 0.005f;
+				fog.config.anisotropy = 0.0f;
+				fog.config.noise_scale = 0.0f;
+				fog.config.intensity = 2.0f;
+				fog.config.fog_near = 0.1f;
+				fog.config.fog_far = 15.0f;
+				fog.config.gi_scattering = fog_demo_strength_;
+				fog.set_gi_only_debug(true);
+				}
 			}
 			else if (kind_ == RenderTestKind::Materials) {
 				modelKey = "RenderTest_Helmet"; modelPath = "./data/model/glTF/DamagedHelmet/DamagedHelmet.gltf";
@@ -119,10 +158,11 @@ namespace
 			const bool reflectionTest = kind_ == RenderTestKind::Reflections;
 			const bool ssgiTest = kind_ == RenderTestKind::SSGI;
 			const bool voxelTest = kind_ == RenderTestKind::VoxelGI;
-			const float cameraDistance = voxelTest ? 6.5f : (reflectionTest ? 12.0f : (kind_ == RenderTestKind::Materials ? 4.5f : (ssgiTest ? 9.0f : 7.0f)));
-			const float cameraHeight = voxelTest ? 1.8f : (reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 1.3f : 2.5f));
-			const float targetHeight = voxelTest ? 1.0f : (reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 0.55f : 1.5f));
-			const float pitch = voxelTest ? -8.0f : (reflectionTest ? 0.0f : (kind_ == RenderTestKind::Materials ? -9.5f : -8.0f));
+			const bool fogTest = kind_ == RenderTestKind::DDGIFog;
+			const float cameraDistance = fogTest ? 5.0f : (voxelTest ? 6.5f : (reflectionTest ? 12.0f : (kind_ == RenderTestKind::Materials ? 4.5f : (ssgiTest ? 9.0f : 7.0f))));
+			const float cameraHeight = fogTest ? 1.5f : (voxelTest ? 1.8f : (reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 1.3f : 2.5f)));
+			const float targetHeight = fogTest ? 1.5f : (voxelTest ? 1.0f : (reflectionTest ? 3.85f : (kind_ == RenderTestKind::Materials ? 0.55f : 1.5f)));
+			const float pitch = fogTest ? 0.0f : (voxelTest ? -8.0f : (reflectionTest ? 0.0f : (kind_ == RenderTestKind::Materials ? -9.5f : -8.0f)));
 			camera->set_rotation(90.0f, pitch,
 				dx::XMVectorSet(0.0f, cameraHeight, -cameraDistance, 1.0f),
 				dx::XMVectorSet(0.0f, targetHeight, 0.0f, 1.0f));
@@ -132,6 +172,12 @@ namespace
 		}
 		void finalize() override
 		{
+			ID3D11ShaderResourceView* null_gi_srvs[2]{};
+			ID3D11Buffer* null_gi_buffers[2]{};
+			auto* context = Graphics_Core::instance().get_device_context();
+			context->PSSetShaderResources(13, 2, null_gi_srvs);
+			context->PSSetConstantBuffers(8, 2, null_gi_buffers);
+			ddgi_.reset();
 			voxel_gi_.reset();
 			auto& resources = Resource_Manager::instance();
 			resources.remove_model_instance("RenderTest_Main");
@@ -144,8 +190,20 @@ namespace
 				Post_Process_Manager::SetSSREnabled(ssr_was_enabled_);
 				Post_Process_Manager::SetSSRPerformanceMode(false);
 			}
-			if (kind_ == RenderTestKind::SSGI || kind_ == RenderTestKind::VoxelGI)
+			if (kind_ == RenderTestKind::SSGI || kind_ == RenderTestKind::VoxelGI || kind_ == RenderTestKind::DDGIFog)
 				Post_Process_Manager::SetSSGIEnabled(ssgi_was_enabled_);
+			if (kind_ == RenderTestKind::DDGIFog)
+			{
+				auto& post = Graphics_Core::instance().post_procss;
+				auto& fog = post.GetVolumetricFog();
+				fog.config = fog_was_;
+				fog.is_enabled = fog_enabled_was_;
+				Post_Process_Manager::SetVolumetricFogEffectEnabled(fog_effect_was_);
+				fog.set_gi_only_debug(fog_gi_only_was_);
+				post.GetHeightFog().is_enabled = height_fog_was_;
+				post.GetDistanceFog().is_enabled = distance_fog_was_;
+				post.GetExponentialFog().is_enabled = exponential_fog_was_;
+			}
 		}
 		void update(float elapsedTime) override
 		{
@@ -175,8 +233,9 @@ namespace
 			if (voxel_gi_)
 			{
 				if (auto* instance = Resource_Manager::instance().get_model_instance("RenderTest_Main"))
-					voxel_gi_->render(context, Resource_Manager::instance().get_model("VoxelGITest"),
+					voxel_gi_->render(context, Resource_Manager::instance().get_model(gi_model_key_),
 						instance->world_transform);
+				if (ddgi_) ddgi_->update(context, *voxel_gi_);
 			}
 			g.get_geometry_buffer()->Clear(context);
 			g.get_geometry_buffer()->Activate(context);
@@ -194,6 +253,14 @@ namespace
 				context->PSSetShaderResources(13, 1, &null_srv);
 				context->PSSetConstantBuffers(8, 1, &null_buffer);
 			}
+			if (ddgi_) ddgi_->bind_lighting(context);
+			else
+			{
+				ID3D11ShaderResourceView* null_srv = nullptr;
+				ID3D11Buffer* null_buffer = nullptr;
+				context->PSSetShaderResources(14, 1, &null_srv);
+				context->PSSetConstantBuffers(9, 1, &null_buffer);
+			}
 			context->OMSetRenderTargets(1, g.get_render_target_view().GetAddressOf(), nullptr);
 			Render_State::instance().set_2d_render_states(context);
 			g.clear(Color_Utils::from_hex("#202632"));
@@ -201,16 +268,32 @@ namespace
 			Render_State::instance().set_3d_render_states(context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 			Resource_Manager::instance().render_models(pass_mode::forward_transparency);
 			g.post_procss.end();
+			auto& fog = g.post_procss.GetVolumetricFog();
+			if (kind_ == RenderTestKind::DDGIFog)
+				fog.config.gi_scattering = fog_gi_enabled_ ? fog_demo_strength_ : 0.0f;
+			fog.set_gi_sources(ddgi_.get(), voxel_gi_.get());
 			g.post_procss.draw();
 			g.post_procss.render();
 			if (voxel_gi_) voxel_gi_->render_debug_3d(context);
-			Text::text_data.Color = Color_Utils::hex_to_colorF("#FFFFFF");
-			Text::draw(label_, D2D1_RECT_F(g.get_screen_width(), g.get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+			if (ddgi_) ddgi_->render_debug(context);
+			if (kind_ != RenderTestKind::DDGIFog)
+			{
+				Text::text_data.Color = Color_Utils::hex_to_colorF("#FFFFFF");
+				Text::draw(label_, D2D1_RECT_F(g.get_screen_width(), g.get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+			}
 		}
 		void draw_gui() override
 		{
 			light_.draw_imgui("Test Directional Light");
 			if (voxel_gi_) voxel_gi_->draw_gui();
+			if (ddgi_) ddgi_->draw_gui();
+			if (kind_ == RenderTestKind::DDGIFog)
+			{
+				ImGui::SeparatorText("DDGI Fog Comparison");
+				ImGui::Checkbox("Fog GI enabled##DDGIFogTest", &fog_gi_enabled_);
+				ImGui::SliderFloat("Fog GI intensity##DDGIFogTest", &fog_demo_strength_, 0.0f, 16.0f);
+				ImGui::TextDisabled("Compare warm left and cyan right fog. No direct light is injected into this fog view.");
+			}
 		}
 	private:
 		void add_instance(const std::string& instanceKey, const std::string& modelKey, float scale,
@@ -235,9 +318,20 @@ namespace
 		RenderTestKind kind_;
 		DirectionalLight light_;
 		std::unique_ptr<VoxelGI> voxel_gi_;
+		std::unique_ptr<DDGI> ddgi_;
+		std::string gi_model_key_;
 		std::wstring label_;
 		bool ssr_was_enabled_ = false;
 		bool ssgi_was_enabled_ = false;
+		VolumetricFog::Config fog_was_{};
+		bool fog_enabled_was_ = true;
+		bool fog_effect_was_ = true;
+		bool fog_gi_only_was_ = false;
+		bool height_fog_was_ = true;
+		bool distance_fog_was_ = true;
+		bool exponential_fog_was_ = true;
+		bool fog_gi_enabled_ = true;
+		float fog_demo_strength_ = 8.0f;
 	};
 }
 
@@ -321,6 +415,7 @@ void Scene_Manager::draw_gui()
 		if (ImGui::Button("AO / Lighting")) change_scene(new Scene_RenderTest(RenderTestKind::Occlusion));
 		if (ImGui::Button("SSGI Color Bleed")) change_scene(new Scene_RenderTest(RenderTestKind::SSGI));
 		if (ImGui::Button("Voxel GI Emission")) change_scene(new Scene_RenderTest(RenderTestKind::VoxelGI));
+		if (ImGui::Button("DDGI Fog Comparison")) change_scene(new Scene_RenderTest(RenderTestKind::DDGIFog));
 		ImGui::Separator();
 	}
 

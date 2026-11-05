@@ -14,6 +14,7 @@
 #include "Engine/utilities/color_util.h"
 #include "Engine/Graphics/IBL/ibl.h"
 #include "Game/Effect/VoxelGI/VoxelGI.h"
+#include "Game/Effect/DDGI/DDGI.h"
 #include "Game/World/Player/player.h"
 
 // ゲームシーン
@@ -57,6 +58,7 @@ private:
 	};
 	std::unique_ptr<Gltf_Model> _gltf_model;
 	std::unique_ptr<VoxelGI> _voxel_gi;
+	std::unique_ptr<DDGI> _ddgi;
 	DirectX::XMFLOAT4X4 _library_world{};
 	DirectionalLight _directional_light;
 

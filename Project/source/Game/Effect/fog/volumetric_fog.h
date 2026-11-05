@@ -3,6 +3,9 @@
 #include "fog_base.h"
 #include <DirectXMath.h>
 
+class DDGI;
+class VoxelGI;
+
 /**
  * @brief ボリュームフォグ
  *
@@ -25,7 +28,7 @@ public:
 		int   grid_width = 80;
 		int   grid_height = 48;
 		int   grid_depth = 128;
-		int   pad_grid = 0;
+		int   show_gi_only = 0;
 
 		float density_base = 0.02f;
 		float scattering = 0.8f;
@@ -39,7 +42,8 @@ public:
 
 		int   is_enabled = 1;
 		float time = 0.0f;
-		float padding[2]{};
+		float gi_scattering = 1.0f;
+		float gi_available = 0.0f;
 	};
 	static_assert(sizeof(Config) % 16 == 0, "VolumetricFog::Config must be 16-byte aligned");
 
@@ -52,11 +56,22 @@ public:
 	ID3D11ShaderResourceView** get_color_map_address()  const override;
 
 	void DrawDebugUI() override;
+	void set_gi_sources(const DDGI* ddgi, const VoxelGI* voxel_gi)
+	{
+		ddgi_ = ddgi;
+		voxel_gi_ = voxel_gi;
+	}
+	void set_gi_only_debug(bool enabled) { show_gi_only_ = enabled; }
+	bool gi_only_debug() const { return show_gi_only_; }
 
 	// パラメータ（ImGui から直接操作可能にする）
 	Config config{};
 
 private:
+	bool gi_active_ = false;
+	bool show_gi_only_ = false;
+	const DDGI* ddgi_ = nullptr;
+	const VoxelGI* voxel_gi_ = nullptr;
 	int allocated_grid_width_ = 80;
 	int allocated_grid_height_ = 48;
 	int allocated_grid_depth_ = 128;

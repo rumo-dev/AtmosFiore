@@ -5,6 +5,8 @@
 #include "Engine/System/graphics_core.h"
 #include "Engine/System/Manager/Light/point_light_manager.h"
 #include "Engine/System/Manager/Light/spot_light_manager.h"
+#include "Game/Effect/DDGI/DDGI.h"
+#include "Game/Effect/VoxelGI/VoxelGI.h"
 #include <cassert>
 #include "tracy_util.h"
 
@@ -71,6 +73,7 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 
 	if (!is_enabled)
 	{
+		gi_active_ = false;
 		TRACY_CPU_ZONE_N("VolumetricFog::make::DisabledPassthrough");
 
 		// 無効化されている場合は前段をクリアして直接 Blit するか何もしない
@@ -89,12 +92,17 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 	config.grid_width = allocated_grid_width_;
 	config.grid_height = allocated_grid_height_;
 	config.grid_depth = allocated_grid_depth_;
+	const bool gi_ready = config.gi_scattering > 0.0f && ddgi_ && voxel_gi_ &&
+		voxel_gi_->volume_srv() && ddgi_->bind_fog(ctx);
+	gi_active_ = gi_ready;
+	config.gi_available = gi_ready ? 1.0f : 0.0f;
 
 	// 定数バッファの更新
 	{
 		TRACY_CB_ZONE("VolumetricFog::make::UpdateConfigCB");
 
 		config.is_enabled = is_enabled ? 1 : 0;
+		config.show_gi_only = show_gi_only_ ? 1 : 0;
 		ctx->UpdateSubresource(cb_.Get(), 0, nullptr, &config, 0, 0);
 	}
 
@@ -129,6 +137,11 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 		ctx->CSSetShaderResources(7, 1, &dir_shadow);
 		ctx->CSSetShaderResources(8, 1, &point_srv);
 		ctx->CSSetShaderResources(9, 1, &spot_srv);
+		if (gi_ready)
+		{
+			ID3D11ShaderResourceView* voxels = voxel_gi_->volume_srv();
+			ctx->CSSetShaderResources(13, 1, &voxels);
+		}
 
 		// サンプラーのバインド
 		Render_State::instance().set_cs_sampler_state(ctx);
@@ -148,6 +161,9 @@ void VolumetricFog::make(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src
 		ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
 		ID3D11ShaderResourceView* null_srvs[10]{};
 		ctx->CSSetShaderResources(5, 5, null_srvs);
+		ctx->CSSetShaderResources(13, 2, null_srvs);
+		ID3D11Buffer* null_cb = nullptr;
+		ctx->CSSetConstantBuffers(9, 1, &null_cb);
 	}
 
 	// ── パス2: Z軸累積 (Compute Shader) ───────────────────────────
@@ -231,6 +247,9 @@ void VolumetricFog::DrawDebugUI()
 	ImGui::SeparatorText("Light & Phase");
 	ImGui::SliderFloat("Anisotropy (g)", &config.anisotropy, -0.99f, 0.99f);
 	ImGui::SliderFloat("Intensity", &config.intensity, 0.0f, 10.0f);
+	ImGui::SliderFloat("GI scattering##VolFog", &config.gi_scattering, 0.0f, 8.0f);
+	ImGui::Checkbox("Show GI fog only##VolFog", &show_gi_only_);
+	ImGui::TextDisabled("DDGI input: %s", gi_active_ ? "active" : "unavailable");
 
 	ImGui::SeparatorText("Noise & Animation");
 	ImGui::SliderFloat("Noise Scale", &config.noise_scale, 0.001f, 1.0f, "%.4f");

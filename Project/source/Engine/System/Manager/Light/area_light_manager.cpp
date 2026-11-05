@@ -87,13 +87,13 @@ void AreaLightManager::draw_imgui()
 	}
 }
 
-void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
+void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx, bool cull_to_camera)
 {
 	if (_lights.empty())
 	{
 		_visible_count = 0;
-		UINT numLights = 0;
-		ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, &numLights, 0, 0);
+		UINT lightCount[4]{};
+		ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, lightCount, 0, 0);
 		ctx->PSSetConstantBuffers(7, 1, _cbLightCount.GetAddressOf());
 		return;
 	}
@@ -101,7 +101,7 @@ void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 	bool enable_culling = false;
 	Frustum camera_frustum{};
 	auto camera_base = CameraManager::instance().get_active_camera();
-	if (camera_base)
+	if (cull_to_camera && camera_base)
 	{
 		const Camera& camera = camera_base->get_camera();
 		camera_frustum = ExtractFrustum(camera.view, camera.projection);
@@ -142,8 +142,8 @@ void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 
 	if (gpuLights.empty())
 	{
-		UINT numLights = 0;
-		ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, &numLights, 0, 0);
+		UINT lightCount[4]{};
+		ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, lightCount, 0, 0);
 		ctx->PSSetConstantBuffers(7, 1, _cbLightCount.GetAddressOf());
 		return;
 	}
@@ -158,8 +158,8 @@ void AreaLightManager::upload_to_gpu(ID3D11DeviceContext* ctx)
 	memcpy(mappedResource.pData, gpuLights.data(), sizeof(AreaLight::AreaLightGpu) * gpuLights.size());
 	ctx->Unmap(_sbLights.Get(), 0);
 
-	UINT numLights = static_cast<UINT>(gpuLights.size());
-	ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, &numLights, 0, 0);
+	UINT lightCount[4]{ static_cast<UINT>(gpuLights.size()) };
+	ctx->UpdateSubresource(_cbLightCount.Get(), 0, nullptr, lightCount, 0, 0);
 	ctx->PSSetShaderResources(10, 1, _sbLightsSRV.GetAddressOf());
 	ctx->PSSetShaderResources(11, 1, _ltcMatrixLutSRV.GetAddressOf());
 	ctx->PSSetShaderResources(12, 1, _ltcAmplitudeLutSRV.GetAddressOf());

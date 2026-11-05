@@ -494,6 +494,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\Scenes\scene_base.h" />
     <ClInclude Include="source\Game\Scenes\scene_indoor.h" />
     <ClInclude Include="source\Game\Effect\VoxelGI\VoxelGI.h" />
+    <ClInclude Include="source\Game\Effect\DDGI\DDGI.h" />
     <ClInclude Include="source\Game\Scenes\scene_title.h" />
     <ClInclude Include="source\Game\Scenes\scene_splash.h" />
     <ClInclude Include="source\Game\Scenes\loading.h" />
@@ -596,6 +597,7 @@ if exist export rmdir /s /q export</Command>
     <ClCompile Include="source\Game\Effect\Vignetting\Vignetting.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp" />
     <ClCompile Include="source\Game\Effect\VoxelGI\VoxelGI.cpp" />
+    <ClCompile Include="source\Game\Effect\DDGI\DDGI.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_title.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_splash.cpp" />
     <ClCompile Include="source\Game\Scenes\loading.cpp" />
@@ -1177,6 +1179,14 @@ if exist export rmdir /s /q export</Command>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_debug_ps.hlsl">
       <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ddgi_update_cs.hlsl">
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\ddgi_filter_cs.hlsl">
+      <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
     </FxCompile>
   </ItemGroup>

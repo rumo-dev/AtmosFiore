@@ -16,6 +16,7 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
 {
     if (!device || !model || !model->has_bbox) return false;
     baked_ = false;
+    bake_revision_ = 0;
     bake_settings_dirty_ = false;
     slice_dirty_ = true;
     device_ = device;
@@ -52,6 +53,22 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
         volume_uav_.GetAddressOf()))) return false;
     if (FAILED(device->CreateShaderResourceView(volume_.Get(), nullptr,
         volume_srv_.GetAddressOf()))) return false;
+    D3D11_TEXTURE3D_DESC albedo_desc = desc;
+    albedo_desc.MipLevels = 1;
+    albedo_desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    albedo_desc.MiscFlags = 0;
+    if (FAILED(device->CreateTexture3D(&albedo_desc, nullptr,
+        albedo_volume_.GetAddressOf()))) return false;
+    if (FAILED(device->CreateUnorderedAccessView(albedo_volume_.Get(), &uav_desc,
+        albedo_uav_.GetAddressOf()))) return false;
+    if (FAILED(device->CreateShaderResourceView(albedo_volume_.Get(), nullptr,
+        albedo_srv_.GetAddressOf()))) return false;
+    if (FAILED(device->CreateTexture3D(&albedo_desc, nullptr,
+        normal_volume_.GetAddressOf()))) return false;
+    if (FAILED(device->CreateUnorderedAccessView(normal_volume_.Get(), &uav_desc,
+        normal_uav_.GetAddressOf()))) return false;
+    if (FAILED(device->CreateShaderResourceView(normal_volume_.Get(), nullptr,
+        normal_srv_.GetAddressOf()))) return false;
 
     D3D11_BUFFER_DESC cb_desc{};
     cb_desc.ByteWidth = sizeof(Constants);
@@ -105,8 +122,11 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
     ctx->PSSetShaderResources(13, 1, &null_srv);
     const float empty[4] = { 0, 0, 0, 0 };
     ctx->ClearUnorderedAccessViewFloat(volume_uav_.Get(), empty);
-    ID3D11UnorderedAccessView* uav = volume_uav_.Get();
-    ctx->OMSetRenderTargetsAndUnorderedAccessViews(0, nullptr, nullptr, 0, 1, &uav, nullptr);
+    ctx->ClearUnorderedAccessViewFloat(albedo_uav_.Get(), empty);
+    ctx->ClearUnorderedAccessViewFloat(normal_uav_.Get(), empty);
+    ID3D11UnorderedAccessView* uavs[3] = {
+        volume_uav_.Get(), albedo_uav_.Get(), normal_uav_.Get() };
+    ctx->OMSetRenderTargetsAndUnorderedAccessViews(0, nullptr, nullptr, 0, 3, uavs, nullptr);
     D3D11_VIEWPORT viewport{ 0, 0, float(Resolution), float(Resolution), 0, 1 };
     ctx->RSSetViewports(1, &viewport);
     Render_State::instance().set_rasterizer_state(ctx, Rasterizer_State::Cull_None_CCW);
@@ -118,13 +138,14 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
         Gltf_Model::animation_mode::single, 0);
 
     ctx->GSSetShader(nullptr, nullptr, 0);
-    ID3D11UnorderedAccessView* null_volume_uav = nullptr;
+    ID3D11UnorderedAccessView* null_volume_uavs[3]{};
     ctx->OMSetRenderTargetsAndUnorderedAccessViews(
-        0, nullptr, nullptr, 0, 1, &null_volume_uav, nullptr);
+        0, nullptr, nullptr, 0, 3, null_volume_uavs, nullptr);
     ctx->OMSetRenderTargets(1, old_rtv.GetAddressOf(), old_dsv.Get());
     if (viewport_count) ctx->RSSetViewports(1, &old_viewport);
     ctx->GenerateMips(volume_srv_.Get());
     baked_ = true;
+    ++bake_revision_;
     bake_settings_dirty_ = false;
     slice_dirty_ = true;
     }
