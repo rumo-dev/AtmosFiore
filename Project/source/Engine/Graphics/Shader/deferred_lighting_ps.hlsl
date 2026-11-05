@@ -9,6 +9,7 @@
 #include "shadow_spot.hlsli"
 #include "area_light.hlsli"
 #include "shadow_area.hlsli"
+#include "ddgi_sample.hlsli"
 
 Texture2D<float4> gbuffer0 : register(t0);
 Texture2D<float4> gbuffer1 : register(t1);
@@ -431,7 +432,11 @@ float4 main(VS_OUT pin) : SV_TARGET
     }
 
     diffuse += ibl_radiance_lambertian(N, V, roughness, c_diff, f0);
-    diffuse += sample_voxel_gi(position, N) * c_diff;
+    float3 voxel_indirect = sample_voxel_gi(position, N);
+    float4 probe_indirect = sample_ddgi(position, N);
+    float probe_weight = probe_indirect.a * saturate(ddgi_blend);
+    diffuse += lerp(voxel_indirect, probe_indirect.rgb * ddgi_strength,
+        probe_weight) * c_diff;
     specular += ibl_radiance_ggx(N, V, roughness, f0);
 
     // Material AO and SSAO attenuate the accumulated lighting.

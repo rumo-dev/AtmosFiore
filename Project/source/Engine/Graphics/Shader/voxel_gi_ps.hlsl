@@ -42,6 +42,8 @@ cbuffer VOXEL_GI_CONSTANTS : register(b8)
 };
 
 RWTexture3D<float4> voxel_radiance : register(u0);
+RWTexture3D<float4> voxel_albedo : register(u1);
+RWTexture3D<float4> voxel_normal : register(u2);
 
 void main(VS_OUT input)
 {
@@ -74,4 +76,6 @@ void main(VS_OUT input)
     radiance += emissive * emissive_multiplier;
     uint3 cell = min((uint3)(p * resolution), resolution - 1);
     voxel_radiance[cell] = float4(radiance, 1);
+    voxel_albedo[cell] = float4(albedo.rgb, 1);
+    voxel_normal[cell] = float4(normalize(input.w_normal.xyz), 1);
 }

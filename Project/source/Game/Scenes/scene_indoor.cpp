@@ -75,6 +75,11 @@ void Scene_Indoor::initialize()
 	_voxel_gi = std::make_unique<VoxelGI>();
 	if (!_voxel_gi->initialize(device, mgr.get_model("Library"), _library_world))
 		_voxel_gi.reset();
+	if (_voxel_gi)
+	{
+		_ddgi = std::make_unique<DDGI>();
+		if (!_ddgi->initialize(device)) _ddgi.reset();
+	}
 
 	IBL::Initialize(device, L"./data/ibl");
 
@@ -110,6 +115,12 @@ void Scene_Indoor::initialize()
 
 // 終了化
 void Scene_Indoor::finalize() {
+	ID3D11ShaderResourceView* null_gi_srvs[2]{};
+	ID3D11Buffer* null_gi_buffers[2]{};
+	auto* context = Graphics_Core::instance().get_device_context();
+	context->PSSetShaderResources(13, 2, null_gi_srvs);
+	context->PSSetConstantBuffers(8, 2, null_gi_buffers);
+	_ddgi.reset();
 	_voxel_gi.reset();
 	Graphics_Core::instance().get_point_light_manager().clear_light();
 	Graphics_Core::instance().get_spot_light_manager().clear_light();
@@ -201,6 +212,7 @@ void Scene_Indoor::render(float elapsedTime)
 		if (_voxel_gi)
 			_voxel_gi->render(immediate_context,
 				Resource_Manager::instance().get_model("Library"), _library_world);
+		if (_ddgi && _voxel_gi) _ddgi->update(immediate_context, *_voxel_gi);
 		render_defferd(elapsedTime);
 
 		render_forward(elapsedTime);
@@ -286,6 +298,14 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 	Resource_Manager::instance().end_model_profile(immediate_context);
 	Graphics_Core::instance().get_geometry_buffer()->Deactivate(immediate_context);
 	if (_voxel_gi) _voxel_gi->bind_lighting(immediate_context);
+	if (_ddgi) _ddgi->bind_lighting(immediate_context);
+	else
+	{
+		ID3D11ShaderResourceView* null_srv = nullptr;
+		ID3D11Buffer* null_buffer = nullptr;
+		immediate_context->PSSetShaderResources(14, 1, &null_srv);
+		immediate_context->PSSetConstantBuffers(9, 1, &null_buffer);
+	}
 }
 
 // 3. 前方描画（フォワード・不透明/半透明）
@@ -329,6 +349,8 @@ void Scene_Indoor::render_UI(float elapsedTime) {
 	}
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Effects");
+		Graphics_Core::instance().post_procss.GetVolumetricFog().set_gi_sources(
+			_ddgi.get(), _voxel_gi.get());
 		Graphics_Core::instance().post_procss.draw();
 	}
 	{
@@ -336,6 +358,7 @@ void Scene_Indoor::render_UI(float elapsedTime) {
 		Graphics_Core::instance().post_procss.render();
 	}
 	if (_voxel_gi) _voxel_gi->render_debug_3d(immediate_context);
+	if (_ddgi) _ddgi->render_debug(immediate_context);
 
 	// テキスト等のUI描画はUIカテゴリに変更してプロファイリング
 	{
@@ -372,4 +395,5 @@ void Scene_Indoor::draw_gui() {
 
 	_player.draw_imgui();
 	if (_voxel_gi) _voxel_gi->draw_gui();
+	if (_ddgi) _ddgi->draw_gui();
 }

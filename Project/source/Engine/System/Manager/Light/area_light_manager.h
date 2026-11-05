@@ -118,7 +118,9 @@ public:
 	 * @pre
 	 * シェーダー側で同一レイアウトのStructuredBufferが定義されていること
 	 */
-	void upload_to_gpu(ID3D11DeviceContext* ctx);
+	void upload_to_gpu(ID3D11DeviceContext* ctx, bool cull_to_camera = true);
+	ID3D11ShaderResourceView* get_srv() const { return _sbLightsSRV.Get(); }
+	ID3D11Buffer* get_cb() const { return _cbLightCount.Get(); }
 
 	/**
 	 * @brief デバッグ描画

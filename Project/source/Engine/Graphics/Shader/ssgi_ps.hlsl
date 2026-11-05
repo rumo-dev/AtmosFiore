@@ -69,5 +69,6 @@ float4 main(VS_OUT pin) : SV_TARGET
     }
 
     float3 indirect = (weight_sum > 1.0e-5f ? gathered / weight_sum : 0.0f) * albedo * ssgi_intensity;
-    return float4(indirect, 1.0f);
+    // Sparse screen hits should have little influence over the probe/voxel GI.
+    return float4(indirect, saturate(weight_sum * 2.0f));
 }

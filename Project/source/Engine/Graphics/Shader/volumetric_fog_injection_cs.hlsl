@@ -6,11 +6,13 @@
 #include "shadow_point.hlsli"
 #include "spot_light.hlsli"
 #include "shadow_spot.hlsli"
+#include "ddgi_sample.hlsli"
 
 // ── テクスチャ ────────────────────────────────────────────────────
 Texture2D<float> point_shadow_front_map : register(t5);
 Texture2D<float> point_shadow_back_map : register(t6);
 Texture2D<float> directional_shadow_map : register(t7);
+Texture3D<float4> fog_voxels : register(t13);
 
 // ── UAV ───────────────────────────────────────────────────────────
 RWTexture3D<float4> g_volume_light_uav : register(u0);
@@ -21,7 +23,7 @@ cbuffer VolumetricFogCB : register(b8)
     int grid_width;
     int grid_height;
     int grid_depth;
-    int pad_grid;
+    int show_gi_only;
 
     float density_base;
     float scattering;
@@ -35,7 +37,8 @@ cbuffer VolumetricFogCB : register(b8)
 
     int is_enabled;
     float time;
-    float pad_cb[2];
+    float gi_scattering;
+    float gi_available;
 };
 
 // ── ノイズ / FBM ─────────────────────────────────────────────────
@@ -115,11 +118,31 @@ void main(uint3 DTid : SV_DispatchThreadID)
         float noise_val = saturate(lerp(0.4, 1.6, fbm(noise_pos)));
         density *= noise_val;
     }
+    float3 voxel_uvw = (cur_pos - ddgi_volume_min.xyz) * ddgi_inv_extent.xyz;
+    bool inside_gi = gi_available > 0.5 &&
+        all(voxel_uvw >= 0.0) && all(voxel_uvw < 1.0);
+    if (inside_gi)
+    {
+        uint3 voxel = min((uint3)(voxel_uvw * 64.0), 63u);
+        if (fog_voxels.Load(int4(voxel, 0)).a >= 0.5) density = 0.0;
+    }
 
     // カメラからボクセルへの視線方向
     float3 ray_dir = normalize(cur_pos - camera_position.xyz);
 
     float3 total_light = 0.0;
+
+    float3 indirect_light = 0.0;
+    if (inside_gi && density > 0.0)
+    {
+        // The probe field supplies broad bounce light. A coarse voxel mip
+        // restores the nearby contribution of small emissive surfaces that
+        // occupy too little solid angle in the isotropic six-lobe average.
+        float3 probe_light = sample_ddgi_fog(cur_pos);
+        float3 local_emission = fog_voxels.SampleLevel(
+            sampler_states[LINEAR_CLAMP], voxel_uvw, 3.0).rgb;
+        indirect_light = (probe_light + local_emission * 0.5) * gi_scattering;
+    }
 
     // Directional Light
     {
@@ -190,8 +213,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
 
     // メディア特性の評価
+    total_light = show_gi_only != 0 ? indirect_light : total_light + indirect_light;
     float3 scattering_coef = total_light * density * scattering;
-    float extinction_coef = density * (scattering + absorption);
+    float extinction_coef = show_gi_only != 0 ? 0.0 : density * (scattering + absorption);
 
     g_volume_light_uav[DTid] = float4(scattering_coef, extinction_coef);
 }

@@ -9,6 +9,7 @@
 #include "Engine/Utilities/color_util.h"
 #include "Engine/Graphics/IBL/ibl.h"
 #include "Game/Effect/VoxelGI/VoxelGI.h"
+#include "Game/Effect/DDGI/DDGI.h"
 #include <memory>
 #include <algorithm>
 
@@ -82,6 +83,11 @@ namespace
 					if (!voxel_gi_->initialize(graphics.get_device(), model, instance->world_transform))
 						voxel_gi_.reset();
 					else voxel_gi_->set_emissive_multiplier(8.0f);
+					if (voxel_gi_)
+					{
+						ddgi_ = std::make_unique<DDGI>();
+						if (!ddgi_->initialize(graphics.get_device())) ddgi_.reset();
+					}
 				}
 				ssgi_was_enabled_ = Post_Process_Manager::IsSSGIEnabled();
 				Post_Process_Manager::SetSSGIEnabled(false);
@@ -132,6 +138,12 @@ namespace
 		}
 		void finalize() override
 		{
+			ID3D11ShaderResourceView* null_gi_srvs[2]{};
+			ID3D11Buffer* null_gi_buffers[2]{};
+			auto* context = Graphics_Core::instance().get_device_context();
+			context->PSSetShaderResources(13, 2, null_gi_srvs);
+			context->PSSetConstantBuffers(8, 2, null_gi_buffers);
+			ddgi_.reset();
 			voxel_gi_.reset();
 			auto& resources = Resource_Manager::instance();
 			resources.remove_model_instance("RenderTest_Main");
@@ -177,6 +189,7 @@ namespace
 				if (auto* instance = Resource_Manager::instance().get_model_instance("RenderTest_Main"))
 					voxel_gi_->render(context, Resource_Manager::instance().get_model("VoxelGITest"),
 						instance->world_transform);
+				if (ddgi_) ddgi_->update(context, *voxel_gi_);
 			}
 			g.get_geometry_buffer()->Clear(context);
 			g.get_geometry_buffer()->Activate(context);
@@ -194,6 +207,14 @@ namespace
 				context->PSSetShaderResources(13, 1, &null_srv);
 				context->PSSetConstantBuffers(8, 1, &null_buffer);
 			}
+			if (ddgi_) ddgi_->bind_lighting(context);
+			else
+			{
+				ID3D11ShaderResourceView* null_srv = nullptr;
+				ID3D11Buffer* null_buffer = nullptr;
+				context->PSSetShaderResources(14, 1, &null_srv);
+				context->PSSetConstantBuffers(9, 1, &null_buffer);
+			}
 			context->OMSetRenderTargets(1, g.get_render_target_view().GetAddressOf(), nullptr);
 			Render_State::instance().set_2d_render_states(context);
 			g.clear(Color_Utils::from_hex("#202632"));
@@ -201,9 +222,11 @@ namespace
 			Render_State::instance().set_3d_render_states(context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
 			Resource_Manager::instance().render_models(pass_mode::forward_transparency);
 			g.post_procss.end();
+			g.post_procss.GetVolumetricFog().set_gi_sources(ddgi_.get(), voxel_gi_.get());
 			g.post_procss.draw();
 			g.post_procss.render();
 			if (voxel_gi_) voxel_gi_->render_debug_3d(context);
+			if (ddgi_) ddgi_->render_debug(context);
 			Text::text_data.Color = Color_Utils::hex_to_colorF("#FFFFFF");
 			Text::draw(label_, D2D1_RECT_F(g.get_screen_width(), g.get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 		}
@@ -211,6 +234,7 @@ namespace
 		{
 			light_.draw_imgui("Test Directional Light");
 			if (voxel_gi_) voxel_gi_->draw_gui();
+			if (ddgi_) ddgi_->draw_gui();
 		}
 	private:
 		void add_instance(const std::string& instanceKey, const std::string& modelKey, float scale,
@@ -235,6 +259,7 @@ namespace
 		RenderTestKind kind_;
 		DirectionalLight light_;
 		std::unique_ptr<VoxelGI> voxel_gi_;
+		std::unique_ptr<DDGI> ddgi_;
 		std::wstring label_;
 		bool ssr_was_enabled_ = false;
 		bool ssgi_was_enabled_ = false;

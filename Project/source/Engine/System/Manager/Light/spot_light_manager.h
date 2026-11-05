@@ -118,7 +118,7 @@ public:
 	 * @pre
 	 * シェーダー側で同一レイアウトのStructuredBufferが定義されていること
 	 */
-	void upload_to_gpu(ID3D11DeviceContext* ctx);
+	void upload_to_gpu(ID3D11DeviceContext* ctx, bool cull_to_camera = true);
 
 	/**
 	 * @brief デバッグ描画

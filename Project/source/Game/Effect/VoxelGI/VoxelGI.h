@@ -20,6 +20,13 @@ public:
     void render_debug_3d(ID3D11DeviceContext* context) const;
     void draw_gui();
     void set_emissive_multiplier(float value) { constants_.emissive_multiplier = value; baked_ = false; }
+    ID3D11ShaderResourceView* volume_srv() const { return baked_ ? volume_srv_.Get() : nullptr; }
+    ID3D11ShaderResourceView* albedo_srv() const { return baked_ ? albedo_srv_.Get() : nullptr; }
+    ID3D11ShaderResourceView* normal_srv() const { return baked_ ? normal_srv_.Get() : nullptr; }
+    DirectX::XMFLOAT4 volume_min() const { return constants_.volume_min; }
+    DirectX::XMFLOAT4 inverse_extent() const { return constants_.inv_extent; }
+    unsigned int bake_revision() const { return bake_revision_; }
+    bool show_3d_volume() const { return show_3d_; }
 
 private:
     struct Constants
@@ -38,6 +45,12 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Texture3D> volume_;
     Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> volume_uav_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> volume_srv_;
+    Microsoft::WRL::ComPtr<ID3D11Texture3D> albedo_volume_;
+    Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> albedo_uav_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> albedo_srv_;
+    Microsoft::WRL::ComPtr<ID3D11Texture3D> normal_volume_;
+    Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> normal_uav_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> normal_srv_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> constants_buffer_;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> slice_texture_;
     Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> slice_uav_;
@@ -48,4 +61,5 @@ private:
     bool baked_ = false;
     bool bake_settings_dirty_ = false;
     bool slice_dirty_ = true;
+    unsigned int bake_revision_ = 0;
 };

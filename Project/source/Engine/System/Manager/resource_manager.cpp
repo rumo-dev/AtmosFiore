@@ -72,6 +72,8 @@ void Resource_Manager::load_shaders() {
 	load_shader<Pixel_Shader>("VOXEL_GI_PS", "voxel_gi_ps");
 	load_shader<Compute_Shader>("VOXEL_GI_SLICE_CS", "voxel_gi_slice_cs");
 	load_shader<Pixel_Shader>("VOXEL_GI_DEBUG_PS", "voxel_gi_debug_ps");
+	load_shader<Compute_Shader>("DDGI_UPDATE_CS", "ddgi_update_cs");
+	load_shader<Compute_Shader>("DDGI_FILTER_CS", "ddgi_filter_cs");
 	load_shader<Vertex_Shader>(
 		"OCCLUSION_BOX_VS",
 		"occlusion_box_vs"
