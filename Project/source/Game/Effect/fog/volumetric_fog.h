@@ -61,6 +61,8 @@ public:
 		ddgi_ = ddgi;
 		voxel_gi_ = voxel_gi;
 	}
+	void set_gi_only_debug(bool enabled) { show_gi_only_ = enabled; }
+	bool gi_only_debug() const { return show_gi_only_; }
 
 	// パラメータ（ImGui から直接操作可能にする）
 	Config config{};

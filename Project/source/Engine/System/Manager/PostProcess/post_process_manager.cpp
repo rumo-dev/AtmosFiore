@@ -88,6 +88,15 @@ std::array<Post_Process_Manager::EffectId, 13> Post_Process_Manager::effect_orde
 };
 std::array<bool, 13> Post_Process_Manager::effect_enabled{};
 std::array<bool, 13> Post_Process_Manager::saved_effect_enabled{};
+void Post_Process_Manager::SetVolumetricFogEffectEnabled(bool enabled)
+{
+	effect_enabled[static_cast<size_t>(EffectId::VolumetricFog)] = enabled;
+}
+
+bool Post_Process_Manager::IsVolumetricFogEffectEnabled()
+{
+	return effect_enabled[static_cast<size_t>(EffectId::VolumetricFog)];
+}
 bool Post_Process_Manager::ssr_performance_mode = false;
 std::unique_ptr<bloom>       Post_Process_Manager::bloomer = nullptr;
 std::unique_ptr<Fog>         Post_Process_Manager::fogger = nullptr;

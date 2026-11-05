@@ -34,6 +34,15 @@ from the fog injection and leaves scene transmittance unchanged for comparison.
 The contribution is zero when DDGI is
 unavailable or disabled.
 
+**DDGI Fog Comparison** in the Scene menu loads `data/model/DDGIFogTest/scene.gltf`.
+The open-front room has large warm and cyan emissive walls separated by a dark
+partition. Its volumetric fog uses denser media and an isolated GI view so the
+colored scattering is visible. **Fog GI enabled** switches the indirect fog
+contribution on and off, while **Fog GI intensity** adjusts it. Entering the
+scene temporarily enables volumetric fog and disables the other fog passes;
+leaving it restores the previous settings. The generated model can be rebuilt
+with `tools/generate_ddgi_fog_test.py`.
+
 The implementation follows the irradiance-field and visibility-moment ideas
 from [Majercik et al., JCGT 2019](https://jcgt.org/published/0008/02/01/) and
 NVIDIA's [RTXGI DDGI documentation](https://github.com/NVIDIAGameWorks/RTXGI-DDGI/blob/main/docs/DDGIVolume.md).

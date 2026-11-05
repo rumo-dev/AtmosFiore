@@ -63,6 +63,8 @@ public:
 	static bool IsSSREnabled() { return ssr_enabled; }
 	static void SetSSGIEnabled(bool enabled) { ssgi_enabled = enabled; }
 	static bool IsSSGIEnabled() { return ssgi_enabled; }
+	static void SetVolumetricFogEffectEnabled(bool enabled);
+	static bool IsVolumetricFogEffectEnabled();
 	static void SetSSRPerformanceMode(bool enabled);
 	static void SetTAAEnabled(bool enabled);
 	static bool IsTAAEnabled() { return taa_enabled; }
