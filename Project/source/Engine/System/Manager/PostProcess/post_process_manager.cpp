@@ -156,12 +156,13 @@ void Post_Process_Manager::initialize()
 	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	const uint32_t ssao_width = (std::max)(1u, w / 2);
 	const uint32_t ssao_height = (std::max)(1u, h / 2);
-	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssr_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssr_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	// AO is a single scalar; storing RGBA wastes three quarters of these targets.
+	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssr_buffer = Framebuffer{};
+	ssr_composite_buffer = Framebuffer{};
 	ssgi_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[0] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
@@ -220,12 +221,13 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	fsquad = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	const UINT ssao_width = (std::max)(1u, width / 2);
 	const UINT ssao_height = (std::max)(1u, height / 2);
-	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssr_buffer = Framebuffer(device, (std::max)(1u, width / 2), (std::max)(1u, height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
-	ssr_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	// SSR targets are allocated when the effect is actually enabled.
+	ssr_buffer = Framebuffer{};
+	ssr_composite_buffer = Framebuffer{};
 	ssgi_buffer = Framebuffer(device, (std::max)(1u, width / 2), (std::max)(1u, height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[0] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
@@ -258,6 +260,7 @@ void Post_Process_Manager::begin()
 	Render_State::instance().set_blend_state(ctx, Blend_State::Alpha);
 
 	if (ssao_enabled && ssao_constant_buffer) {
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: SSAO");
 		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
 		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
 		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
@@ -359,6 +362,14 @@ void Post_Process_Manager::draw()
 	dlss_applied_this_frame = false;
 	ID3D11ShaderResourceView* current = fsquad.GetColorMap();
 	if (ssr_enabled && ssr_constant_buffer) {
+		if (!ssr_buffer.GetColorMap()) {
+			auto* device = Graphics_Core::instance().get_device();
+			ssr_buffer = Framebuffer(device, (std::max)(1u, render_width / 2),
+				(std::max)(1u, render_height / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+			ssr_composite_buffer = Framebuffer(device, render_width, render_height,
+				DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+		}
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: SSR");
 		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
 		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
 		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
@@ -385,7 +396,12 @@ void Post_Process_Manager::draw()
 		ctx->PSSetShaderResources(0, 2, null_composite_inputs);
 		current = ssr_composite_buffer.GetColorMap();
 	}
+	else if (ssr_buffer.GetColorMap()) {
+		ssr_buffer = Framebuffer{};
+		ssr_composite_buffer = Framebuffer{};
+	}
 	if (ssgi_enabled && ssgi_constant_buffer) {
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: SSGI");
 		auto* geometry_buffer = Graphics_Core::instance().get_geometry_buffer();
 		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
 		geometry_buffer->GetShaderResourceViews(gbuffer_srvs);
@@ -413,6 +429,7 @@ void Post_Process_Manager::draw()
 		current = ssgi_composite_buffer.GetColorMap();
 	}
 	if (taa_enabled && !(dlss && dlss->IsEnabled()) && taa_constant_buffer) {
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: TAA");
 		ID3D11ShaderResourceView* null_taa_inputs[3]{};
 		ctx->PSSetShaderResources(0, 3, null_taa_inputs);
 		if (!taa_history_valid) {
@@ -892,6 +909,7 @@ void Post_Process_Manager::drawBloomGUI()
 	ImGui::BeginChild("##bloom_left", ImVec2(left_w, 0), false);
 	CheckboxInt("Enable Bloom", bloomer->is_bloom, "Enable bloom effect");
 	if (bloomer->is_bloom) {
+		ImGui::Checkbox("Compute Blur (A/B)", &bloomer->use_compute_blur);
 		SliderFloatWithTooltip("Threshold", &bloomer->bloom_extraction_threshold,
 			0.0f, 1.0f, "Brightness threshold for bloom");
 		SliderFloatWithTooltip("Intensity", &bloomer->bloom_intensity,

@@ -7,7 +7,7 @@ ToneMapping::ToneMapping(ID3D11Device* device, uint32_t width, uint32_t height)
 	TRACY_CPU_ZONE_C("ToneMapping::ToneMapping", TracyCategory::System);
 
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
-	tone_mapping_target = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, false);
+	tone_mapping_target = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 1, false);
 	create_ps_from_cso(device, "tonemapping_ps.cso", tone_mapping_ps.GetAddressOf());
 	D3D11_BUFFER_DESC cb_desc{};
 	cb_desc.Usage = D3D11_USAGE_DEFAULT;

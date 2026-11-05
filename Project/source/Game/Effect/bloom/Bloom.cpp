@@ -1,11 +1,16 @@
 // BLOOM
 #include "bloom.h"
+#include <algorithm>
 #include<vector>
 
 #include"Engine/system/render_state.h"
 bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 {
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
+	UINT format_support = 0;
+	const bool compute_output_supported = SUCCEEDED(device->CheckFormatSupport(
+		DXGI_FORMAT_R16G16B16A16_FLOAT, &format_support)) &&
+		(format_support & D3D11_FORMAT_SUPPORT_TYPED_UNORDERED_ACCESS_VIEW) != 0;
 
 	glow_extraction = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT,
 		1,		// mip_levels: ミップマップ不要
@@ -14,17 +19,19 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 
 	for (size_t downsampled_index = 0; downsampled_index < downsampled_count; ++downsampled_index)
 	{
+		level_widths[downsampled_index] = (std::max)(1u, width >> downsampled_index);
+		level_heights[downsampled_index] = (std::max)(1u, height >> downsampled_index);
 		gaussian_blur[downsampled_index][0] = std::make_unique<Framebuffer>(
 			device,
-			width >> downsampled_index,
-			height >> downsampled_index, DXGI_FORMAT_R16G16B16A16_FLOAT,
+			level_widths[downsampled_index],
+			level_heights[downsampled_index], DXGI_FORMAT_R16G16B16A16_FLOAT,
 			1,		// mip_levels: ミップマップ不要
-			false	// use_depth
+			false, false, compute_output_supported
 		);
 		gaussian_blur[downsampled_index][1] = std::make_unique<Framebuffer>(
 			device,
-			width >> downsampled_index,
-			height >> downsampled_index, DXGI_FORMAT_R16G16B16A16_FLOAT,
+			level_widths[downsampled_index],
+			level_heights[downsampled_index], DXGI_FORMAT_R16G16B16A16_FLOAT,
 			1,		// mip_levels: ミップマップ不要
 			false	// use_depth
 		);
@@ -33,7 +40,7 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 		device,
 		width,
 		height, DXGI_FORMAT_R16G16B16A16_FLOAT,
-		0,		// mip_levels: 0 = 最小サイズ(1x1)までのフルミップチェインを生成
+		1,		// Exposure builds its own mip chain from the current pipeline input.
 		false	// use_depth
 	);
 	create_ps_from_cso(device, "glow_extraction_ps.cso", glow_extraction_ps.GetAddressOf());
@@ -42,6 +49,8 @@ bloom::bloom(ID3D11Device* device, uint32_t width, uint32_t height)
 	create_ps_from_cso(device, "gaussian_blur_vertical_ps.cso", gaussian_blur_vertical_ps.GetAddressOf());
 	create_ps_from_cso(device, "gaussian_blur_upsampling_ps.cso", gaussian_blur_upsampling_ps.GetAddressOf());
 	create_ps_from_cso(device, "bloomfinal.cso", bloom_final_ps.GetAddressOf());
+	create_cs_from_cso(device, "bloom_blur_cs.cso", gaussian_blur_cs.GetAddressOf());
+	use_compute_blur = compute_output_supported && gaussian_blur_cs.Get() != nullptr;
 
 	HRESULT hr{ S_OK };
 	D3D11_BUFFER_DESC buffer_desc{};
@@ -91,6 +100,38 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 	glow_extraction->Deactivate(immediate_context);
 	immediate_context->PSSetShaderResources(0, 1, &null_shader_resource_view);
 
+	if (use_compute_blur && gaussian_blur_cs && gaussian_blur[0][0]->GetUnorderedAccessView())
+	{
+		ID3D11ShaderResourceView* null_srv = nullptr;
+		ID3D11UnorderedAccessView* null_uav = nullptr;
+		ID3D11ShaderResourceView* null_ps_srvs[downsampled_count]{};
+		immediate_context->PSSetShaderResources(0, downsampled_count, null_ps_srvs);
+		immediate_context->CSSetShader(gaussian_blur_cs.Get(), nullptr, 0);
+		for (size_t level = 0; level < downsampled_count; ++level)
+		{
+			ID3D11ShaderResourceView* source = level == 0
+				? glow_extraction->GetColorMap()
+				: gaussian_blur[level - 1][0]->GetColorMap();
+			// The linear downsample stays in the pixel path. The horizontal and
+			// vertical Gaussian passes are fused into one tiled dispatch.
+			gaussian_blur[level][1]->Activate(immediate_context);
+			bit_block_transfer->Blit(immediate_context, &source, 0, 1, gaussian_blur_downsampling_ps.Get());
+			gaussian_blur[level][1]->Deactivate(immediate_context);
+			immediate_context->PSSetShaderResources(0, 1, &null_srv);
+
+			ID3D11ShaderResourceView* blur_input = gaussian_blur[level][1]->GetColorMap();
+			ID3D11UnorderedAccessView* blur_output = gaussian_blur[level][0]->GetUnorderedAccessView();
+			immediate_context->CSSetShaderResources(0, 1, &blur_input);
+			immediate_context->CSSetUnorderedAccessViews(0, 1, &blur_output, nullptr);
+			immediate_context->Dispatch((level_widths[level] + 7u) / 8u,
+				(level_heights[level] + 7u) / 8u, 1u);
+			immediate_context->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
+			immediate_context->CSSetShaderResources(0, 1, &null_srv);
+		}
+		immediate_context->CSSetShader(nullptr, nullptr, 0);
+	}
+	else
+	{
 	// Gaussian blur
 	// Efficient Gaussian blur with linear sampling
 	// http://rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
@@ -136,6 +177,7 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 		gaussian_blur[downsampled_index][0]->Deactivate(immediate_context);
 		immediate_context->PSSetShaderResources(0, 1, &null_shader_resource_view);
 	}
+	}
 
 	// Downsampling
 	glow_extraction->Clear(immediate_context, 0, 0, 0, 1);
@@ -163,8 +205,6 @@ void bloom::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVie
 
 
 	bloom_final->Deactivate(immediate_context);
-	// 最小サイズ(1x1)までのミップマップを生成
-	bloom_final->GenerateMips(immediate_context);
 	// Restore states
 	immediate_context->PSSetConstantBuffers(8, 1, cached_constant_buffer.GetAddressOf());
 

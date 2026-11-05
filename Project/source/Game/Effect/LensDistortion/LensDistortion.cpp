@@ -36,7 +36,7 @@ LensDistortion::LensDistortion(ID3D11Device* device,
 	distortion_buffer = std::make_unique<Framebuffer>(
 		device, width, height,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		false
+		1, false
 	);
 
 	create_ps_from_cso(device, "lens_distortion_ps.cso", distortion_ps.GetAddressOf());

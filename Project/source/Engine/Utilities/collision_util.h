@@ -716,7 +716,9 @@ public:
 		_triangles = &triangles;
 
 		size_t tri_count = triangles.size() / 3;
-		_cells.reserve(tri_count); // ざっくり予約
+		// The number of occupied cells is usually far smaller than the number
+		// of triangles. Reserving one bucket per triangle wastes memory here.
+		_cells.reserve((std::min)(tri_count, size_t{ 4096 }));
 
 		_visited_tokens.assign(tri_count, 0);
 		_query_token = 0;

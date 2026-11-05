@@ -493,6 +493,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\Scenes\scene.h" />
     <ClInclude Include="source\Game\Scenes\scene_base.h" />
     <ClInclude Include="source\Game\Scenes\scene_indoor.h" />
+    <ClInclude Include="source\Game\Effect\VoxelGI\VoxelGI.h" />
     <ClInclude Include="source\Game\Scenes\scene_title.h" />
     <ClInclude Include="source\Game\Scenes\scene_splash.h" />
     <ClInclude Include="source\Game\Scenes\loading.h" />
@@ -594,6 +595,7 @@ if exist export rmdir /s /q export</Command>
     </ClCompile>
     <ClCompile Include="source\Game\Effect\Vignetting\Vignetting.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_indoor.cpp" />
+    <ClCompile Include="source\Game\Effect\VoxelGI\VoxelGI.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_title.cpp" />
     <ClCompile Include="source\Game\Scenes\scene_splash.cpp" />
     <ClCompile Include="source\Game\Scenes\loading.cpp" />
@@ -698,6 +700,16 @@ if exist export rmdir /s /q export</Command>
       <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">
       </EnableDebuggingInformation>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\occlusion_box_vs.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|Win32'">Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\distance_fog_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
@@ -957,6 +969,16 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\bloom_blur_cs.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">5.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\gaussian_blur_downsampling_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Pixel</ShaderType>
@@ -1136,6 +1158,26 @@ if exist export rmdir /s /q export</Command>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">5.0</ShaderModel>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_vs.hlsl">
+      <ShaderType>Vertex</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_gs.hlsl">
+      <ShaderType>Geometry</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_slice_cs.hlsl">
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\voxel_gi_debug_ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

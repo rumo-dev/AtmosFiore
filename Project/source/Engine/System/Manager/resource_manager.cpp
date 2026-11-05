@@ -67,6 +67,15 @@ void Resource_Manager::load_shaders() {
 		"GLTF_VS",
 		"gltf_model_vs"
 	);
+	load_shader<Vertex_Shader>("VOXEL_GI_VS", "voxel_gi_vs");
+	load_shader<Geometry_Shader>("VOXEL_GI_GS", "voxel_gi_gs");
+	load_shader<Pixel_Shader>("VOXEL_GI_PS", "voxel_gi_ps");
+	load_shader<Compute_Shader>("VOXEL_GI_SLICE_CS", "voxel_gi_slice_cs");
+	load_shader<Pixel_Shader>("VOXEL_GI_DEBUG_PS", "voxel_gi_debug_ps");
+	load_shader<Vertex_Shader>(
+		"OCCLUSION_BOX_VS",
+		"occlusion_box_vs"
+	);
 	load_shader<Vertex_Shader>(
 		"POINT_SHADOW_VS",
 		"point_shadow_vs"
@@ -182,6 +191,7 @@ void Resource_Manager::load_shaders() {
 	// Register every shader referenced by a static CSO name in one place.
 	// File based loading remains inside ShaderManager and is cached by source file.
 	load_shader<Pixel_Shader>("BLOOM_FINAL_PS", "bloomfinal.cso");
+	load_shader<Compute_Shader>("BLOOM_BLUR_CS", "bloom_blur_cs.cso");
 	load_shader<Pixel_Shader>("CHROMATIC_ABERRATION_PS", "chromatic_aberration_ps.cso");
 	load_shader<Pixel_Shader>("DEBUG_PRIMITIVE_PS", "debug_primitive_ps.cso");
 	load_shader<Vertex_Shader>("DEBUG_PRIMITIVE_VS", "debug_primitive_vs.cso");

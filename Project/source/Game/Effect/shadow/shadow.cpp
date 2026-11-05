@@ -34,7 +34,7 @@ shadow::shadow(ID3D11Device* device, uint32_t width, uint32_t height)
 		width,
 		height,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		false
+		1, false
 	);
 }
 

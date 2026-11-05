@@ -5,7 +5,7 @@
 $safeitemrootname$::$safeitemrootname$(ID3D11Device* device, uint32_t width, uint32_t height)
 {
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
-	color_map = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, false);
+	color_map = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
 	HRESULT hr{ S_OK };
 	// 定数バッファの作成
 	D3D11_BUFFER_DESC cb_desc{};

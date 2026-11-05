@@ -9,7 +9,7 @@ ExponentialFog::ExponentialFog(ID3D11Device* device, uint32_t width, uint32_t he
 	TRACY_CPU_ZONE_C("ExponentialFog::ExponentialFog", TracyCategory::System);
 
 	blit_ = std::make_unique<FullscreenQuad>(device);
-	target_ = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, false);
+	target_ = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
 	create_ps_from_cso(device, "exponential_fog_ps.cso", ps_.GetAddressOf());
 	D3D11_BUFFER_DESC desc{};
 	desc.Usage = D3D11_USAGE_DEFAULT;

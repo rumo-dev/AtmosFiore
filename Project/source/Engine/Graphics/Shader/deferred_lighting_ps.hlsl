@@ -18,6 +18,58 @@ Texture2D<float> point_shadow_front_map : register(t4);
 Texture2D<float> point_shadow_back_map : register(t5);
 Texture2D<float> directional_shadow_map : register(t6);
 Texture2D<float4> ssao_texture : register(t7);
+Texture3D<float4> voxel_gi_radiance : register(t13);
+
+cbuffer VOXEL_GI_CONSTANTS : register(b8)
+{
+    float4 voxel_volume_min;
+    float4 voxel_inv_extent;
+    uint voxel_resolution;
+    uint voxel_slice;
+    float voxel_strength;
+    float voxel_emissive_multiplier;
+    float voxel_environment_fill;
+    float3 voxel_padding;
+};
+
+float3 trace_voxel_cone(float3 origin, float3 direction)
+{
+    float voxel_size = voxel_inv_extent.w;
+    float distance_along_cone = voxel_size * 1.5;
+    float4 accumulated = float4(0, 0, 0, 0);
+    [loop] for (uint step = 0; step < 10 && accumulated.a < 0.95; ++step)
+    {
+        float3 sample_position = origin + direction * distance_along_cone;
+        float3 uvw = (sample_position - voxel_volume_min.xyz) * voxel_inv_extent.xyz;
+        if (any(uvw < 0) || any(uvw >= 1)) break;
+        float diameter = max(voxel_size, distance_along_cone * 0.6);
+        float lod = max(0.0, log2(diameter / voxel_size));
+        float4 sample_value = voxel_gi_radiance.SampleLevel(
+            sampler_states[LINEAR_CLAMP], uvw, lod);
+        accumulated.rgb += (1 - accumulated.a) * sample_value.rgb;
+        accumulated.a += (1 - accumulated.a) * sample_value.a;
+        distance_along_cone += diameter * 0.75;
+    }
+    return accumulated.rgb;
+}
+
+float3 sample_voxel_gi(float3 position, float3 normal)
+{
+    float3 result = float3(0, 0, 0);
+    if (voxel_strength > 0 && dot(normal, normal) >= 0.5)
+    {
+        float3 tangent = normalize(cross(normal,
+            abs(normal.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0)));
+        float3 bitangent = cross(normal, tangent);
+        float3 origin = position + normal * voxel_inv_extent.w * 1.5;
+        result = trace_voxel_cone(origin, normal);
+        result += trace_voxel_cone(origin, normalize(normal + tangent));
+        result += trace_voxel_cone(origin, normalize(normal - tangent));
+        result += trace_voxel_cone(origin, normalize(normal + bitangent));
+        result += trace_voxel_cone(origin, normalize(normal - bitangent));
+    }
+    return result * (voxel_strength / 5.0);
+}
 
 //// ==========================================
 //// 3Dノイズ生成関数 (Value Noise & FBM)
@@ -379,6 +431,7 @@ float4 main(VS_OUT pin) : SV_TARGET
     }
 
     diffuse += ibl_radiance_lambertian(N, V, roughness, c_diff, f0);
+    diffuse += sample_voxel_gi(position, N) * c_diff;
     specular += ibl_radiance_ggx(N, V, roughness, f0);
 
     // Material AO and SSAO attenuate the accumulated lighting.

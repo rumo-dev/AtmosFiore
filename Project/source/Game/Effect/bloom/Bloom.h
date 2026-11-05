@@ -114,6 +114,7 @@ public:
 
 	/** @brief Bloom強度 */
 	float bloom_intensity = 0.673f;
+	bool use_compute_blur = true;
 	// Bloom.h の class bloom に追加
 public:
 	std::vector<CustomUI::ImageAsset> GetDebugAssets() {
@@ -183,6 +184,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> gaussian_blur_vertical_ps;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> gaussian_blur_upsampling_ps;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> bloom_final_ps;
+	Microsoft::WRL::ComPtr<ID3D11ComputeShader> gaussian_blur_cs;
+	uint32_t level_widths[downsampled_count]{};
+	uint32_t level_heights[downsampled_count]{};
 
 	/**
 	 * @brief 定数バッファ構造体
