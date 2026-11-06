@@ -3,7 +3,10 @@
 Texture3D<float4> source_voxels : register(t13);
 Texture3D<float4> source_albedo : register(t15);
 Texture3D<float4> source_normal : register(t16);
+Texture2D<float> directional_shadow_map : register(t7);
 #include "constants.hlsli"
+#include "samplers.hlsli"
+#include "shadow_directional.hlsli"
 #include "point_light.hlsli"
 #include "spot_light.hlsli"
 
@@ -43,6 +46,10 @@ cbuffer DDGI_CONSTANTS : register(b9)
     uint inject_lights;
     float light_multiplier;
     float2 ddgi_padding;
+    float4 voxel_min;
+    float4 voxel_inv_extent;
+    uint voxel_resolution;
+    float3 voxel_padding;
 };
 
 static const float3 axes[6] = {
@@ -65,9 +72,12 @@ float3 ray_direction(uint index, uint probe_index)
 
 float3 evaluate_lights(float3 position, float3 normal)
 {
+    float3 sun_direction = normalize(-directional_light_direction.xyz);
+    float sun_visibility = SampleDirectionalShadow(
+        directional_shadow_map, position, normal, sun_direction);
     float3 incident = directional_light_color.rgb *
         (directional_light_color.w / 683.0) *
-        saturate(dot(normal, normalize(-directional_light_direction.xyz)));
+        saturate(dot(normal, sun_direction)) * sun_visibility;
     [loop] for (uint i = 0; i < numPointLights; ++i)
     {
         PointLight_GPU light = pointLights[i];
@@ -125,8 +135,8 @@ float3 evaluate_lights(float3 position, float3 normal)
 void trace_voxel_ray(float3 origin, float3 direction, out float3 radiance,
     out float distance)
 {
-    float cell_size = inv_extent.w;
-    float max_distance = rcp(inv_extent.x) * 1.5;
+    float cell_size = voxel_inv_extent.w;
+    float max_distance = max(rcp(inv_extent.x), max(rcp(inv_extent.y), rcp(inv_extent.z))) * 1.5;
     float step_size = cell_size * 0.8;
     radiance = 0;
     distance = max_distance;
@@ -134,13 +144,20 @@ void trace_voxel_ray(float3 origin, float3 direction, out float3 radiance,
     {
         float travel = step * step_size;
         if (travel >= max_distance) break;
-        float3 uvw = (origin + direction * travel - volume_min.xyz) * inv_extent.xyz;
+        float3 uvw = (origin + direction * travel - voxel_min.xyz) * voxel_inv_extent.xyz;
         if (any(uvw < 0) || any(uvw >= 1)) break;
-        uint3 cell = min((uint3)(uvw * 64.0), 63u);
+        uint3 cell = min((uint3)(uvw * voxel_resolution), voxel_resolution - 1u);
         float4 sample_value = source_voxels.Load(int4(cell, 0));
         if (sample_value.a >= 0.5)
         {
-            radiance = max(sample_value.rgb, 0);
+            // Visibility uses the exact occupied cell. Gather radiance from
+            // its cone footprint so a nearby thin emitter can illuminate the
+            // wall hit by this ray, even when no ray hits the emitter cell.
+            float diameter = max(cell_size, travel * 0.75);
+            float lod = max(0.0, log2(diameter / cell_size));
+            float3 footprint_radiance = source_voxels.SampleLevel(
+                sampler_states[LINEAR_CLAMP], uvw, lod).rgb;
+            radiance = max(max(sample_value.rgb, footprint_radiance), 0.0);
             if (inject_lights != 0)
             {
                 float3 albedo = source_albedo.Load(int4(cell, 0)).rgb;
@@ -179,8 +196,9 @@ void main(uint3 id : SV_DispatchThreadID)
 
     float3 probe_position = volume_min.xyz +
         ((float3(id) + 0.5) / float3(probe_count)) / inv_extent.xyz;
-    float3 cell_coord = (probe_position - volume_min.xyz) * inv_extent.xyz;
-    float occupied = source_voxels.Load(int4((uint3)(cell_coord * 64.0), 0)).a;
+    float3 cell_coord = (probe_position - voxel_min.xyz) * voxel_inv_extent.xyz;
+    float occupied = all(cell_coord >= 0.0) && all(cell_coord < 1.0) ?
+        source_voxels.Load(int4(min((uint3)(cell_coord * voxel_resolution), voxel_resolution - 1u), 0)).a : 0.0;
     float3 sum_radiance[6];
     float3 sum_moments[6];
     [unroll] for (uint l = 0; l < 6; ++l)

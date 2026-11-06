@@ -38,7 +38,8 @@ cbuffer VOXEL_GI_CONSTANTS : register(b8)
     float strength;
     float emissive_multiplier;
     float environment_fill;
-    float3 padding;
+    uint emissive_only;
+    float2 padding;
 };
 
 RWTexture3D<float4> voxel_radiance : register(u0);
@@ -75,6 +76,14 @@ void main(VS_OUT input)
     }
     radiance += emissive * emissive_multiplier;
     uint3 cell = min((uint3)(p * resolution), resolution - 1);
+    // A later wall or trim triangle can share this voxel with a thin light
+    // strip. The second pass writes emitters last so they remain visible.
+    if (emissive_only != 0)
+    {
+        if (!any(emissive > 0.0f)) return;
+        voxel_radiance[cell] = float4(radiance, 1);
+        return;
+    }
     voxel_radiance[cell] = float4(radiance, 1);
     voxel_albedo[cell] = float4(albedo.rgb, 1);
     voxel_normal[cell] = float4(normalize(input.w_normal.xyz), 1);

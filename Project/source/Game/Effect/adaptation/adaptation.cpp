@@ -66,6 +66,7 @@ void Adaptation::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResour
 	cb_data.speed_to_light = speed_to_light;
 	cb_data.speed_to_dark = speed_to_dark;
 	cb_data.target_lum = target_lum;
+	cb_data.max_exposure = max_exposure;
 	immediate_context->UpdateSubresource(cb_adaptation.Get(), 0, 0, &cb_data, 0, 0);
 
 	// 2. Compute Shader での露出値更新

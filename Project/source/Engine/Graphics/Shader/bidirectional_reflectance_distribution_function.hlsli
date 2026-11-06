@@ -84,7 +84,7 @@ float3 ibl_radiance_lambertian(float3 N, float3 V, float roughness, float3 diffu
 
     return (fms_ems + k_d) * irradiance;
 }
-float3 ibl_radiance_ggx(float3 N, float3 V, float roughness, float3 f0)
+float3 ibl_radiance_ggx(float3 position, float3 N, float3 V, float roughness, float3 f0)
 {
     float NoV = clamp(dot(N, V), 0.0, 1.0);
 
@@ -92,7 +92,7 @@ float3 ibl_radiance_ggx(float3 N, float3 V, float roughness, float3 f0)
     float2 f_ab = sample_lut_ggx(brdf_sample_point).rg;
 
     float3 R = normalize(reflect(-V, N));
-    float3 specular_light = sample_specular_pmrem(R, roughness).rgb;
+    float3 specular_light = sample_specular_environment(position, R, roughness);
 
 	// see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
 	// Roughness dependent fresnel, from Fdez-Aguera

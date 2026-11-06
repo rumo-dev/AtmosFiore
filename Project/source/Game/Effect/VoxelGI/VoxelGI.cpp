@@ -5,9 +5,11 @@
 #include "Engine/System/render_state.h"
 #include "Engine/System/graphics_core.h"
 #include "Engine/Graphics/UI/ImGui/imgui.h"
+#include <DirectXPackedVector.h>
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 using Microsoft::WRL::ComPtr;
 
@@ -16,14 +18,32 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
 {
     if (!device || !model || !model->has_bbox) return false;
     baked_ = false;
-    bake_revision_ = 0;
     bake_settings_dirty_ = false;
     slice_dirty_ = true;
     device_ = device;
+    model_ = model;
+    world_ = world;
+    resolution_ = (std::clamp)(resolution_, 32u, 256u);
+    constants_.resolution = resolution_;
+    constants_.slice = (std::min)(constants_.slice, resolution_ - 1);
+    volume_.Reset();
+    volume_uav_.Reset();
+    volume_srv_.Reset();
+    albedo_volume_.Reset();
+    albedo_uav_.Reset();
+    albedo_srv_.Reset();
+    normal_volume_.Reset();
+    normal_uav_.Reset();
+    normal_srv_.Reset();
+    constants_buffer_.Reset();
+    slice_texture_.Reset();
+    slice_uav_.Reset();
+    slice_srv_.Reset();
 
     DirectX::XMFLOAT3 lower, upper;
     model->compute_instance_aabb(world, false, 0.0f,
-        Gltf_Model::animation_mode::single, 0, lower, upper);
+        Gltf_Model::animation_mode::single, 0, lower, upper,
+        bounds_root_name_.empty() ? nullptr : bounds_root_name_.c_str());
     const float x = upper.x - lower.x;
     const float y = upper.y - lower.y;
     const float z = upper.z - lower.z;
@@ -33,10 +53,15 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
     const float cy = (lower.y + upper.y) * 0.5f;
     const float cz = (lower.z + upper.z) * 0.5f;
     constants_.volume_min = { cx - half, cy - half, cz - half, 0 };
-    constants_.inv_extent = { 1 / extent, 1 / extent, 1 / extent, extent / Resolution };
+    constants_.inv_extent = { 1 / extent, 1 / extent, 1 / extent, extent / resolution_ };
+    constants_.slice = use_debug_slice_height_
+        ? (std::clamp)(static_cast<UINT>((std::clamp)(
+            (debug_slice_height_ - constants_.volume_min.y) / extent, 0.0f, 0.999f) * resolution_),
+            0u, resolution_ - 1)
+        : resolution_ / 2;
 
     D3D11_TEXTURE3D_DESC desc{};
-    desc.Width = desc.Height = desc.Depth = Resolution;
+    desc.Width = desc.Height = desc.Depth = resolution_;
     desc.MipLevels = 0;
     desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -48,7 +73,7 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
     uav_desc.Format = desc.Format;
     uav_desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE3D;
     uav_desc.Texture3D.MipSlice = 0;
-    uav_desc.Texture3D.WSize = Resolution;
+    uav_desc.Texture3D.WSize = resolution_;
     if (FAILED(device->CreateUnorderedAccessView(volume_.Get(), &uav_desc,
         volume_uav_.GetAddressOf()))) return false;
     if (FAILED(device->CreateShaderResourceView(volume_.Get(), nullptr,
@@ -77,7 +102,7 @@ bool VoxelGI::initialize(ID3D11Device* device, Gltf_Model* model,
     if (FAILED(device->CreateBuffer(&cb_desc, nullptr, constants_buffer_.GetAddressOf()))) return false;
 
     D3D11_TEXTURE2D_DESC slice_desc{};
-    slice_desc.Width = slice_desc.Height = Resolution;
+    slice_desc.Width = slice_desc.Height = resolution_;
     slice_desc.MipLevels = slice_desc.ArraySize = 1;
     slice_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     slice_desc.SampleDesc.Count = 1;
@@ -127,15 +152,23 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
     ID3D11UnorderedAccessView* uavs[3] = {
         volume_uav_.Get(), albedo_uav_.Get(), normal_uav_.Get() };
     ctx->OMSetRenderTargetsAndUnorderedAccessViews(0, nullptr, nullptr, 0, 3, uavs, nullptr);
-    D3D11_VIEWPORT viewport{ 0, 0, float(Resolution), float(Resolution), 0, 1 };
+    D3D11_VIEWPORT viewport{ 0, 0, float(resolution_), float(resolution_), 0, 1 };
     ctx->RSSetViewports(1, &viewport);
     Render_State::instance().set_rasterizer_state(ctx, Rasterizer_State::Cull_None_CCW);
     Render_State::instance().set_depth_stencil_state(ctx, Depth_State::Test_Disable_Write_Disable);
     Render_State::instance().set_blend_state(ctx, Blend_State::Opaque);
     ctx->GSSetShader(gs, nullptr, 0);
 
+    constants_.emissive_only = 0;
     model->render(ctx, world, pass_mode::voxel_gi, false, 0.0f,
         Gltf_Model::animation_mode::single, 0);
+
+    constants_.emissive_only = 1;
+    ctx->UpdateSubresource(constants_buffer_.Get(), 0, nullptr, &constants_, 0, 0);
+    model->render(ctx, world, pass_mode::voxel_gi, false, 0.0f,
+        Gltf_Model::animation_mode::single, 0);
+    constants_.emissive_only = 0;
+    ctx->UpdateSubresource(constants_buffer_.Get(), 0, nullptr, &constants_, 0, 0);
 
     ctx->GSSetShader(nullptr, nullptr, 0);
     ID3D11UnorderedAccessView* null_volume_uavs[3]{};
@@ -143,6 +176,47 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
         0, nullptr, nullptr, 0, 3, null_volume_uavs, nullptr);
     ctx->OMSetRenderTargets(1, old_rtv.GetAddressOf(), old_dsv.Get());
     if (viewport_count) ctx->RSSetViewports(1, &old_viewport);
+
+    // Resolve emissive surfaces into their cells explicitly. Thin strips can
+    // share a cell with a wall, where unordered pixel-shader UAV writes may
+    // otherwise leave the wall's dark value as the final result.
+    std::vector<Gltf_Model::emissive_sample> samples;
+    model->collect_emissive_surface_samples(world, constants_.inv_extent.w, samples);
+    std::unordered_map<UINT, DirectX::XMFLOAT3> emissive_cells;
+    for (const auto& sample : samples)
+    {
+        const float fx = (sample.position.x - constants_.volume_min.x) * constants_.inv_extent.x;
+        const float fy = (sample.position.y - constants_.volume_min.y) * constants_.inv_extent.y;
+        const float fz = (sample.position.z - constants_.volume_min.z) * constants_.inv_extent.z;
+        if (fx < 0.0f || fx >= 1.0f || fy < 0.0f || fy >= 1.0f || fz < 0.0f || fz >= 1.0f)
+            continue;
+        const UINT x = static_cast<UINT>(fx * resolution_);
+        const UINT y = static_cast<UINT>(fy * resolution_);
+        const UINT z = static_cast<UINT>(fz * resolution_);
+        const UINT index = x + resolution_ * (y + resolution_ * z);
+        auto& radiance = emissive_cells[index];
+        radiance.x = (std::max)(radiance.x, sample.radiance.x);
+        radiance.y = (std::max)(radiance.y, sample.radiance.y);
+        radiance.z = (std::max)(radiance.z, sample.radiance.z);
+    }
+    emissive_voxel_count_ = static_cast<unsigned int>(emissive_cells.size());
+    bright_emissive_voxel_count_ = 0;
+    for (const auto& [index, radiance] : emissive_cells)
+    {
+        if ((std::max)({ radiance.x, radiance.y, radiance.z }) >= 10.0f)
+            ++bright_emissive_voxel_count_;
+        const UINT x = index % resolution_;
+        const UINT y = (index / resolution_) % resolution_;
+        const UINT z = index / (resolution_ * resolution_);
+        const uint16_t texel[4] = {
+            DirectX::PackedVector::XMConvertFloatToHalf(radiance.x * constants_.emissive_multiplier),
+            DirectX::PackedVector::XMConvertFloatToHalf(radiance.y * constants_.emissive_multiplier),
+            DirectX::PackedVector::XMConvertFloatToHalf(radiance.z * constants_.emissive_multiplier),
+            DirectX::PackedVector::XMConvertFloatToHalf(1.0f)
+        };
+        const D3D11_BOX cell{ x, y, z, x + 1, y + 1, z + 1 };
+        ctx->UpdateSubresource(volume_.Get(), 0, &cell, texel, sizeof(texel), sizeof(texel));
+    }
     ctx->GenerateMips(volume_srv_.Get());
     baked_ = true;
     ++bake_revision_;
@@ -161,7 +235,7 @@ void VoxelGI::render(ID3D11DeviceContext* ctx, Gltf_Model* model,
             ctx->CSSetConstantBuffers(0, 1, &cb);
             ctx->CSSetShaderResources(0, 1, &srv);
             ctx->CSSetUnorderedAccessViews(0, 1, &slice_uav, nullptr);
-            ctx->Dispatch(Resolution / 8, Resolution / 8, 1);
+            ctx->Dispatch(resolution_ / 8, resolution_ / 8, 1);
             ID3D11UnorderedAccessView* null_uav = nullptr;
             ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
             ctx->CSSetShaderResources(0, 1, &null_srv);
@@ -212,6 +286,25 @@ void VoxelGI::draw_gui()
     if (!volume_srv_) return;
     if (!ImGui::CollapsingHeader("Voxel GI")) return;
     ImGui::Checkbox("Enabled##VoxelGI", &enabled_);
+    constexpr UINT resolution_values[] = { 32, 64, 128, 192, 256 };
+    const char* resolution_labels[] = { "32", "64", "128", "192", "256" };
+    int resolution_index = 0;
+    for (int i = 0; i < 5; ++i)
+        if (resolution_ == resolution_values[i]) resolution_index = i;
+    if (ImGui::Combo("Resolution##VoxelGI", &resolution_index, resolution_labels, 5))
+    {
+        const UINT next_resolution = resolution_values[resolution_index];
+        if (next_resolution != resolution_)
+        {
+            resolution_ = next_resolution;
+            if (!initialize(device_.Get(), model_, world_)) enabled_ = false;
+        }
+    }
+    ImGui::TextDisabled("Voxel size: %.2f m", constants_.inv_extent.w);
+    const float cells = static_cast<float>(resolution_) * resolution_ * resolution_;
+    ImGui::TextDisabled("Volume memory: ~%.0f MiB", cells * 8.0f * (2.0f + 8.0f / 7.0f) / (1024.0f * 1024.0f));
+    ImGui::TextDisabled("Emissive cells: %u", emissive_voxel_count_);
+    ImGui::TextDisabled("Bright strip cells: %u", bright_emissive_voxel_count_);
     ImGui::SliderFloat("Strength##VoxelGI", &constants_.strength, 0.0f, 2.0f);
     bake_settings_dirty_ |= ImGui::SliderFloat("Emissive multiplier##VoxelGI",
         &constants_.emissive_multiplier, 0.0f, 20.0f);
@@ -225,11 +318,14 @@ void VoxelGI::draw_gui()
     if (show_3d_)
         ImGui::TextDisabled("Shown on the main screen; follows the active camera");
     int selected_slice = static_cast<int>(constants_.slice);
-    if (ImGui::SliderInt("Y slice", &selected_slice, 0, Resolution - 1))
+    if (ImGui::SliderInt("Y slice", &selected_slice, 0, static_cast<int>(resolution_ - 1)))
     {
         constants_.slice = static_cast<UINT>(selected_slice);
         slice_dirty_ = true;
+        use_debug_slice_height_ = false;
     }
+    ImGui::TextDisabled("Slice height: %.2f m",
+        constants_.volume_min.y + (static_cast<float>(constants_.slice) + 0.5f) * constants_.inv_extent.w);
     if (show_slice_)
         ImGui::Image(reinterpret_cast<ImTextureID>(slice_srv_.Get()), ImVec2(256, 256));
 }

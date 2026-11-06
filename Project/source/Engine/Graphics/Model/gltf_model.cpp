@@ -158,7 +158,8 @@ void Gltf_Model::compute_instance_aabb(
 	animation_mode anim_mode,
 	int animation_index,
 	DirectX::XMFLOAT3& out_min,
-	DirectX::XMFLOAT3& out_max) const
+	DirectX::XMFLOAT3& out_max,
+	const char* bounds_root_name) const
 {
 	using namespace DirectX;
 
@@ -168,30 +169,108 @@ void Gltf_Model::compute_instance_aabb(
 		return;
 	}
 
-	XMMATRIX world_m = XMLoadFloat4x4(&world);
-
-	XMVECTOR corners[8] = {
-		XMVectorSet(bbox_min.x, bbox_min.y, bbox_min.z, 1.0f),
-		XMVectorSet(bbox_max.x, bbox_min.y, bbox_min.z, 1.0f),
-		XMVectorSet(bbox_min.x, bbox_max.y, bbox_min.z, 1.0f),
-		XMVectorSet(bbox_max.x, bbox_max.y, bbox_min.z, 1.0f),
-		XMVectorSet(bbox_min.x, bbox_min.y, bbox_max.z, 1.0f),
-		XMVectorSet(bbox_max.x, bbox_min.y, bbox_max.z, 1.0f),
-		XMVectorSet(bbox_min.x, bbox_max.y, bbox_max.z, 1.0f),
-		XMVectorSet(bbox_max.x, bbox_max.y, bbox_max.z, 1.0f),
-	};
-
-	XMVECTOR wmin = XMVectorSet(FLT_MAX, FLT_MAX, FLT_MAX, 1.0f);
-	XMVECTOR wmax = XMVectorSet(-FLT_MAX, -FLT_MAX, -FLT_MAX, 1.0f);
-
-	for (int i = 0; i < 8; ++i) {
-		XMVECTOR tv = XMVector3TransformCoord(corners[i], world_m);
-		wmin = XMVectorMin(wmin, tv);
-		wmax = XMVectorMax(wmax, tv);
+	const XMMATRIX world_m = XMLoadFloat4x4(&world);
+	XMVECTOR wmin = XMVectorReplicate(FLT_MAX);
+	XMVECTOR wmax = XMVectorReplicate(-FLT_MAX);
+	bool has_geometry = false;
+	std::vector<size_t> node_indices;
+	if (bounds_root_name)
+	{
+		for (size_t i = 0; i < nodes.size(); ++i)
+			if (nodes[i].name == bounds_root_name) { node_indices.push_back(i); break; }
+		for (size_t i = 0; i < node_indices.size(); ++i)
+			for (int child : nodes[node_indices[i]].children)
+				if (child >= 0 && static_cast<size_t>(child) < nodes.size())
+					node_indices.push_back(static_cast<size_t>(child));
 	}
+	if (node_indices.empty())
+		for (size_t i = 0; i < nodes.size(); ++i) node_indices.push_back(i);
+	for (size_t node_index : node_indices)
+	{
+		const auto& node = nodes[node_index];
+		if (node.mesh < 0 || static_cast<size_t>(node.mesh) >= meshes.size()) continue;
+		const XMMATRIX transform = XMLoadFloat4x4(&node.global_transform) * world_m;
+		for (const auto& primitive : meshes[node.mesh].primitives)
+		{
+			XMFLOAT3 local_min = primitive.meshlet_bounds_min;
+			XMFLOAT3 local_max = primitive.meshlet_bounds_max;
+			if (primitive.meshlets.empty() || local_min.x > local_max.x)
+			{
+				if (primitive.cpu_positions.empty()) continue;
+				local_min = { FLT_MAX, FLT_MAX, FLT_MAX };
+				local_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+				for (const auto& position : primitive.cpu_positions)
+				{
+					local_min.x = (std::min)(local_min.x, position.x);
+					local_min.y = (std::min)(local_min.y, position.y);
+					local_min.z = (std::min)(local_min.z, position.z);
+					local_max.x = (std::max)(local_max.x, position.x);
+					local_max.y = (std::max)(local_max.y, position.y);
+					local_max.z = (std::max)(local_max.z, position.z);
+				}
+			}
+			XMVECTOR primitive_min, primitive_max;
+			transform_bounds(local_min, local_max, transform, primitive_min, primitive_max);
+			wmin = XMVectorMin(wmin, primitive_min);
+			wmax = XMVectorMax(wmax, primitive_max);
+			has_geometry = true;
+		}
+	}
+	if (!has_geometry)
+		transform_bounds(bbox_min, bbox_max, world_m, wmin, wmax);
 
 	XMStoreFloat3(&out_min, wmin);
 	XMStoreFloat3(&out_max, wmax);
+}
+
+void Gltf_Model::collect_emissive_surface_samples(
+	const DirectX::XMFLOAT4X4& world, float voxel_size,
+	std::vector<emissive_sample>& out_samples) const
+{
+	using namespace DirectX;
+	const XMMATRIX instance_world = XMLoadFloat4x4(&world);
+	for (const auto& node : nodes)
+	{
+		if (node.mesh < 0 || static_cast<size_t>(node.mesh) >= meshes.size()) continue;
+		// The same bulb is exported at several LODs. Only the visible LOD0 is needed.
+		const size_t lod = node.name.find("_LOD");
+		if (lod != std::string::npos && node.name.compare(lod, 5, "_LOD0") != 0) continue;
+		const XMMATRIX transform = XMLoadFloat4x4(&node.global_transform) * instance_world;
+		for (const auto& primitive : meshes[node.mesh].primitives)
+		{
+			const auto& emissive = materials[primitive.material].data.emissive_factor;
+			if ((std::max)({ emissive[0], emissive[1], emissive[2] }) <= 0.0f ||
+				primitive.cpu_indices.empty() || primitive.cpu_positions.empty()) continue;
+			const bool strip = materials[primitive.material].name.rfind("EmissiveStripLight_", 0) == 0;
+			for (size_t i = 0; i + 2 < primitive.cpu_indices.size(); i += 3)
+			{
+				const uint32_t ia = primitive.cpu_indices[i];
+				const uint32_t ib = primitive.cpu_indices[i + 1];
+				const uint32_t ic = primitive.cpu_indices[i + 2];
+				if (ia >= primitive.cpu_positions.size() || ib >= primitive.cpu_positions.size() ||
+					ic >= primitive.cpu_positions.size()) continue;
+				const XMVECTOR a = XMVector3TransformCoord(XMLoadFloat3(&primitive.cpu_positions[ia]), transform);
+				const XMVECTOR b = XMVector3TransformCoord(XMLoadFloat3(&primitive.cpu_positions[ib]), transform);
+				const XMVECTOR c = XMVector3TransformCoord(XMLoadFloat3(&primitive.cpu_positions[ic]), transform);
+				const float ab = XMVectorGetX(XMVector3Length(b - a));
+				const float ac = XMVectorGetX(XMVector3Length(c - a));
+				const float bc = XMVectorGetX(XMVector3Length(c - b));
+				const int steps = strip ? (std::clamp)(
+					static_cast<int>(std::ceil((std::max)({ ab, ac, bc }) /
+						(std::max)(voxel_size * 0.5f, 0.01f))), 1, 32) : 1;
+				for (int u = 0; u <= steps; ++u)
+					for (int v = 0; v <= steps - u; ++v)
+					{
+						const float fu = static_cast<float>(u) / steps;
+						const float fv = static_cast<float>(v) / steps;
+						emissive_sample sample{};
+						XMStoreFloat3(&sample.position, a + (b - a) * fu + (c - a) * fv);
+						sample.radiance = { emissive[0], emissive[1], emissive[2] };
+						out_samples.push_back(sample);
+					}
+			}
+		}
+	}
 }
 
 Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : filename(filename)
@@ -680,6 +759,16 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 		material.data.emissive_factor[0] = static_cast<float>(gltf_material.emissiveFactor.at(0));
 		material.data.emissive_factor[1] = static_cast<float>(gltf_material.emissiveFactor.at(1));
 		material.data.emissive_factor[2] = static_cast<float>(gltf_material.emissiveFactor.at(2));
+		const auto emissive_extension = gltf_material.extensions.find("KHR_materials_emissive_strength");
+		if (emissive_extension != gltf_material.extensions.end() && emissive_extension->second.IsObject())
+		{
+			const auto& strength_value = emissive_extension->second.Get("emissiveStrength");
+			if (strength_value.IsNumber())
+			{
+				const float strength = static_cast<float>(strength_value.GetNumberAsDouble());
+				for (float& channel : material.data.emissive_factor) channel *= strength;
+			}
+		}
 
 		material.data.alpha_mode = gltf_material.alphaMode == "OPAQUE" ?
 			0 : gltf_material.alphaMode == "MASK" ? 1 : gltf_material.alphaMode == "BLEND" ? 2 : 0;
@@ -967,6 +1056,11 @@ void Gltf_Model::render_node(
 {
 	using namespace DirectX;
 	const node& node = current_nodes[node_index];
+	const size_t lod_marker = node.name.find("_LOD");
+	const bool duplicate_forward_lod =
+		(pass == pass_mode::forward_transparency || pass == pass_mode::forward_opaque) &&
+		lod_marker != std::string::npos && lod_marker + 4 < node.name.size() &&
+		node.name[lod_marker + 4] >= '1' && node.name[lod_marker + 4] <= '9';
 
 	if (node.skin > -1)
 	{
@@ -1015,7 +1109,7 @@ void Gltf_Model::render_node(
 		}
 	}
 
-	if (node.mesh > -1)
+	if (node.mesh > -1 && !duplicate_forward_lod)
 	{
 		const mesh& mesh = meshes[node.mesh];
 		for (const auto& primitive : mesh.primitives)

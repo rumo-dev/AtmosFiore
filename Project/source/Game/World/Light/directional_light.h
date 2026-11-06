@@ -65,6 +65,12 @@ private:
 	}
 
 public:
+	void set_time_of_day(float hours, bool animate)
+	{
+		time_of_day = std::clamp(hours, 0.0f, 24.0f);
+		auto_rotate = animate;
+		update_from_time();
+	}
 
 	void tick(float delta_time)
 	{

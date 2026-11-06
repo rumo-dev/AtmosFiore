@@ -7,6 +7,23 @@
 #include "Engine/Utilities/math_util.h"
 #include <algorithm>
 
+void DDGI::set_probe_bounds(DirectX::XMFLOAT3 minimum, DirectX::XMFLOAT3 maximum)
+{
+    minimum.x = (std::min)(minimum.x, maximum.x - 0.1f);
+    minimum.y = (std::min)(minimum.y, maximum.y - 0.1f);
+    minimum.z = (std::min)(minimum.z, maximum.z - 0.1f);
+    constants_.volume_min = { minimum.x, minimum.y, minimum.z, 0.0f };
+    constants_.inv_extent = {
+        1.0f / (maximum.x - minimum.x),
+        1.0f / (maximum.y - minimum.y),
+        1.0f / (maximum.z - minimum.z), 0.0f };
+    requested_min_[0] = minimum.x; requested_min_[1] = minimum.y; requested_min_[2] = minimum.z;
+    requested_max_[0] = maximum.x; requested_max_[1] = maximum.y; requested_max_[2] = maximum.z;
+    custom_bounds_ = true;
+    frame_ = 0;
+    has_data_ = false;
+}
+
 bool DDGI::initialize(ID3D11Device* device)
 {
     if (!device) return false;
@@ -89,8 +106,24 @@ void DDGI::update(ID3D11DeviceContext* ctx, const VoxelGI& source)
         source_revision_ = source.bake_revision();
         frame_ = 0;
     }
-    constants_.volume_min = source.volume_min();
-    constants_.inv_extent = source.inverse_extent();
+    constants_.voxel_min = source.volume_min();
+    constants_.voxel_inv_extent = source.inverse_extent();
+    constants_.voxel_resolution = source.resolution();
+    if (!custom_bounds_)
+    {
+        constants_.volume_min = constants_.voxel_min;
+        constants_.inv_extent = constants_.voxel_inv_extent;
+        requested_min_[0] = constants_.volume_min.x;
+        requested_min_[1] = constants_.volume_min.y;
+        requested_min_[2] = constants_.volume_min.z;
+        requested_max_[0] = constants_.volume_min.x + 1.0f / constants_.inv_extent.x;
+        requested_max_[1] = constants_.volume_min.y + 1.0f / constants_.inv_extent.y;
+        requested_max_[2] = constants_.volume_min.z + 1.0f / constants_.inv_extent.z;
+    }
+    const float sx = 1.0f / (constants_.inv_extent.x * constants_.count_x);
+    const float sy = 1.0f / (constants_.inv_extent.y * constants_.count_y);
+    const float sz = 1.0f / (constants_.inv_extent.z * constants_.count_z);
+    constants_.inv_extent.w = (std::max)({ sx, sy, sz });
     constants_.frame = frame_++;
     constants_.inject_lights = inject_lights_ ? 1u : 0u;
     ctx->UpdateSubresource(constants_buffer_.Get(), 0, nullptr, &constants_, 0, 0);
@@ -107,6 +140,8 @@ void DDGI::update(ID3D11DeviceContext* ctx, const VoxelGI& source)
         graphics.get_spot_light_manager().get_srv(),
         graphics.get_area_light_manager().get_srv()
     };
+    ID3D11ShaderResourceView* directional_shadow =
+        graphics.post_procss.GetShadow().get_directional_shadow_map();
     ID3D11Buffer* light_cb = graphics.get_constant_buffer(
         Graphics_Core::Conastant_Buffer_Type::Light);
     ID3D11Buffer* point_cb = graphics.get_point_light_manager().get_cb();
@@ -118,6 +153,7 @@ void DDGI::update(ID3D11DeviceContext* ctx, const VoxelGI& source)
     };
     const int next = 1 - current_;
     ID3D11UnorderedAccessView* output = probe_uav_[next].Get();
+    Render_State::instance().set_cs_sampler_state(ctx);
     ctx->CSSetShader(shader, nullptr, 0);
     ctx->CSSetConstantBuffers(2, 1, &light_cb);
     ctx->CSSetConstantBuffers(4, 1, &point_cb);
@@ -125,6 +161,7 @@ void DDGI::update(ID3D11DeviceContext* ctx, const VoxelGI& source)
     ctx->CSSetConstantBuffers(7, 1, &area_cb);
     ctx->CSSetConstantBuffers(9, 1, &cb);
     ctx->CSSetShaderResources(8, 3, lights);
+    ctx->CSSetShaderResources(7, 1, &directional_shadow);
     ctx->CSSetShaderResources(13, 4, inputs);
     ctx->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
     ctx->Dispatch(constants_.count_x, constants_.count_y, constants_.count_z);
@@ -133,6 +170,7 @@ void DDGI::update(ID3D11DeviceContext* ctx, const VoxelGI& source)
     ID3D11Buffer* null_cb = nullptr;
     ctx->CSSetUnorderedAccessViews(0, 1, &null_uav, nullptr);
     ctx->CSSetShaderResources(8, 3, null_inputs);
+    ctx->CSSetShaderResources(7, 1, null_inputs);
     ctx->CSSetShaderResources(13, 4, null_inputs);
     // Filter the finished raw field for lighting. The next update still reads
     // the unfiltered field, avoiding repeated blur through temporal history.
@@ -175,9 +213,7 @@ void DDGI::render_debug(ID3D11DeviceContext* ctx) const
     Render_State::instance().set_render_states(ctx,
         Depth_State::Test_Disable_Write_Disable,
         Blend_State::Alpha, Rasterizer_State::Wireframe_CCW);
-    const float extent = 1.0f / constants_.inv_extent.x;
-    const float spacing = extent / static_cast<float>((std::max)({
-        constants_.count_x, constants_.count_y, constants_.count_z }));
+    const float spacing = constants_.inv_extent.w;
     const float radius = (std::max)(0.025f, spacing * 0.12f);
     const Frustum frustum = ExtractFrustum(camera.view, camera.projection);
     for (unsigned int z = 0; z < constants_.count_z; ++z)
@@ -185,9 +221,9 @@ void DDGI::render_debug(ID3D11DeviceContext* ctx) const
     for (unsigned int x = 0; x < constants_.count_x; ++x)
     {
         const unsigned int index = x + constants_.count_x * (y + constants_.count_y * z);
-        const float px = constants_.volume_min.x + extent * (x + 0.5f) / constants_.count_x;
-        const float py = constants_.volume_min.y + extent * (y + 0.5f) / constants_.count_y;
-        const float pz = constants_.volume_min.z + extent * (z + 0.5f) / constants_.count_z;
+        const float px = constants_.volume_min.x + (x + 0.5f) / (constants_.count_x * constants_.inv_extent.x);
+        const float py = constants_.volume_min.y + (y + 0.5f) / (constants_.count_y * constants_.inv_extent.y);
+        const float pz = constants_.volume_min.z + (z + 0.5f) / (constants_.count_z * constants_.inv_extent.z);
         if (!SphereIntersectsFrustum(frustum,
             DirectX::XMVectorSet(px, py, pz, 1), radius)) continue;
         DirectX::XMFLOAT4X4 world{};
@@ -228,6 +264,12 @@ void DDGI::draw_gui()
     ImGui::SliderFloat("Voxel / probe blend##DDGI", &constants_.blend, 0.0f, 1.0f);
     ImGui::SliderFloat("Probe hysteresis##DDGI", &constants_.hysteresis, 0.0f, 0.98f);
     ImGui::Checkbox("Show probes in 3D##DDGI", &show_probes_);
+    ImGui::DragFloat3("Probe min XYZ##DDGI", requested_min_, 0.1f);
+    ImGui::DragFloat3("Probe max XYZ##DDGI", requested_max_, 0.1f);
+    if (ImGui::Button("Apply probe bounds##DDGI"))
+        set_probe_bounds({ requested_min_[0], requested_min_[1], requested_min_[2] },
+            { requested_max_[0], requested_max_[1], requested_max_[2] });
+    ImGui::TextDisabled("Probe spacing: %.2f m", constants_.inv_extent.w);
     ImGui::SliderInt3("Probe grid XYZ##DDGI", requested_counts_, 2, 12);
     if (ImGui::Button("Apply probe grid##DDGI"))
     {

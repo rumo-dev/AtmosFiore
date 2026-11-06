@@ -14,6 +14,7 @@ class DDGI
 public:
     static constexpr unsigned int DefaultGridSize = 8;
     bool initialize(ID3D11Device* device);
+    void set_probe_bounds(DirectX::XMFLOAT3 minimum, DirectX::XMFLOAT3 maximum);
     void update(ID3D11DeviceContext* context, const VoxelGI& source);
     void bind_lighting(ID3D11DeviceContext* context) const;
     bool bind_fog(ID3D11DeviceContext* context) const;
@@ -36,8 +37,12 @@ private:
         unsigned int inject_lights = 1;
         float light_multiplier = 1.0f;
         float padding[2]{};
+        DirectX::XMFLOAT4 voxel_min{};
+        DirectX::XMFLOAT4 voxel_inv_extent{};
+        unsigned int voxel_resolution = 64;
+        float voxel_padding[3]{};
     } constants_;
-    static_assert(sizeof(Constants) == 80, "DDGI shader constant layout changed");
+    static_assert(sizeof(Constants) == 128, "DDGI shader constant layout changed");
 
     bool create_probe_buffers();
 
@@ -58,5 +63,8 @@ private:
     bool inject_lights_ = true;
     bool grid_valid_ = false;
     int requested_counts_[3] = { 8, 8, 8 };
+    float requested_min_[3] = {};
+    float requested_max_[3] = {};
+    bool custom_bounds_ = false;
     std::unique_ptr<Debug_Sphere> debug_sphere_;
 };

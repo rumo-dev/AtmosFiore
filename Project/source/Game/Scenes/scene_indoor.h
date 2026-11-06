@@ -16,6 +16,7 @@
 #include "Game/Effect/VoxelGI/VoxelGI.h"
 #include "Game/Effect/DDGI/DDGI.h"
 #include "Game/World/Player/player.h"
+#include <array>
 
 // ゲームシーン
 class Scene_Indoor : public Scene_Base
@@ -50,6 +51,37 @@ public:
 	void draw_gui() override;
 
 private:
+	static constexpr unsigned int ReflectionProbeCount = 3;
+	struct ReflectionProbe
+	{
+		DirectX::XMFLOAT4 position{};
+		DirectX::XMFLOAT4 minimum{};
+		DirectX::XMFLOAT4 maximum{};
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
+		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
+		Microsoft::WRL::ComPtr<ID3D11RenderTargetView> faces[6];
+		bool dirty = true;
+		bool ready = false;
+		UINT next_face = 0;
+	};
+	struct ReflectionProbeConstants
+	{
+		DirectX::XMFLOAT4 positions[ReflectionProbeCount]{};
+		DirectX::XMFLOAT4 minima[ReflectionProbeCount]{};
+		DirectX::XMFLOAT4 maxima[ReflectionProbeCount]{};
+		DirectX::XMFLOAT4 settings{};
+	};
+	bool initialize_reflection_probes(ID3D11Device* device);
+	void capture_reflection_probe(ID3D11DeviceContext* context);
+	void bind_reflection_probes(ID3D11DeviceContext* context);
+	void draw_reflection_probe_gui();
+	std::array<ReflectionProbe, ReflectionProbeCount> _reflection_probes;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> _reflection_probe_depth;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> _reflection_probe_constants;
+	bool _reflection_probes_available = false;
+	bool _reflection_probes_enabled = true;
+	float _reflection_probe_edge_fade = 1.5f;
+	float _reflection_probe_strength = 0.65f;
 	enum class Sprite_Type
 	{
 		Default,
@@ -59,7 +91,7 @@ private:
 	std::unique_ptr<Gltf_Model> _gltf_model;
 	std::unique_ptr<VoxelGI> _voxel_gi;
 	std::unique_ptr<DDGI> _ddgi;
-	DirectX::XMFLOAT4X4 _library_world{};
+	DirectX::XMFLOAT4X4 _indoor_world{};
 	DirectionalLight _directional_light;
 
 	/// プレイヤー

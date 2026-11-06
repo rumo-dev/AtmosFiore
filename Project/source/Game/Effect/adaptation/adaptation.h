@@ -18,6 +18,8 @@ public:
 		float speed_to_light;  // 明るい場所への順応スピード（秒^-1）
 		float speed_to_dark;   // 暗い場所への順応スピード（秒^-1）
 		float target_lum;      // 目標輝度（基準値: 0.18 = 中間グレー）
+		float max_exposure;
+		float padding[3]{};
 	};
 
 	// 露出値のクランプ範囲定数
@@ -41,6 +43,7 @@ public:
 	float speed_to_light = 2.0f;
 	float speed_to_dark = 1.0f;
 	float target_lum = 0.18f;
+	float max_exposure = MAX_EXPOSURE;
 
 private:
 	std::unique_ptr<FullscreenQuad> bit_block_transfer;

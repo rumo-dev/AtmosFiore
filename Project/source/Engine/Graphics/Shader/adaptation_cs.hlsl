@@ -16,12 +16,13 @@ cbuffer AdaptationConfig : register(b0)
     float speed_to_light; // 明るい場所への順応スピード（秒^-1）
     float speed_to_dark; // 暗い場所への順応スピード（秒^-1）
     float target_lum; // 目標輝度（基準値: 0.18 = 中間グレー）
+    float max_exposure;
+    float3 padding;
 };
 
 // 定数定義
 static const float MIN_LUMINANCE = 0.001f; // ゼロ除算防止の最小輝度
 static const float MIN_EXPOSURE = 0.05f; // 露出の下限クランプ値
-static const float MAX_EXPOSURE = 10.0f; // 露出の上限クランプ値
 static const float EPSILON_TIME = 0.0001f; // デルタタイムの下限
 
 // BT.709 標準係数による輝度計算
@@ -49,10 +50,13 @@ void main()
     float current_lum = max(GetLuminance(avg_color), MIN_LUMINANCE);
 
     // 画面の明るさに対する理想的な露出値を計算
-    float target_exposure = target_lum / (current_lum * (1.0 - target_lum));
+    float exposure_limit = max(max_exposure, MIN_EXPOSURE);
+    float target_exposure = clamp(target_lum / (current_lum * (1.0 - target_lum)),
+        MIN_EXPOSURE, exposure_limit);
 
     // 前フレームの露出値を読み込む
-    float old_exposure = rw_exposure_texture[uint2(0, 0)];
+    float old_exposure = clamp(rw_exposure_texture[uint2(0, 0)],
+        MIN_EXPOSURE, exposure_limit);
 
     // 明暗の変化方向によって順応スピードを切り替える
     // 明るくなる場合は speed_to_light、暗くなる場合は speed_to_dark
@@ -65,8 +69,13 @@ void main()
     // 式: new = old + (target - old) * (1 - exp(-speed * dt))
     float new_exposure = old_exposure + (target_exposure - old_exposure) * (1.0f - exp(-speed * safe_delta_time));
 
+    // A large brightness jump should not leave the whole frame clipped while
+    // the camera turns from a dark room toward a bright opening.
+    if (target_exposure < old_exposure * 0.5f)
+        new_exposure = min(new_exposure, target_exposure * 1.35f);
+
     // 露出値を安全な範囲にクランプ
-    new_exposure = clamp(new_exposure, MIN_EXPOSURE, MAX_EXPOSURE);
+    new_exposure = clamp(new_exposure, MIN_EXPOSURE, exposure_limit);
 
     // 新しい露出値を保存
     rw_exposure_texture[uint2(0, 0)] = new_exposure;

@@ -80,6 +80,7 @@ private:
 	//ComPtr<ID3D11DepthStencilView> _depth_stencil_view;
 	D3D11_VIEWPORT _viewport = {};
 	DirectX::XMFLOAT4X4 _previous_view_projection{};
+	Camera_Constants _last_camera_constants{};
 	bool _has_previous_view_projection = false;
 
 	std::unique_ptr<Render_State>					_render_state;
@@ -241,6 +242,7 @@ public:
 	{
 		update_scene_constants(CameraManager::instance().get_active_camera()->get_camera());
 	}
+	void restore_camera_constants();
 
 	void set_directional_light(const dx::XMFLOAT4 ambient, const dx::XMFLOAT4& direction, const dx::XMFLOAT4& color)
 	{

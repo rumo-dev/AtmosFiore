@@ -23,6 +23,10 @@ cbuffer DDGI_CONSTANTS : register(b9)
     uint inject_lights;
     float light_multiplier;
     float2 ddgi_padding;
+    float4 voxel_min;
+    float4 voxel_inv_extent;
+    uint voxel_resolution;
+    float3 voxel_padding;
 };
 
 uint probe_index(uint3 cell)
@@ -39,11 +43,12 @@ float3 probe_position(uint3 cell)
 bool clear_between(float3 from, float3 to)
 {
     float distance = length(to - from);
-    uint steps = min(48u, max(2u, (uint)ceil(distance / (inv_extent.w * 0.75))));
+    uint steps = min(48u, max(2u, (uint)ceil(distance / (voxel_inv_extent.w * 0.75))));
     [loop] for (uint i = 1; i < steps; ++i)
     {
-        float3 uvw = (lerp(from, to, (float)i / steps) - volume_min.xyz) * inv_extent.xyz;
-        uint3 voxel = min((uint3)max(uvw * 64.0, 0.0), 63u);
+        float3 uvw = (lerp(from, to, (float)i / steps) - voxel_min.xyz) * voxel_inv_extent.xyz;
+        if (any(uvw < 0.0) || any(uvw >= 1.0)) continue;
+        uint3 voxel = min((uint3)(uvw * voxel_resolution), voxel_resolution - 1u);
         if (source_voxels.Load(int4(voxel, 0)).a >= 0.5) return false;
     }
     return true;

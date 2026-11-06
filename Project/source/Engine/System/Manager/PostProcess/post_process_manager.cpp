@@ -88,6 +88,20 @@ std::array<Post_Process_Manager::EffectId, 13> Post_Process_Manager::effect_orde
 };
 std::array<bool, 13> Post_Process_Manager::effect_enabled{};
 std::array<bool, 13> Post_Process_Manager::saved_effect_enabled{};
+std::string Post_Process_Manager::settings_path = "data/post_process_settings.json";
+bool Post_Process_Manager::UseSettingsFile(const std::string& path)
+{
+	if (path.empty()) return false;
+	const std::string previous = settings_path;
+	settings_path = path;
+	if (!Post_Process_Manager{}.loadPipelineSettings())
+	{
+		settings_path = previous;
+		return false;
+	}
+	ResetTemporalHistory();
+	return true;
+}
 void Post_Process_Manager::SetVolumetricFogEffectEnabled(bool enabled)
 {
 	effect_enabled[static_cast<size_t>(EffectId::VolumetricFog)] = enabled;
@@ -710,7 +724,8 @@ void Post_Process_Manager::drawPipelineGUI()
 		ssgi_constants.debug_view = static_cast<float>(ssgi_debug_view);
 	}
 	ImGui::TextDisabled("The order below is the execution order.");
-	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Saved to data/post_process_settings.json" : "Could not save settings.");
+	ImGui::TextDisabled("Preset: %s", settings_path.c_str());
+	if (ImGui::Button("Save Settings")) ImGui::SetTooltip(savePipelineSettings() ? "Settings saved." : "Could not save settings.");
 	ImGui::SameLine();
 	if (ImGui::Button("Load Settings")) ImGui::SetTooltip(loadPipelineSettings() ? "Settings loaded." : "Could not load settings.");
 	for (size_t i = 0; i < effect_order.size(); ++i) {
@@ -736,13 +751,15 @@ bool Post_Process_Manager::savePipelineSettings() const
 	for (bool enabled : effect_enabled) j["enabled"].push_back(enabled);
 	#define SAVE_PARAM(group, field, value) j[group][field] = value
 	SAVE_PARAM("bloom", "enabled", bloomer->is_bloom); SAVE_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); SAVE_PARAM("bloom", "intensity", bloomer->bloom_intensity);
-	SAVE_PARAM("adaptation", "target_lum", adaptation->target_lum); SAVE_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); SAVE_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
+	SAVE_PARAM("adaptation", "target_lum", adaptation->target_lum); SAVE_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); SAVE_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark); SAVE_PARAM("adaptation", "max_exposure", adaptation->max_exposure);
 	SAVE_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); SAVE_PARAM("tone_mapping", "mapping_type", static_cast<int>(tone_mapper->mapping_type)); SAVE_PARAM("tone_mapping", "exposure", tone_mapper->exposure); SAVE_PARAM("tone_mapping", "gamma", tone_mapper->gamma); SAVE_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); SAVE_PARAM("tone_mapping", "max_white", tone_mapper->max_white); SAVE_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); SAVE_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); SAVE_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); SAVE_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
 	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("dof", "blur_strength", dofer->blur_strength); SAVE_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); SAVE_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled);
 	SAVE_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); SAVE_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); SAVE_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
 	SAVE_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); SAVE_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); SAVE_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
 	SAVE_PARAM("vignetting", "enabled", vignetting->is_enabled); SAVE_PARAM("vignetting", "physical_link", vignetting->physical_link); SAVE_PARAM("vignetting", "intensity", vignetting->intensity); SAVE_PARAM("vignetting", "inner_radius", vignetting->inner_radius); SAVE_PARAM("vignetting", "outer_radius", vignetting->outer_radius); SAVE_PARAM("vignetting", "smoothness", vignetting->smoothness);
 	SAVE_PARAM("taa", "enabled", taa_enabled); SAVE_PARAM("taa", "history_weight", taa_history_weight);
+	SAVE_PARAM("ssao", "enabled", ssao_enabled); SAVE_PARAM("ssao", "radius", ssao_constants.radius); SAVE_PARAM("ssao", "bias", ssao_constants.bias); SAVE_PARAM("ssao", "intensity", ssao_constants.intensity); SAVE_PARAM("ssao", "contrast", ssao_constants.contrast); SAVE_PARAM("ssao", "spatial_sigma", ssao_constants.spatial_sigma); SAVE_PARAM("ssao", "position_sigma", ssao_constants.position_sigma);
+	SAVE_PARAM("ssr", "enabled", ssr_enabled); SAVE_PARAM("ssr", "max_distance", ssr_constants.max_distance); SAVE_PARAM("ssr", "surface_thickness", ssr_constants.surface_thickness); SAVE_PARAM("ssr", "reflection_strength", ssr_constants.reflection_strength); SAVE_PARAM("ssr", "roughness_cutoff", ssr_constants.roughness_cutoff); SAVE_PARAM("ssr", "metallic_cutoff", ssr_constants.metallic_cutoff); SAVE_PARAM("ssr", "max_steps", ssr_constants.max_steps);
 	SAVE_PARAM("ssgi", "enabled", ssgi_enabled); SAVE_PARAM("ssgi", "radius", ssgi_constants.radius); SAVE_PARAM("ssgi", "intensity", ssgi_constants.intensity); SAVE_PARAM("ssgi", "thickness", ssgi_constants.thickness);
 	SAVE_PARAM("volumetric_fog", "enabled", vol_fog->config.is_enabled); SAVE_PARAM("volumetric_fog", "density", vol_fog->config.density_base); SAVE_PARAM("volumetric_fog", "scattering", vol_fog->config.scattering); SAVE_PARAM("volumetric_fog", "absorption", vol_fog->config.absorption); SAVE_PARAM("volumetric_fog", "anisotropy", vol_fog->config.anisotropy); SAVE_PARAM("volumetric_fog", "noise_scale", vol_fog->config.noise_scale); SAVE_PARAM("volumetric_fog", "intensity", vol_fog->config.intensity); SAVE_PARAM("volumetric_fog", "fog_near", vol_fog->config.fog_near); SAVE_PARAM("volumetric_fog", "fog_far", vol_fog->config.fog_far);
 	SAVE_PARAM("volumetric_fog", "grid_width", vol_fog->config.grid_width); SAVE_PARAM("volumetric_fog", "grid_height", vol_fog->config.grid_height); SAVE_PARAM("volumetric_fog", "grid_depth", vol_fog->config.grid_depth);
@@ -751,7 +768,7 @@ bool Post_Process_Manager::savePipelineSettings() const
 	SAVE_PARAM("distance_fog", "enabled", dst_fog->config.is_enabled); SAVE_PARAM("distance_fog", "start", dst_fog->config.fog_start); SAVE_PARAM("distance_fog", "end", dst_fog->config.fog_end); SAVE_PARAM("distance_fog", "density", dst_fog->config.density); SAVE_PARAM("distance_fog", "intensity", dst_fog->config.intensity); SAVE_PARAM("distance_fog", "color", json::array({dst_fog->config.fog_color[0], dst_fog->config.fog_color[1], dst_fog->config.fog_color[2]}));
 	SAVE_PARAM("exponential_fog", "enabled", exp_fog->config.is_enabled); SAVE_PARAM("exponential_fog", "density", exp_fog->config.density); SAVE_PARAM("exponential_fog", "intensity", exp_fog->config.intensity); SAVE_PARAM("exponential_fog", "mode", exp_fog->config.mode); SAVE_PARAM("exponential_fog", "color", json::array({exp_fog->config.fog_color[0], exp_fog->config.fog_color[1], exp_fog->config.fog_color[2]}));
 	#undef SAVE_PARAM
-	std::ofstream file("data/post_process_settings.json");
+	std::ofstream file(settings_path);
 	if (!file) return false;
 	file << j.dump(2);
 	return file.good();
@@ -760,7 +777,7 @@ bool Post_Process_Manager::savePipelineSettings() const
 bool Post_Process_Manager::loadPipelineSettings()
 {
 	using nlohmann::json;
-	std::ifstream file("data/post_process_settings.json");
+	std::ifstream file(settings_path);
 	if (!file) return false;
 	json j;
 	try { file >> j; } catch (...) { return false; }
@@ -804,7 +821,9 @@ bool Post_Process_Manager::loadPipelineSettings()
 	}
 	#define LOAD_PARAM(group, field, target) do { if (j.contains(group) && j[group].is_object()) target = j[group].value(field, target); } while (false)
 	LOAD_PARAM("bloom", "enabled", bloomer->is_bloom); LOAD_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); LOAD_PARAM("bloom", "intensity", bloomer->bloom_intensity);
-	LOAD_PARAM("adaptation", "target_lum", adaptation->target_lum); LOAD_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); LOAD_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark);
+	adaptation->max_exposure = Adaptation::MAX_EXPOSURE;
+	LOAD_PARAM("adaptation", "target_lum", adaptation->target_lum); LOAD_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); LOAD_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark); LOAD_PARAM("adaptation", "max_exposure", adaptation->max_exposure);
+	adaptation->max_exposure = std::clamp(adaptation->max_exposure, 0.05f, 10.0f);
 	LOAD_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); { int type = static_cast<int>(tone_mapper->mapping_type); LOAD_PARAM("tone_mapping", "mapping_type", type); if (type >= 0 && type < 34) tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(type); } LOAD_PARAM("tone_mapping", "exposure", tone_mapper->exposure); LOAD_PARAM("tone_mapping", "gamma", tone_mapper->gamma); LOAD_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); LOAD_PARAM("tone_mapping", "max_white", tone_mapper->max_white); LOAD_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); LOAD_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); LOAD_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); LOAD_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
 	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("dof", "blur_strength", dofer->blur_strength); LOAD_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); LOAD_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled);
 	dofer->blur_strength = std::clamp(dofer->blur_strength, 0.0f, 4.0f);
@@ -819,6 +838,8 @@ bool Post_Process_Manager::loadPipelineSettings()
 		taa_history_weight = std::clamp(taa_history_weight, 0.5f, 0.97f);
 		if (was_enabled != taa_enabled) ResetTemporalHistory();
 	}
+	LOAD_PARAM("ssao", "enabled", ssao_enabled); LOAD_PARAM("ssao", "radius", ssao_constants.radius); LOAD_PARAM("ssao", "bias", ssao_constants.bias); LOAD_PARAM("ssao", "intensity", ssao_constants.intensity); LOAD_PARAM("ssao", "contrast", ssao_constants.contrast); LOAD_PARAM("ssao", "spatial_sigma", ssao_constants.spatial_sigma); LOAD_PARAM("ssao", "position_sigma", ssao_constants.position_sigma);
+	LOAD_PARAM("ssr", "enabled", ssr_enabled); LOAD_PARAM("ssr", "max_distance", ssr_constants.max_distance); LOAD_PARAM("ssr", "surface_thickness", ssr_constants.surface_thickness); LOAD_PARAM("ssr", "reflection_strength", ssr_constants.reflection_strength); LOAD_PARAM("ssr", "roughness_cutoff", ssr_constants.roughness_cutoff); LOAD_PARAM("ssr", "metallic_cutoff", ssr_constants.metallic_cutoff); LOAD_PARAM("ssr", "max_steps", ssr_constants.max_steps);
 	LOAD_PARAM("ssgi", "enabled", ssgi_enabled); LOAD_PARAM("ssgi", "radius", ssgi_constants.radius); LOAD_PARAM("ssgi", "intensity", ssgi_constants.intensity); LOAD_PARAM("ssgi", "thickness", ssgi_constants.thickness);
 	ssgi_constants.radius = std::clamp(ssgi_constants.radius, 0.25f, 8.0f);
 	ssgi_constants.intensity = std::clamp(ssgi_constants.intensity, 0.0f, 2.0f);
@@ -959,8 +980,9 @@ void Post_Process_Manager::drawAdaptationGUI()
 
 	ImGui::BeginChild("##adapt_left", ImVec2(left_w, 0), false);
 	SliderFloatWithTooltip("Target Lum", &adaptation->target_lum, 0.0f, 1.0f, "Target luminance for adaptation");
-	SliderFloatWithTooltip("Speed to Light", &adaptation->speed_to_light, 0.0f, 10.0f, "Speed of adaptation to lighter scenes");
-	SliderFloatWithTooltip("Speed to Dark", &adaptation->speed_to_dark, 0.0f, 10.0f, "Speed of adaptation to darker scenes");
+	SliderFloatWithTooltip("Exposure increase", &adaptation->speed_to_light, 0.0f, 10.0f, "Response when the scene becomes darker");
+	SliderFloatWithTooltip("Exposure decrease", &adaptation->speed_to_dark, 0.0f, 10.0f, "Response when the scene becomes brighter");
+	SliderFloatWithTooltip("Maximum exposure", &adaptation->max_exposure, 0.05f, 10.0f, "Limits overexposure after turning toward bright areas");
 	ImGui::EndChild();
 
 	ImGui::SameLine();

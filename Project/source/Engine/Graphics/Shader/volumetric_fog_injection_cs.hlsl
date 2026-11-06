@@ -118,12 +118,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
         float noise_val = saturate(lerp(0.4, 1.6, fbm(noise_pos)));
         density *= noise_val;
     }
-    float3 voxel_uvw = (cur_pos - ddgi_volume_min.xyz) * ddgi_inv_extent.xyz;
+    float3 voxel_uvw = (cur_pos - ddgi_voxel_min.xyz) * ddgi_voxel_inv_extent.xyz;
     bool inside_gi = gi_available > 0.5 &&
         all(voxel_uvw >= 0.0) && all(voxel_uvw < 1.0);
     if (inside_gi)
     {
-        uint3 voxel = min((uint3)(voxel_uvw * 64.0), 63u);
+        uint3 voxel = min((uint3)(voxel_uvw * ddgi_voxel_resolution), ddgi_voxel_resolution - 1u);
         if (fog_voxels.Load(int4(voxel, 0)).a >= 0.5) density = 0.0;
     }
 

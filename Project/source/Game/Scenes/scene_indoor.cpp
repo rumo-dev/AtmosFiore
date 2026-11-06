@@ -15,6 +15,7 @@
 
 #include "Game/World/camera/camera_manager.h"
 #include <string>
+#include <algorithm>
 #include "Engine/Utilities/color_Util.h"
 
 // Tracy Profiler Utility Header (Tracy.hpp や D3D11マクロ、カテゴリ定義が含まれます)
@@ -27,73 +28,130 @@ void Scene_Indoor::initialize()
 	log_printf("ゲームシーン初期化開始\n", LogLevel::Info);
 	ID3D11Device* device = Graphics_Core::instance().get_device();
 
-	// スポットライトの追加
-	for (int i = 0; i < 10; i++) {
-		float x = Random::Range(-10.0f, 10.0f);
-		float z = Random::Range(-10.0f, 10.0f);
-		float y = Random::Range(3.0f, 7.0f);
-		float r = Random::Range(5.0f, 15.0f);
-		float intensity = Random::Range(25000.0f, 75000.0f); // cd
-		float innerAngle = Random::Range(0.1f, 0.5f);
-		float outerAngle = Random::Range(0.4f, 0.8f);
-		dx::XMFLOAT3 direction = { Random::Range(-1.0f, 1.0f), Random::Range(-1.0f, -0.5f), Random::Range(-1.0f, 1.0f) };
-		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f);
-		Graphics_Core::instance().get_spot_light_manager().add_light({ x, y, z }, direction, r, intensity, innerAngle, outerAngle, diffuseColor);
-	}
+	// Indoor.gltf の座標は cm 相当。Room 2 をプレイヤーの周囲に置く。
+	constexpr float source_to_meters = 0.01f;
+	constexpr float room_offset_x = -30.0f;
+	auto& graphics = Graphics_Core::instance();
+	graphics.post_procss.UseSettingsFile("data/post_process_indoor.json");
 
-	// ポイントライトの追加
-	for (int i = 0; i < 16; i++) {
-		float x = Random::Range(-10.0f, 10.0f);
-		float z = Random::Range(-10.0f, 10.0f);
-		float y = Random::Range(3.0f, 7.0f);
-		float r = 5.0f;
-		float intensity = 10000.0f; // cd
-		dx::XMFLOAT4 diffuseColor = Color_Utils::random_hsv(1.0f, 1.0f, 1.0f);
-		Graphics_Core::instance().get_point_light_manager().add_light({ x, y, z }, r, intensity, diffuseColor);
-	}
-	Graphics_Core::instance().get_area_light_manager().add_light();
+	// 天井の開口部から午後の日光を入れる。方向光のシャドウが屋根と梁を遮蔽する。
+	_directional_light.illuminance_lux = 80000.0f;
+	_directional_light.ambientColor = { 0.04f, 0.04f, 0.04f, 1.0f };
+	_directional_light.set_time_of_day(14.0f, false);
 
-	// ライブラリモデルの登録
-	ModelInstance library;
-	library.model_key = "Library";
-	library.world_transform = make_world_matrix(
-		CoordinateSystem::RH_Y_UP,
-		{ 1,1,1 },
-		{ 0,3.5f,0 },
-		{ 0,0,0 },
-		1.0f);
-	library.is_animation = false;
-	library.animation_index = 12;
-	library.animation_time = 0.f;
-	library.loop_animation = true;
-	library.animation_speed = 0.01f;
-	library.anim_mode = Gltf_Model::animation_mode::all;
-
+	// インドアモデルの登録
 	auto& mgr = Resource_Manager::instance();
-	mgr.add_model_instance("Library", library);
-	_library_world = library.world_transform;
+	Gltf_Model* indoor_model = mgr.load_model("Indoor", "./data/model/Indoor/Indoor.gltf");
+	ModelInstance indoor;
+	indoor.model_key = "Indoor";
+	indoor.world_transform = make_world_matrix(
+		CoordinateSystem::RH_Y_UP,
+		{ 1.0f, 1.0f, 1.0f },
+		{ 0.0f, 0.0f, 0.0f },
+		{ room_offset_x, 0.0f, 0.0f }, source_to_meters);
+	indoor.is_animation = false;
+	indoor.disable_frustum_culling = true; // ノードが広範囲に分布するモデル
+	mgr.add_model_instance("Indoor", indoor);
+	_indoor_world = indoor.world_transform;
+	if (indoor_model)
+	{
+		auto& spots = graphics.get_spot_light_manager();
+		auto& points = graphics.get_point_light_manager();
+		const dx::XMFLOAT4 warm_white = { 1.0f, 0.88f, 0.72f, 1.0f };
+		const dx::XMFLOAT4 neutral_white = { 1.0f, 0.96f, 0.88f, 1.0f };
+		const dx::XMMATRIX scene_world = dx::XMLoadFloat4x4(&_indoor_world);
+		int normal_hotspots = 0;
+		int bulb_hotspots = 0;
+		for (const auto& node : indoor_model->nodes)
+		{
+			const std::string& name = node.name;
+			const bool is_spot = name.rfind("Light_Spot_", 0) == 0;
+			const bool is_point = name.rfind("Light_Point_", 0) == 0;
+			if (!is_spot && !is_point) continue;
+
+			// ノードの親子変換とモデルの RH→LH 変換を両方適用する。
+			const dx::XMMATRIX fixture_world =
+				dx::XMLoadFloat4x4(&node.global_transform) * scene_world;
+			dx::XMFLOAT3 position;
+			dx::XMStoreFloat3(&position, dx::XMVector3TransformCoord(
+				dx::XMVectorZero(), fixture_world));
+			if (is_spot)
+			{
+				SpotLight light;
+				light.position = position;
+				dx::XMStoreFloat3(&light.direction, dx::XMVector3Normalize(
+					dx::XMVector3TransformNormal(dx::XMVectorSet(0, -1, 0, 0), fixture_world)));
+				const bool floor_spot = name.rfind("Light_Spot_800lm", 0) == 0;
+				const bool large_spot = name.rfind("Light_Spot_3200lm", 0) == 0;
+				light.radius = large_spot ? 8.0f : (floor_spot ? 5.0f : 6.0f);
+				light.intensity = large_spot ? 12000.0f : (floor_spot ? 5000.0f :
+					name.rfind("Light_Spot_1600lm", 0) == 0 ? 8000.0f : 6000.0f);
+				light.innerAngle = floor_spot ? 0.30f : 0.38f;
+				light.outerAngle = floor_spot ? 0.55f : 0.65f;
+				light.diffuseColor = floor_spot ? warm_white : neutral_white;
+				spots.add_light(light);
+			}
+			else
+			{
+				PointLight light;
+				light.position = position;
+				const bool small_hotspot = name.rfind("Light_Point_Hotspot_Small", 0) == 0;
+				const bool bulb = name.rfind("Light_Point_Bulb", 0) == 0;
+				light.radius = small_hotspot ? 3.0f : (bulb ? 5.0f : 6.0f);
+				light.intensity = small_hotspot ? 800.0f : (bulb ? 4000.0f : 8000.0f);
+				light.diffuseColor = small_hotspot || bulb ? warm_white : neutral_white;
+				// 影はモデル内のポイント光だけに割り当てる。アトラスの上限は 16 灯。
+				light.cast_shadows = bulb ? bulb_hotspots++ == 0 :
+					!small_hotspot && normal_hotspots++ % 3 == 0 && normal_hotspots <= 24;
+				points.add_light(light);
+			}
+		}
+	}
 	_voxel_gi = std::make_unique<VoxelGI>();
-	if (!_voxel_gi->initialize(device, mgr.get_model("Library"), _library_world))
+	_voxel_gi->set_bounds_root("Structure");
+	_voxel_gi->set_debug_slice_height(5.2f);
+	_voxel_gi->set_resolution(192);
+	_voxel_gi->set_emissive_multiplier(2.0f);
+	_voxel_gi->set_strength(0.8f);
+	if (!_voxel_gi->initialize(device, indoor_model, _indoor_world))
 		_voxel_gi.reset();
 	if (_voxel_gi)
 	{
 		_ddgi = std::make_unique<DDGI>();
+		_ddgi->set_probe_bounds({ 20.0f, 0.0f, -8.0f }, { 36.0f, 10.0f, 7.0f });
 		if (!_ddgi->initialize(device)) _ddgi.reset();
 	}
 
 	IBL::Initialize(device, L"./data/ibl");
+	_reflection_probes_available = initialize_reflection_probes(device);
+	if (!_reflection_probes_available) _reflection_probes_enabled = false;
 
 	// すべてのカメラの生成と登録
 	HWND hwnd = Graphics_Core::instance().get_window_handle();
 	auto& camera_mgr = CameraManager::instance();
 
-	camera_mgr.register_camera("Spectator", std::make_shared<SpectatorCamera>(hwnd));
-	camera_mgr.register_camera("ThirdPerson", std::make_shared<ThirdPersonCamera>(hwnd));
-	camera_mgr.register_camera("FirstPerson", std::make_shared<FirstPersonCamera>(hwnd));
+	auto indoor_camera = [](const std::shared_ptr<ICamera>& camera)
+	{
+		auto& lens = camera->get_camera();
+		lens.FocalLength = 35.0f;
+		lens.SensorSize = 36.0f;
+		lens.near_z = 0.08f;
+		lens.far_z = 250.0f;
+		lens.FNumber = 8.0f;
+		lens.FocusDist = 6.0f;
+		lens.shutterDenominator = 60.0f;
+		lens.ISO = 400.0f;
+		lens.EV_Compensation = 0.0f;
+		lens.autoSettingsEnabled = false;
+		return camera;
+	};
+	camera_mgr.register_camera("Spectator", indoor_camera(std::make_shared<SpectatorCamera>(hwnd)));
+	camera_mgr.register_camera("ThirdPerson", indoor_camera(std::make_shared<ThirdPersonCamera>(hwnd)));
+	camera_mgr.register_camera("FirstPerson", indoor_camera(std::make_shared<FirstPersonCamera>(hwnd)));
 
 	dx::XMVECTOR target_pos = dx::XMVectorSet(0.0f, 3.5f, 0.0f, 1.0f);
-	camera_mgr.register_camera("Orbit", std::make_shared<OrbitCamera>(hwnd, target_pos));
-	camera_mgr.register_camera("QuarterView", std::make_shared<QuarterViewCamera>(target_pos));
+	camera_mgr.register_camera("Orbit", indoor_camera(std::make_shared<OrbitCamera>(hwnd, target_pos)));
+	camera_mgr.register_camera("QuarterView", indoor_camera(std::make_shared<QuarterViewCamera>(target_pos)));
 
 	auto cinematic_cam = std::make_shared<CinematicCamera>();
 	cinematic_cam->add_way_point(dx::XMVectorSet(-10.0f, 5.0f, -15.0f, 1.0f), target_pos);
@@ -101,13 +159,13 @@ void Scene_Indoor::initialize()
 	cinematic_cam->add_way_point(dx::XMVectorSet(0.0f, 8.0f, -8.0f, 1.0f), target_pos);
 	cinematic_cam->add_way_point(dx::XMVectorSet(5.0f, 4.0f, -10.0f, 1.0f), target_pos);
 	cinematic_cam->add_way_point(dx::XMVectorSet(10.0f, 5.0f, -15.0f, 1.0f), target_pos);
-	camera_mgr.register_camera("Cinematic", cinematic_cam);
+	camera_mgr.register_camera("Cinematic", indoor_camera(cinematic_cam));
 
 	camera_mgr.switch_camera("ThirdPerson");
 
 	_player.initialize(hwnd, dx::XMVectorSet(0.0f, 3.0f, 0.0f, 1.0f));
 	_player.setup_spotlight();
-	_player.setup_collision("Library", library.world_transform);
+	_player.setup_collision("Indoor", indoor.world_transform);
 	_player.setup_model_instance("Player");
 
 	log_printf("ゲームシーン初期化終了\n", LogLevel::Info);
@@ -115,15 +173,22 @@ void Scene_Indoor::initialize()
 
 // 終了化
 void Scene_Indoor::finalize() {
+	Graphics_Core::instance().post_procss.UseSettingsFile("data/post_process_settings.json");
+	ID3D11DeviceContext* context = Graphics_Core::instance().get_device_context();
+	ID3D11ShaderResourceView* null_probe_srvs[ReflectionProbeCount]{};
+	ID3D11Buffer* null_probe_buffer = nullptr;
+	context->PSSetShaderResources(36, ReflectionProbeCount, null_probe_srvs);
+	context->PSSetConstantBuffers(10, 1, &null_probe_buffer);
 	ID3D11ShaderResourceView* null_gi_srvs[2]{};
 	ID3D11Buffer* null_gi_buffers[2]{};
-	auto* context = Graphics_Core::instance().get_device_context();
 	context->PSSetShaderResources(13, 2, null_gi_srvs);
 	context->PSSetConstantBuffers(8, 2, null_gi_buffers);
 	_ddgi.reset();
 	_voxel_gi.reset();
 	Graphics_Core::instance().get_point_light_manager().clear_light();
 	Graphics_Core::instance().get_spot_light_manager().clear_light();
+	Graphics_Core::instance().get_area_light_manager().clear_light();
+	Resource_Manager::instance().remove_model_instance("Indoor");
 	log_printf("ゲームシーン終了\n", LogLevel::Info);
 }
 
@@ -209,9 +274,10 @@ void Scene_Indoor::render(float elapsedTime)
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Scene Indoor");
 		render_shadowmap(elapsedTime);
 		Graphics_Core::instance().update_constants();
+		capture_reflection_probe(immediate_context);
 		if (_voxel_gi)
 			_voxel_gi->render(immediate_context,
-				Resource_Manager::instance().get_model("Library"), _library_world);
+				Resource_Manager::instance().get_model("Indoor"), _indoor_world);
 		if (_ddgi && _voxel_gi) _ddgi->update(immediate_context, *_voxel_gi);
 		render_defferd(elapsedTime);
 
@@ -306,6 +372,7 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 		immediate_context->PSSetShaderResources(14, 1, &null_srv);
 		immediate_context->PSSetConstantBuffers(9, 1, &null_buffer);
 	}
+	bind_reflection_probes(immediate_context);
 }
 
 // 3. 前方描画（フォワード・不透明/半透明）
@@ -326,7 +393,7 @@ void Scene_Indoor::render_forward(float elapsedTime) {
 	Graphics_Core::instance().clear(Color_Utils::from_hex("#291F32"));
 
 	Graphics_Core::instance().post_procss.begin();
-	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_Back_CW, Depth_State::Test_Enable_Write_Disable);
+	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_None_CW, Depth_State::Test_Enable_Write_Disable);
 
 	Resource_Manager::instance().render_models(pass_mode::forward_transparency);
 	render_debug(elapsedTime);
@@ -396,4 +463,231 @@ void Scene_Indoor::draw_gui() {
 	_player.draw_imgui();
 	if (_voxel_gi) _voxel_gi->draw_gui();
 	if (_ddgi) _ddgi->draw_gui();
+	draw_reflection_probe_gui();
+}
+
+bool Scene_Indoor::initialize_reflection_probes(ID3D11Device* device)
+{
+	constexpr UINT size = 128;
+	const DirectX::XMFLOAT4 positions[ReflectionProbeCount] = {
+		{ -30.0f, 3.0f, 0.0f, 1.0f },
+		{ 0.0f, 3.0f, 0.0f, 1.0f },
+		{ 27.0f, 3.0f, 0.0f, 1.0f }
+	};
+	const DirectX::XMFLOAT4 minima[ReflectionProbeCount] = {
+		{ -47.0f, -0.5f, -16.0f, 0.0f },
+		{ -15.0f, -0.5f, -16.0f, 0.0f },
+		{ 18.0f, -0.5f, -16.0f, 0.0f }
+	};
+	const DirectX::XMFLOAT4 maxima[ReflectionProbeCount] = {
+		{ -15.0f, 13.0f, 16.0f, 0.0f },
+		{ 18.0f, 13.0f, 16.0f, 0.0f },
+		{ 36.0f, 13.0f, 16.0f, 0.0f }
+	};
+	D3D11_TEXTURE2D_DESC desc{};
+	desc.Width = desc.Height = size;
+	desc.MipLevels = 0;
+	desc.ArraySize = 6;
+	desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
+	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	desc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE | D3D11_RESOURCE_MISC_GENERATE_MIPS;
+	for (unsigned int i = 0; i < ReflectionProbeCount; ++i)
+	{
+		auto& probe = _reflection_probes[i];
+		probe.position = positions[i];
+		probe.minimum = minima[i];
+		probe.maximum = maxima[i];
+		if (FAILED(device->CreateTexture2D(&desc, nullptr, probe.texture.GetAddressOf()))) return false;
+		D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+		srv_desc.Format = desc.Format;
+		srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+		srv_desc.TextureCube.MipLevels = UINT(-1);
+		if (FAILED(device->CreateShaderResourceView(probe.texture.Get(), &srv_desc,
+			probe.srv.GetAddressOf()))) return false;
+		for (UINT face = 0; face < 6; ++face)
+		{
+			D3D11_RENDER_TARGET_VIEW_DESC rtv_desc{};
+			rtv_desc.Format = desc.Format;
+			rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+			rtv_desc.Texture2DArray.ArraySize = 1;
+			rtv_desc.Texture2DArray.FirstArraySlice = face;
+			if (FAILED(device->CreateRenderTargetView(probe.texture.Get(), &rtv_desc,
+				probe.faces[face].GetAddressOf()))) return false;
+		}
+	}
+	D3D11_TEXTURE2D_DESC depth_desc{};
+	depth_desc.Width = depth_desc.Height = size;
+	depth_desc.MipLevels = depth_desc.ArraySize = 1;
+	depth_desc.Format = DXGI_FORMAT_D32_FLOAT;
+	depth_desc.SampleDesc.Count = 1;
+	depth_desc.Usage = D3D11_USAGE_DEFAULT;
+	depth_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> depth;
+	if (FAILED(device->CreateTexture2D(&depth_desc, nullptr, depth.GetAddressOf()))) return false;
+	if (FAILED(device->CreateDepthStencilView(depth.Get(), nullptr,
+		_reflection_probe_depth.GetAddressOf()))) return false;
+	D3D11_BUFFER_DESC cb_desc{};
+	cb_desc.ByteWidth = sizeof(ReflectionProbeConstants);
+	cb_desc.Usage = D3D11_USAGE_DEFAULT;
+	cb_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	return SUCCEEDED(device->CreateBuffer(&cb_desc, nullptr,
+		_reflection_probe_constants.GetAddressOf()));
+}
+
+void Scene_Indoor::capture_reflection_probe(ID3D11DeviceContext* context)
+{
+	if (!_reflection_probes_available || !_reflection_probes_enabled ||
+		!_reflection_probe_constants) return;
+	Gltf_Model* model = Resource_Manager::instance().get_model("Indoor");
+	if (!model) return;
+	for (auto& probe : _reflection_probes)
+	{
+		if (!probe.dirty) continue;
+		if (probe.next_face == 0) probe.ready = false;
+		ID3D11ShaderResourceView* null_srvs[ReflectionProbeCount]{};
+		context->PSSetShaderResources(36, ReflectionProbeCount, null_srvs);
+		ReflectionProbeConstants disabled{};
+		context->UpdateSubresource(_reflection_probe_constants.Get(), 0, nullptr, &disabled, 0, 0);
+		ID3D11Buffer* probe_cb = _reflection_probe_constants.Get();
+		context->PSSetConstantBuffers(10, 1, &probe_cb);
+
+		Microsoft::WRL::ComPtr<ID3D11RenderTargetView> old_rtv;
+		Microsoft::WRL::ComPtr<ID3D11DepthStencilView> old_dsv;
+		context->OMGetRenderTargets(1, old_rtv.GetAddressOf(), old_dsv.GetAddressOf());
+		UINT viewport_count = 1;
+		D3D11_VIEWPORT old_viewport{};
+		context->RSGetViewports(&viewport_count, &old_viewport);
+		D3D11_VIEWPORT viewport{ 0, 0, 128.0f, 128.0f, 0, 1 };
+		context->RSSetViewports(1, &viewport);
+		ID3D11Buffer* camera_cb = Graphics_Core::instance().get_constant_buffer(
+			Graphics_Core::Conastant_Buffer_Type::Camera);
+		const DirectX::XMVECTOR eye = DirectX::XMLoadFloat4(&probe.position);
+		const DirectX::XMVECTOR directions[6] = {
+			DirectX::XMVectorSet(1, 0, 0, 0), DirectX::XMVectorSet(-1, 0, 0, 0),
+			DirectX::XMVectorSet(0, 1, 0, 0), DirectX::XMVectorSet(0, -1, 0, 0),
+			DirectX::XMVectorSet(0, 0, 1, 0), DirectX::XMVectorSet(0, 0, -1, 0)
+		};
+		const DirectX::XMVECTOR up[6] = {
+			DirectX::XMVectorSet(0, 1, 0, 0), DirectX::XMVectorSet(0, 1, 0, 0),
+			DirectX::XMVectorSet(0, 0, -1, 0), DirectX::XMVectorSet(0, 0, 1, 0),
+			DirectX::XMVectorSet(0, 1, 0, 0), DirectX::XMVectorSet(0, 1, 0, 0)
+		};
+		const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
+			DirectX::XM_PIDIV2, 1.0f, 0.05f, 120.0f);
+		const float clear_color[4] = { 0.025f, 0.03f, 0.04f, 1.0f };
+		for (UINT face = probe.next_face; face < probe.next_face + 1; ++face)
+		{
+			ID3D11RenderTargetView* rtv = probe.faces[face].Get();
+			context->OMSetRenderTargets(1, &rtv, _reflection_probe_depth.Get());
+			context->ClearRenderTargetView(rtv, clear_color);
+			context->ClearDepthStencilView(_reflection_probe_depth.Get(),
+				D3D11_CLEAR_DEPTH, 1.0f, 0);
+			const DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(
+				eye, DirectX::XMVectorAdd(eye, directions[face]), up[face]);
+			const DirectX::XMMATRIX vp = view * projection;
+			Camera_Constants camera{};
+			camera.camera_position = probe.position;
+			DirectX::XMStoreFloat4x4(&camera.view, view);
+			DirectX::XMStoreFloat4x4(&camera.projection, projection);
+			DirectX::XMStoreFloat4x4(&camera.view_projection, vp);
+			camera.previous_view_projection = camera.view_projection;
+			DirectX::XMStoreFloat4x4(&camera.inv_view, DirectX::XMMatrixInverse(nullptr, view));
+			DirectX::XMStoreFloat4x4(&camera.inv_projection, DirectX::XMMatrixInverse(nullptr, projection));
+			DirectX::XMStoreFloat4x4(&camera.inv_view_projection, DirectX::XMMatrixInverse(nullptr, vp));
+			camera.light_view_projection = Graphics_Core::instance().post_procss.GetShadow().light_view_projection;
+			camera.near_z = 0.05f;
+			camera.far_z = 120.0f;
+			context->UpdateSubresource(camera_cb, 0, nullptr, &camera, 0, 0);
+			context->VSSetConstantBuffers(1, 1, &camera_cb);
+			context->PSSetConstantBuffers(1, 1, &camera_cb);
+			Render_State::instance().set_render_states(context,
+				Depth_State::Test_Enable_Write_Enable, Blend_State::Opaque,
+				Rasterizer_State::Cull_None_CCW);
+			model->render(context, _indoor_world, pass_mode::forward_opaque,
+				false, 0.0f, Gltf_Model::animation_mode::single, 0);
+			Render_State::instance().set_render_states(context,
+				Depth_State::Test_Enable_Write_Disable, Blend_State::Alpha,
+				Rasterizer_State::Cull_None_CCW);
+			model->render(context, _indoor_world, pass_mode::forward_transparency,
+				false, 0.0f, Gltf_Model::animation_mode::single, 0);
+		}
+		context->OMSetRenderTargets(0, nullptr, nullptr);
+		if (++probe.next_face == 6)
+		{
+			context->GenerateMips(probe.srv.Get());
+			probe.next_face = 0;
+			probe.ready = true;
+			probe.dirty = false;
+		}
+		context->OMSetRenderTargets(1, old_rtv.GetAddressOf(), old_dsv.Get());
+		if (viewport_count) context->RSSetViewports(1, &old_viewport);
+		Graphics_Core::instance().restore_camera_constants();
+		break; // Capture one cube face per frame to avoid a frame-time spike.
+	}
+}
+
+void Scene_Indoor::bind_reflection_probes(ID3D11DeviceContext* context)
+{
+	ReflectionProbeConstants data{};
+	ID3D11ShaderResourceView* srvs[ReflectionProbeCount]{};
+	for (unsigned int i = 0; i < ReflectionProbeCount; ++i)
+	{
+		const auto& probe = _reflection_probes[i];
+		if (!_reflection_probes_available || !_reflection_probes_enabled || !probe.ready) break;
+		data.positions[i] = probe.position;
+		data.minima[i] = probe.minimum;
+		data.maxima[i] = probe.maximum;
+		srvs[i] = probe.srv.Get();
+		data.settings.x += 1.0f;
+	}
+	data.settings.y = _reflection_probe_edge_fade;
+	data.settings.z = _reflection_probe_strength;
+	ID3D11Buffer* cb = _reflection_probe_constants.Get();
+	if (cb) context->UpdateSubresource(cb, 0, nullptr, &data, 0, 0);
+	context->PSSetConstantBuffers(10, 1, &cb);
+	context->PSSetShaderResources(36, ReflectionProbeCount, srvs);
+}
+
+void Scene_Indoor::draw_reflection_probe_gui()
+{
+	if (!ImGui::CollapsingHeader("Reflection Probes")) return;
+	if (!_reflection_probes_available)
+	{
+		ImGui::TextDisabled("Probe allocation failed");
+		return;
+	}
+	ImGui::Checkbox("Enabled##ReflectionProbes", &_reflection_probes_enabled);
+	ImGui::DragFloat("Edge fade (m)##ReflectionProbes", &_reflection_probe_edge_fade,
+		0.1f, 0.1f, 10.0f);
+	ImGui::SliderFloat("Strength##ReflectionProbes", &_reflection_probe_strength,
+		0.0f, 1.0f);
+	if (ImGui::Button("Recapture all##ReflectionProbes"))
+		for (auto& probe : _reflection_probes)
+		{
+			probe.dirty = true;
+			probe.next_face = 0;
+		}
+	for (unsigned int i = 0; i < ReflectionProbeCount; ++i)
+	{
+		auto& probe = _reflection_probes[i];
+		ImGui::PushID(static_cast<int>(i));
+		ImGui::Separator();
+		ImGui::Text("Probe %u: %s (%u/6 faces)", i + 1,
+			probe.dirty ? "capture pending" : "ready", probe.dirty ? probe.next_face : 6);
+		if (ImGui::DragFloat3("Position", &probe.position.x, 0.1f))
+		{
+			probe.dirty = true;
+			probe.next_face = 0;
+		}
+		ImGui::DragFloat3("Box min", &probe.minimum.x, 0.1f);
+		ImGui::DragFloat3("Box max", &probe.maximum.x, 0.1f);
+		if (ImGui::Button("Recapture"))
+		{
+			probe.dirty = true;
+			probe.next_face = 0;
+		}
+		ImGui::PopID();
+	}
 }

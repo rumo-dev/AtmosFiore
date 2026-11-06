@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <string>
 #include <DirectXMath.h>
 #include "Engine/Graphics/FrameBuffer/frame_buffer.h"
 #include "Engine/Graphics/DLSS/dlss_manager.h"
@@ -69,6 +70,7 @@ public:
 	static void SetTAAEnabled(bool enabled);
 	static bool IsTAAEnabled() { return taa_enabled; }
 	static void ResetTemporalHistory();
+	static bool UseSettingsFile(const std::string& path);
 	// Returns the current Halton jitter in NDC and advances the sequence once per frame.
 	static DirectX::XMFLOAT2 GetTAAJitterNdc();
 	static void SetDLSSRenderResolution(UINT width, UINT height);
@@ -108,6 +110,7 @@ public:
 	void drawDOFGUI();
 
 private:
+	static std::string settings_path;
 	enum class EffectId { Sky, Bloom, Adaptation, VolumetricFog, HeightFog, DistanceFog, ExponentialFog, DoF, Exposure, ChromaticAberration, LensDistortion, Vignetting, ToneMapping };
 	static std::array<EffectId, 13> effect_order;
 	static std::array<bool, 13> effect_enabled;

@@ -1,0 +1,168 @@
+{
+  "adaptation": {
+    "target_lum": 0.17,
+    "speed_to_light": 1.25,
+    "speed_to_dark": 5,
+    "max_exposure": 2
+  },
+  "bloom": {
+    "enabled": 1,
+    "threshold": 1.5,
+    "intensity": 0.22
+  },
+  "chromatic_aberration": {
+    "enabled": false,
+    "intensity": 0.1,
+    "physical_link": false
+  },
+  "distance_fog": {
+    "color": [
+      0.699999988079071,
+      0.800000011920929,
+      0.8999999761581421
+    ],
+    "density": 0.5,
+    "enabled": 0,
+    "end": 80,
+    "intensity": 0.15,
+    "start": 15
+  },
+  "dof": {
+    "enabled": 0,
+    "blur_strength": 0.5,
+    "debug_threshold_px": 1,
+    "show_range_overlay": false
+  },
+  "enabled": [
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+  ],
+  "exponential_fog": {
+    "color": [
+      0.699999988079071,
+      0.800000011920929,
+      0.8999999761581421
+    ],
+    "density": 0.001,
+    "enabled": 0,
+    "intensity": 0.1,
+    "mode": 1
+  },
+  "exposure": {
+    "enabled": false
+  },
+  "height_fog": {
+    "base_height": 0,
+    "color": [
+      0.699999988079071,
+      0.800000011920929,
+      0.8999999761581421
+    ],
+    "density": 0.15,
+    "enabled": 0,
+    "falloff": 1.5490000247955322,
+    "intensity": 0.01,
+    "noise_scale": 0.6305000185966492,
+    "noise_strength": 2.7850000858306885,
+    "wind_velocity": [
+      0.4729999899864197,
+      0,
+      0
+    ]
+  },
+  "lens_distortion": {
+    "enabled": false,
+    "scale": 0.15,
+    "physical_link": false
+  },
+  "order": [
+    0,
+    3,
+    4,
+    5,
+    6,
+    7,
+    2,
+    1,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "ssgi": {
+    "enabled": false,
+    "radius": 2,
+    "intensity": 0.15,
+    "thickness": 0.2
+  },
+  "tone_mapping": {
+    "enabled": 1,
+    "exposure": 1,
+    "gamma": 2.2,
+    "gt_param": 0.2199999988079071,
+    "linear_angle": 0.10000000149011612,
+    "linear_strength": 0.30000001192092896,
+    "mapping_type": 0,
+    "max_white": 10,
+    "shoulder": 0.2199999988079071,
+    "toe_strength": 0.20000000298023224
+  },
+  "version": 1,
+  "taa": {
+    "enabled": true,
+    "history_weight": 0.84
+  },
+  "vignetting": {
+    "enabled": false,
+    "intensity": 0.15,
+    "inner_radius": 0.45,
+    "outer_radius": 0.9,
+    "smoothness": 1.5,
+    "physical_link": false
+  },
+  "volumetric_fog": {
+    "absorption": 0.008,
+    "anisotropy": 0.55,
+    "density": 0.005,
+    "enabled": 1,
+    "fog_far": 30,
+    "fog_near": 0.2,
+    "grid_depth": 96,
+    "grid_height": 54,
+    "grid_width": 96,
+    "intensity": 0.35,
+    "noise_scale": 0,
+    "scattering": 0.55,
+    "gi_scattering": 0.2
+  },
+  "ssao": {
+    "enabled": true,
+    "radius": 0.45,
+    "bias": 0.02,
+    "intensity": 0.6,
+    "contrast": 1,
+    "spatial_sigma": 3,
+    "position_sigma": 8
+  },
+  "ssr": {
+    "enabled": false,
+    "max_distance": 16,
+    "surface_thickness": 0.2,
+    "reflection_strength": 0.5,
+    "roughness_cutoff": 0.45,
+    "metallic_cutoff": 0.03,
+    "max_steps": 40
+  }
+}

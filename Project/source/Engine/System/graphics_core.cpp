@@ -343,6 +343,7 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 	data.ISO = camera.ISO;
 	data.EV_Compensation = camera.EV_Compensation;
 	data.isReserved = static_cast<int>(camera.isReversed_Z);
+	_last_camera_constants = data;
 
 	{
 		TRACY_CPU_ZONE_N("Graphics_Core::update_scene_constants::UpdateCameraCB");
@@ -363,4 +364,13 @@ void Graphics_Core::update_scene_constants(Camera& camera)
 		_immediate_context->VSSetConstantBuffers(2, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].GetAddressOf());
 		_immediate_context->PSSetConstantBuffers(2, 1, _constant_buffers[static_cast<int>(Conastant_Buffer_Type::Light)].GetAddressOf());
 	}
+}
+
+void Graphics_Core::restore_camera_constants()
+{
+	ID3D11Buffer* buffer = get_constant_buffer(Conastant_Buffer_Type::Camera);
+	_immediate_context->UpdateSubresource(buffer, 0, nullptr, &_last_camera_constants, 0, 0);
+	_immediate_context->VSSetConstantBuffers(1, 1, &buffer);
+	_immediate_context->PSSetConstantBuffers(1, 1, &buffer);
+	_immediate_context->CSSetConstantBuffers(1, 1, &buffer);
 }

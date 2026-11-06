@@ -308,8 +308,17 @@ public:
 		animation_mode anim_mode,
 		int animation_index,
 		DirectX::XMFLOAT3& out_min,
-		DirectX::XMFLOAT3& out_max
+		DirectX::XMFLOAT3& out_max,
+		const char* bounds_root_name = nullptr
 	) const;
+	struct emissive_sample
+	{
+		DirectX::XMFLOAT3 position;
+		DirectX::XMFLOAT3 radiance;
+	};
+	void collect_emissive_surface_samples(
+		const DirectX::XMFLOAT4X4& world, float voxel_size,
+		std::vector<emissive_sample>& out_samples) const;
 
 	void extract_collision_triangles(
 		const DirectX::XMFLOAT4X4& world_matrix,

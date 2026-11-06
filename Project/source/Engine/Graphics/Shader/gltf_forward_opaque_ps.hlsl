@@ -175,7 +175,7 @@ float4 main(VS_OUT pin, bool is_front_face : SV_IsFrontFace) : SV_TARGET
 
 	// UNIT.39
     diffuse += ibl_radiance_lambertian(N, V, roughness_factor, c_diff, f0);
-    specular += ibl_radiance_ggx(N, V, roughness_factor, f0);
+    specular += ibl_radiance_ggx(pin.w_position.xyz, N, V, roughness_factor, f0);
 
 
     float3 emissive = emissive_factor;

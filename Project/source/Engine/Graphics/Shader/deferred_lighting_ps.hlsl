@@ -38,12 +38,13 @@ float3 trace_voxel_cone(float3 origin, float3 direction)
     float voxel_size = voxel_inv_extent.w;
     float distance_along_cone = voxel_size * 1.5;
     float4 accumulated = float4(0, 0, 0, 0);
-    [loop] for (uint step = 0; step < 10 && accumulated.a < 0.95; ++step)
+    [loop] for (uint step = 0; step < 12 && accumulated.a < 0.95; ++step)
     {
         float3 sample_position = origin + direction * distance_along_cone;
         float3 uvw = (sample_position - voxel_volume_min.xyz) * voxel_inv_extent.xyz;
         if (any(uvw < 0) || any(uvw >= 1)) break;
-        float diameter = max(voxel_size, distance_along_cone * 0.6);
+        // A wider footprint preserves thin emissive strips in the mip chain.
+        float diameter = max(voxel_size, distance_along_cone * 0.9);
         float lod = max(0.0, log2(diameter / voxel_size));
         float4 sample_value = voxel_gi_radiance.SampleLevel(
             sampler_states[LINEAR_CLAMP], uvw, lod);
@@ -68,8 +69,12 @@ float3 sample_voxel_gi(float3 position, float3 normal)
         result += trace_voxel_cone(origin, normalize(normal - tangent));
         result += trace_voxel_cone(origin, normalize(normal + bitangent));
         result += trace_voxel_cone(origin, normalize(normal - bitangent));
+        result += trace_voxel_cone(origin, normalize(normal + tangent + bitangent));
+        result += trace_voxel_cone(origin, normalize(normal + tangent - bitangent));
+        result += trace_voxel_cone(origin, normalize(normal - tangent + bitangent));
+        result += trace_voxel_cone(origin, normalize(normal - tangent - bitangent));
     }
-    return result * (voxel_strength / 5.0);
+    return result * (voxel_strength / 9.0);
 }
 
 //// ==========================================
@@ -435,9 +440,11 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 voxel_indirect = sample_voxel_gi(position, N);
     float4 probe_indirect = sample_ddgi(position, N);
     float probe_weight = probe_indirect.a * saturate(ddgi_blend);
-    diffuse += lerp(voxel_indirect, probe_indirect.rgb * ddgi_strength,
-        probe_weight) * c_diff;
-    specular += ibl_radiance_ggx(N, V, roughness, f0);
+    // Sparse probes can miss thin emitters. Keep the voxel contribution when
+    // a probe has less radiance, while still accepting brighter probe bounce.
+    float3 probe_radiance = probe_indirect.rgb * ddgi_strength;
+    diffuse += (voxel_indirect + probe_weight * max(probe_radiance - voxel_indirect, 0.0)) * c_diff;
+    specular += ibl_radiance_ggx(position, N, V, roughness, f0);
 
     // Material AO and SSAO attenuate the accumulated lighting.
     float ssao = ssao_texture.SampleLevel(sampler_states[POINT_CLAMP], pin.texcoord, 0).r;
