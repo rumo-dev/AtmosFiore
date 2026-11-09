@@ -8,7 +8,8 @@
 cbuffer ExposureConstants : register(b9)
 {
     int IsEnabled; // 有効フラグ
-    float3 pad;
+    float ReferenceEV100;
+    float2 pad;
 }
 
 Texture2D ColorMap : register(t0);
@@ -24,16 +25,6 @@ float ComputeEV100(float tStop, float shutterSpeed, float iso)
 }
 
 //----------------------------------------------------------
-// EV100 → 線形露出スケール
-//   L_max = 1.2 * 2^EV100  (ACES 基準 18% グレー)
-//   exposure = 1 / L_max
-//----------------------------------------------------------
-float EV100ToExposure(float ev100)
-{
-    return 1.0f / (1.2f * exp2(ev100));
-}
-
-//----------------------------------------------------------
 // Main
 //----------------------------------------------------------
 float4 main(VS_OUT pin) : SV_TARGET
@@ -46,7 +37,9 @@ float4 main(VS_OUT pin) : SV_TARGET
 
     float ev100 = ComputeEV100(TStop, ShutterSpeed, ISO);
     ev100 += EV_Compensation;
-    float exposure = EV100ToExposure(ev100);
+    // Preserve the camera's chosen reference exposure while allowing the
+    // physical shutter/aperture/ISO controls to shift brightness around it.
+    float exposure = exp2(ReferenceEV100 - ev100);
 
     // 線形スケールのみ適用。出力は依然 HDR。
     return float4(hdr * exposure, 1.0f);

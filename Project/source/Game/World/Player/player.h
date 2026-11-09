@@ -229,6 +229,38 @@ public:
 
 	dx::XMVECTOR get_position() const { return position_; }
 
+	// プレイヤーからカメラまでを複数のレイで調べ、壁の手前までの距離を返す。
+	float camera_clear_distance(dx::XMVECTOR focus, dx::XMVECTOR desired, float radius) const
+	{
+		const dx::XMVECTOR delta = dx::XMVectorSubtract(desired, focus);
+		const float distance = dx::XMVectorGetX(dx::XMVector3Length(delta));
+		if (distance < 0.001f || collision_grid_.empty()) return distance;
+
+		const dx::XMVECTOR direction = dx::XMVectorScale(delta, 1.0f / distance);
+		const dx::XMVECTOR midpoint = dx::XMVectorScale(dx::XMVectorAdd(focus, desired), 0.5f);
+		dx::XMFLOAT3 center;
+		dx::XMStoreFloat3(&center, midpoint);
+		collision_grid_.query(center, distance * 0.5f + radius, camera_triangles_);
+
+		float clear_distance = distance;
+		bool blocked = false;
+		for (size_t i = 0; i + 2 < camera_triangles_.size(); i += 3)
+		{
+			const CollisionTriangle triangle{
+				dx::XMLoadFloat3(&camera_triangles_[i]),
+				dx::XMLoadFloat3(&camera_triangles_[i + 1]),
+				dx::XMLoadFloat3(&camera_triangles_[i + 2])
+			};
+			const Ray ray{ focus, direction };
+			const RayHitResult hit = SweepSphereTriangle(ray, radius, triangle, clear_distance);
+			if (hit.hit) {
+				clear_distance = hit.t;
+				blocked = true;
+			}
+		}
+		return blocked ? (std::max)(0.05f, clear_distance - 0.1f) : distance;
+	}
+
 	dx::XMVECTOR get_head_position() const
 	{
 		return dx::XMVectorAdd(position_, dx::XMVectorScale(up_vector_, eye_height_));
@@ -564,12 +596,15 @@ private:
 			// プレイヤー周辺の三角形だけを抽出
 			dx::XMFLOAT3 pos_f;
 			dx::XMStoreFloat3(&pos_f, position_);
-			collision_grid_.query(pos_f, collision_query_radius_, nearby_triangles_);
+			collision_grid_.query(pos_f,
+				(std::max)(collision_query_radius_, Length(move_delta) + sphere_radius_ + 0.25f),
+				nearby_triangles_);
 
 			if (!nearby_triangles_.empty())
 			{
 				CollisionSphere sphere{ position_, sphere_radius_ };
-				SphereCastTriangles(sphere, move_delta, nearby_triangles_, corrected_delta);
+				corrected_delta = SweepSphereTriangles(sphere.center, move_delta,
+					sphere.radius, nearby_triangles_);
 			}
 		}
 
@@ -695,6 +730,7 @@ private:
 	std::vector<dx::XMFLOAT3> collision_triangles_;   ///< ワールド空間三角形リスト
 	CollisionTriangleGrid     collision_grid_;          ///< 空間グリッド
 	std::vector<dx::XMFLOAT3> nearby_triangles_;       ///< 近傍クエリバッファ
+	mutable std::vector<dx::XMFLOAT3> camera_triangles_; ///< カメラ遮蔽判定用バッファ
 
 	// スポットライト
 	int              spotlight_index_ = -1;

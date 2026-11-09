@@ -227,9 +227,9 @@ namespace
 			Render_State::instance().set_3d_render_states(context, Rasterizer_State::Cull_Back_CCW);
 			auto& shadow = g.post_procss.GetShadow();
 			shadow.make_directional_shadow_begin();
+			g.update_constants();
 			Resource_Manager::instance().render_models(pass_mode::directional_shadow);
 			shadow.make_shadow_end();
-			g.update_constants();
 			if (voxel_gi_)
 			{
 				if (auto* instance = Resource_Manager::instance().get_model_instance("RenderTest_Main"))

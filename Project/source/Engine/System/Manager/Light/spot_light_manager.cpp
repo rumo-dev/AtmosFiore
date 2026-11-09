@@ -1,6 +1,7 @@
 #include "spot_light_manager.h"
 #include "Engine/System/graphics_core.h"
 #include "Game/World/camera/camera_manager.h"
+#include "Game/World/camera/light_camera_tools.h"
 #include "Engine/Utilities/math_util.h"
 
 void SpotLightManager::initialize(ID3D11Device* device)
@@ -57,6 +58,13 @@ void SpotLightManager::draw_imgui()
 	{
 		add_light({ 0, 5, 0 }, { 0, -1, 0 }, 10.0f, 30000.0f, 0.5f, 0.7f, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("Add at Camera##Spot"))
+	{
+		const CameraLightPlacement camera = GetCameraLightPlacement();
+		add_light(camera.position, camera.forward, 10.0f, 30000.0f,
+			0.5f, 0.7f, { 1.0f, 1.0f, 1.0f, 1.0f });
+	}
 
 	ImGui::Separator();
 
@@ -70,6 +78,7 @@ void SpotLightManager::draw_imgui()
 		if (ImGui::CollapsingHeader(label.c_str()))
 		{
 			l.draw_imgui("Parameters");
+			if (ImGui::Button("Go to Light")) GoToLightPosition(l.position, &l.direction);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(removeButtonLabel.c_str()))

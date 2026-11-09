@@ -115,6 +115,125 @@ inline RayHitResult RayCastTriangle(const Ray& ray, const CollisionTriangle& tri
 	return result;
 }
 
+// カメラとプレイヤーに使う、面・辺・頂点を含む連続球体スイープ。
+inline RayHitResult SweepSphereTriangle(const Ray& ray, float radius,
+	const CollisionTriangle& tri, float max_dist)
+{
+	RayHitResult best;
+	const dx::XMVECTOR vertices[3] = { tri.v0, tri.v1, tri.v2 };
+	const dx::XMVECTOR ab = dx::XMVectorSubtract(tri.v1, tri.v0);
+	const dx::XMVECTOR ac = dx::XMVectorSubtract(tri.v2, tri.v0);
+	dx::XMVECTOR n = dx::XMVector3Cross(ab, ac);
+	const float n_length = dx::XMVectorGetX(dx::XMVector3Length(n));
+	if (n_length < 1.0e-6f) return best;
+	n = dx::XMVectorScale(n, 1.0f / n_length);
+
+	auto dot = [](dx::XMVECTOR a, dx::XMVECTOR b) {
+		return dx::XMVectorGetX(dx::XMVector3Dot(a, b));
+	};
+	auto record = [&](float t, dx::XMVECTOR normal) {
+		if (t < 0.0f || t > max_dist || t >= best.t) return;
+		if (dot(ray.direction, normal) >= -1.0e-5f) return;
+		best.hit = true;
+		best.t = t;
+		best.normal = normal;
+		best.point = dx::XMVectorAdd(ray.origin, dx::XMVectorScale(ray.direction, t));
+	};
+
+	// 球の中心が三角形の面に達する時刻を調べる。
+	const float signed_distance = dot(dx::XMVectorSubtract(ray.origin, tri.v0), n);
+	const float velocity_normal = dot(ray.direction, n);
+	if (fabsf(velocity_normal) > 1.0e-6f) {
+		const float side = signed_distance >= 0.0f ? 1.0f : -1.0f;
+		const float t = (side * radius - signed_distance) / velocity_normal;
+		if (t >= 0.0f && t <= max_dist) {
+			const dx::XMVECTOR center = dx::XMVectorAdd(ray.origin, dx::XMVectorScale(ray.direction, t));
+			const dx::XMVECTOR point = dx::XMVectorSubtract(center, dx::XMVectorScale(n, side * radius));
+			const dx::XMVECTOR e0 = dx::XMVectorSubtract(tri.v1, tri.v0);
+			const dx::XMVECTOR e1 = dx::XMVectorSubtract(tri.v2, tri.v1);
+			const dx::XMVECTOR e2 = dx::XMVectorSubtract(tri.v0, tri.v2);
+			if (dot(dx::XMVector3Cross(e0, dx::XMVectorSubtract(point, tri.v0)), n) >= -1.0e-5f &&
+				dot(dx::XMVector3Cross(e1, dx::XMVectorSubtract(point, tri.v1)), n) >= -1.0e-5f &&
+				dot(dx::XMVector3Cross(e2, dx::XMVectorSubtract(point, tri.v2)), n) >= -1.0e-5f)
+				record(t, dx::XMVectorScale(n, side));
+		}
+	}
+
+	// 辺の円柱と端点の球も検査し、斜めの角をすり抜けないようにする。
+	for (int i = 0; i < 3; ++i) {
+		const dx::XMVECTOR a = vertices[i];
+		const dx::XMVECTOR b = vertices[(i + 1) % 3];
+		const dx::XMVECTOR edge = dx::XMVectorSubtract(b, a);
+		const float edge_length = dx::XMVectorGetX(dx::XMVector3Length(edge));
+		if (edge_length > 1.0e-6f) {
+			const dx::XMVECTOR axis = dx::XMVectorScale(edge, 1.0f / edge_length);
+			const dx::XMVECTOR relative = dx::XMVectorSubtract(ray.origin, a);
+			const dx::XMVECTOR v = dx::XMVectorSubtract(ray.direction, dx::XMVectorScale(axis, dot(ray.direction, axis)));
+			const dx::XMVECTOR w = dx::XMVectorSubtract(relative, dx::XMVectorScale(axis, dot(relative, axis)));
+			const float qa = dot(v, v);
+			const float qb = 2.0f * dot(v, w);
+			const float qc = dot(w, w) - radius * radius;
+			const float discriminant = qb * qb - 4.0f * qa * qc;
+			if (qa > 1.0e-8f && discriminant >= 0.0f) {
+				const float t = (-qb - sqrtf(discriminant)) / (2.0f * qa);
+				const float along = dot(relative, axis) + t * dot(ray.direction, axis);
+				if (t >= 0.0f && along >= 0.0f && along <= edge_length) {
+					const dx::XMVECTOR center = dx::XMVectorAdd(ray.origin, dx::XMVectorScale(ray.direction, t));
+					const dx::XMVECTOR closest = dx::XMVectorAdd(a, dx::XMVectorScale(axis, along));
+					record(t, dx::XMVector3Normalize(dx::XMVectorSubtract(center, closest)));
+				}
+			}
+		}
+		const dx::XMVECTOR relative = dx::XMVectorSubtract(ray.origin, a);
+		const float qb = 2.0f * dot(ray.direction, relative);
+		const float qc = dot(relative, relative) - radius * radius;
+		const float discriminant = qb * qb - 4.0f * qc;
+		if (discriminant >= 0.0f) {
+			const float t = (-qb - sqrtf(discriminant)) * 0.5f;
+			const dx::XMVECTOR center = dx::XMVectorAdd(ray.origin, dx::XMVectorScale(ray.direction, t));
+			record(t, dx::XMVector3Normalize(dx::XMVectorSubtract(center, a)));
+		}
+	}
+	return best;
+}
+
+inline dx::XMVECTOR SweepSphereTriangles(dx::XMVECTOR origin, dx::XMVECTOR movement,
+	float radius, const std::vector<dx::XMFLOAT3>& triangles)
+{
+	dx::XMVECTOR traveled = dx::XMVectorZero();
+	dx::XMVECTOR remaining = movement;
+	for (int iteration = 0; iteration < 3; ++iteration) {
+		const float length = dx::XMVectorGetX(dx::XMVector3Length(remaining));
+		if (length < 1.0e-5f) break;
+		const dx::XMVECTOR direction = dx::XMVectorScale(remaining, 1.0f / length);
+		const Ray ray{ origin, direction };
+		RayHitResult nearest;
+		nearest.t = length;
+		for (size_t i = 0; i + 2 < triangles.size(); i += 3) {
+			const CollisionTriangle tri{
+				dx::XMLoadFloat3(&triangles[i]),
+				dx::XMLoadFloat3(&triangles[i + 1]),
+				dx::XMLoadFloat3(&triangles[i + 2])
+			};
+			const RayHitResult hit = SweepSphereTriangle(ray, radius, tri, nearest.t);
+			if (hit.hit && hit.t < nearest.t) nearest = hit;
+		}
+		if (!nearest.hit) {
+			traveled = dx::XMVectorAdd(traveled, remaining);
+			break;
+		}
+		const float advance = (std::max)(0.0f, nearest.t - 0.005f);
+		const dx::XMVECTOR step = dx::XMVectorScale(direction, advance);
+		origin = dx::XMVectorAdd(origin, step);
+		traveled = dx::XMVectorAdd(traveled, step);
+		remaining = dx::XMVectorScale(direction, length - nearest.t);
+		const float into_wall = dx::XMVectorGetX(dx::XMVector3Dot(remaining, nearest.normal));
+		if (into_wall < 0.0f)
+			remaining = dx::XMVectorSubtract(remaining, dx::XMVectorScale(nearest.normal, into_wall));
+	}
+	return traveled;
+}
+
 // ============================================================
 //  カプセル vs 三角形（スフィア掃引 vs 三角形）
 // ============================================================

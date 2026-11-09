@@ -12,6 +12,12 @@
     <FxCompile Include="source\Engine\Graphics\Shader\deferred_lighting_ps.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\directional_shadow_mask_ps.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\directional_shadow_blur_ps.hlsl">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\error_ps.hlsl">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </FxCompile>

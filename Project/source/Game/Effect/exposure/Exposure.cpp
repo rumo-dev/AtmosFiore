@@ -54,6 +54,7 @@ void Exposure::make(ID3D11DeviceContext* immediate_context,
 	// ---- 定数バッファ更新 ----
 	ExposureConstants data{};
 	data.is_enabled = is_enabled ? 1 : 0;
+	data.reference_ev100 = reference_ev100;
 	immediate_context->UpdateSubresource(constant_buffer.Get(), 0, 0, &data, 0, 0);
 	immediate_context->PSSetConstantBuffers(9, 1, constant_buffer.GetAddressOf());
 
@@ -77,5 +78,7 @@ void Exposure::DrawDebugUI()
 {
 
 	CustomUI::Checkbox("Enable", &is_enabled);
+	if (is_enabled)
+		CustomUI::SliderFloat("Reference EV100", &reference_ev100, -4.0f, 16.0f, "%.2f");
 
 }

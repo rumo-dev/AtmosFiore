@@ -26,13 +26,13 @@ private:
     {
         DirectX::XMFLOAT4 volume_min{};
         DirectX::XMFLOAT4 inv_extent{};
-        unsigned int count_x = DefaultGridSize;
+        unsigned int count_x = 12;
         unsigned int count_y = DefaultGridSize;
-        unsigned int count_z = DefaultGridSize;
+        unsigned int count_z = 12;
         float strength = 1.0f;
         unsigned int frame = 0;
         float hysteresis = 0.85f;
-        float blend = 0.7f;
+        float blend = 0.85f;
         float visibility_bias = 0.08f;
         unsigned int inject_lights = 1;
         float light_multiplier = 1.0f;
@@ -62,7 +62,7 @@ private:
     bool show_probes_ = false;
     bool inject_lights_ = true;
     bool grid_valid_ = false;
-    int requested_counts_[3] = { 8, 8, 8 };
+    int requested_counts_[3] = { 12, 8, 12 };
     float requested_min_[3] = {};
     float requested_max_[3] = {};
     bool custom_bounds_ = false;

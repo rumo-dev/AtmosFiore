@@ -165,6 +165,7 @@ public: // shadow settings
 	 */
 	const uint32_t shadowmap_width = 2048;
 	const uint32_t shadowmap_height = 2048;
+	const uint32_t directional_shadowmap_size = 3072;
 
 	///< ポイントライト用双放物面シャドウマップ（前後）
 	std::unique_ptr<shadow_map> point_shadow_front;
@@ -172,6 +173,9 @@ public: // shadow settings
 	std::unique_ptr<shadow_map> directional_shadow_map;
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> point_shadow_constant_buffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> directional_pcss_constant_buffer;
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> directional_shadow_rasterizer;
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> saved_directional_rasterizer;
 	shadow_map* active_shadow_map{ nullptr };
 
 	///< ライト注視点
@@ -180,7 +184,7 @@ public: // shadow settings
 	///< ライト距離
 	float light_view_distance{ 35.0f };
 
-	///< 投影サイズ（直交投影範囲）
+	///< 平行光源のシャドウを割り当てるカメラからの最大距離
 	float light_view_size{ 100.0f };
 
 	///< ニアクリップ
@@ -190,6 +194,12 @@ public: // shadow settings
 	float light_view_far_z{ 100.0f };
 
 	float point_shadow_bias{ 0.003f };
+	float directional_light_angular_radius{ 0.025f };
+	bool directional_pcss_enabled{ true };
+	float directional_pcss_search_radius{ 16.0f };
+	float directional_pcss_min_filter_radius{ 0.0f };
+	float directional_pcss_max_filter_radius{ 16.0f };
+	float directional_screen_blur_radius{ 6.0f };
 	float point_shadow_strength{ 0.65f };
 	int point_shadow_enabled{ 1 };
 
@@ -218,7 +228,13 @@ public: // shadow settings
 	void shadow_gui()
 	{
 		ImGui::SliderFloat("light_view_distance", &light_view_distance, 1.0f, +100.0f);
-		ImGui::SliderFloat("light_view_size", &light_view_size, 1.0f, +100.0f);
+		ImGui::SliderFloat("shadow_distance", &light_view_size, 1.0f, +100.0f);
+		ImGui::SliderFloat("sun_angular_radius", &directional_light_angular_radius, 0.001f, 0.05f, "%.3f rad");
+		ImGui::Checkbox("directional_pcss_enabled", &directional_pcss_enabled);
+		ImGui::SliderFloat("pcss_search_radius", &directional_pcss_search_radius, 2.0f, 24.0f, "%.1f px");
+		ImGui::SliderFloat("pcss_min_filter_radius", &directional_pcss_min_filter_radius, 0.0f, 12.0f, "%.1f px");
+		ImGui::SliderFloat("pcss_max_filter_radius", &directional_pcss_max_filter_radius, 2.0f, 32.0f, "%.1f px");
+		ImGui::SliderFloat("shadow_screen_blur", &directional_screen_blur_radius, 0.0f, 32.0f, "%.1f px");
 		ImGui::SliderFloat("light_view_near_z", &light_view_near_z, 0.01f, light_view_far_z - 1.0f);
 		ImGui::SliderFloat("light_view_far_z", &light_view_far_z, light_view_near_z + 1.0f, +100.0f);
 		bool enabled = point_shadow_enabled != 0;
@@ -240,6 +256,7 @@ public:
 	float get_light_view_size() const { return light_view_size; }
 	float get_light_view_near_z() const { return light_view_near_z; }
 	float get_light_view_far_z() const { return light_view_far_z; }
+	float get_directional_screen_blur_radius() const { return directional_screen_blur_radius; }
 
 	// Get last computed light view-projection (for culling)
 	DirectX::XMFLOAT4X4 get_light_view_projection() const { return last_light_view_projection; }

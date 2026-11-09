@@ -45,12 +45,23 @@ namespace {
 		float thickness = 0.2f;
 		float debug_view = 0.0f;
 	};
+	struct alignas(16) DirectionalShadowBlurConstants {
+		float direction_x = 1.0f;
+		float direction_y = 0.0f;
+		float radius_pixels = 12.0f;
+		float depth_sigma = 5.0f;
+		float normal_power = 2.0f;
+		float spatial_sigma = 2.0f;
+		float padding[2]{};
+	};
 	SsaoConstants ssao_constants;
 	SsrConstants ssr_constants;
 	TaaConstants taa_constants;
 	SsgiConstants ssgi_constants;
+	DirectionalShadowBlurConstants directional_shadow_blur_constants;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssao_constant_buffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> ssr_constant_buffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> directional_shadow_blur_constant_buffer;
 }
 
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
@@ -59,11 +70,15 @@ Framebuffer                  Post_Process_Manager::ssao_buffer;
 Framebuffer                  Post_Process_Manager::ssao_blur_buffer;
 Framebuffer                  Post_Process_Manager::ssao_vertical_buffer;
 Framebuffer                  Post_Process_Manager::ssao_filtered_buffer;
+Framebuffer                  Post_Process_Manager::directional_shadow_mask_buffer;
+Framebuffer                  Post_Process_Manager::directional_shadow_blur_horizontal_buffer;
+Framebuffer                  Post_Process_Manager::directional_shadow_blur_vertical_buffer;
 Framebuffer                  Post_Process_Manager::ssr_buffer;
 Framebuffer                  Post_Process_Manager::ssr_composite_buffer;
 Framebuffer                  Post_Process_Manager::ssgi_buffer;
 Framebuffer                  Post_Process_Manager::ssgi_composite_buffer;
 std::array<Framebuffer, 2>   Post_Process_Manager::taa_history;
+std::array<Framebuffer, 2>   Post_Process_Manager::taa_shadow_history;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Post_Process_Manager::taa_constant_buffer;
 bool                         Post_Process_Manager::taa_enabled = true;
 bool                         Post_Process_Manager::taa_history_valid = false;
@@ -184,12 +199,17 @@ void Post_Process_Manager::initialize()
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_mask_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_horizontal_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_vertical_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssr_buffer = Framebuffer{};
 	ssr_composite_buffer = Framebuffer{};
 	ssgi_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	ssgi_composite_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[0] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[1] = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	taa_shadow_history[0] = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	taa_shadow_history[1] = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	D3D11_BUFFER_DESC ssao_cb_desc{};
 	ssao_cb_desc.ByteWidth = sizeof(SsaoConstants);
 	ssao_cb_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -204,6 +224,8 @@ void Post_Process_Manager::initialize()
 	device->CreateBuffer(&ssao_cb_desc, nullptr, taa_constant_buffer.GetAddressOf());
 	ssao_cb_desc.ByteWidth = sizeof(SsgiConstants);
 	device->CreateBuffer(&ssao_cb_desc, nullptr, ssgi_constant_buffer.GetAddressOf());
+	ssao_cb_desc.ByteWidth = sizeof(DirectionalShadowBlurConstants);
+	device->CreateBuffer(&ssao_cb_desc, nullptr, directional_shadow_blur_constant_buffer.GetAddressOf());
 	ResetTemporalHistory();
 	render_width = w;
 	render_height = h;
@@ -248,6 +270,9 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_mask_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_horizontal_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_vertical_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	// SSR targets are allocated when the effect is actually enabled.
 	ssr_buffer = Framebuffer{};
 	ssr_composite_buffer = Framebuffer{};
@@ -255,6 +280,8 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	ssgi_composite_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[0] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	taa_history[1] = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	taa_shadow_history[0] = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	taa_shadow_history[1] = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ResetTemporalHistory();
 	render_width = width;
 	render_height = height;
@@ -338,12 +365,73 @@ void Post_Process_Manager::begin()
 		ssao_filtered_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 
+	// Render the PCSS visibility first, then blur that result in screen space.
+	// Filtering the visibility separately avoids smearing the lit scene and
+	// lets depth/normal edges stop the blur at geometry boundaries.
+	if (directional_shadow_blur_constant_buffer)
+	{
+		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Directional Shadow Mask and Blur");
+		ID3D11ShaderResourceView* gbuffer_srvs[GBUFFER_COUNT]{};
+		Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(gbuffer_srvs);
+		ID3D11ShaderResourceView* null_inputs[3]{};
+		Render_State::instance().set_blend_state(ctx, Blend_State::Opaque);
+
+		directional_shadow_mask_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		directional_shadow_mask_buffer.Activate(ctx);
+		ID3D11ShaderResourceView* mask_inputs[3] = {
+			gbuffer_srvs[0], gbuffer_srvs[2], shadower->get_directional_shadow_map()
+		};
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, mask_inputs, 0, 3,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("DIRECTIONAL_SHADOW_MASK_PS"));
+		directional_shadow_mask_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 3, null_inputs);
+
+		directional_shadow_blur_constants.radius_pixels =
+			shadower->get_directional_screen_blur_radius();
+		ctx->PSSetConstantBuffers(12, 1, directional_shadow_blur_constant_buffer.GetAddressOf());
+		directional_shadow_blur_constants.direction_x = 1.0f;
+		directional_shadow_blur_constants.direction_y = 0.0f;
+		ctx->UpdateSubresource(directional_shadow_blur_constant_buffer.Get(), 0, nullptr,
+			&directional_shadow_blur_constants, 0, 0);
+		directional_shadow_blur_horizontal_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		directional_shadow_blur_horizontal_buffer.Activate(ctx);
+		ID3D11ShaderResourceView* horizontal_inputs[3] = {
+			directional_shadow_mask_buffer.GetColorMap(), gbuffer_srvs[0], gbuffer_srvs[2]
+		};
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, horizontal_inputs, 0, 3,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("DIRECTIONAL_SHADOW_BLUR_PS"));
+		directional_shadow_blur_horizontal_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 3, null_inputs);
+
+		directional_shadow_blur_constants.direction_x = 0.0f;
+		directional_shadow_blur_constants.direction_y = 1.0f;
+		ctx->UpdateSubresource(directional_shadow_blur_constant_buffer.Get(), 0, nullptr,
+			&directional_shadow_blur_constants, 0, 0);
+		directional_shadow_blur_vertical_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		directional_shadow_blur_vertical_buffer.Activate(ctx);
+		ID3D11ShaderResourceView* vertical_inputs[3] = {
+			directional_shadow_blur_horizontal_buffer.GetColorMap(), gbuffer_srvs[0], gbuffer_srvs[2]
+		};
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, vertical_inputs, 0, 3,
+			Resource_Manager::instance().get_native_shader<Pixel_Shader>("DIRECTIONAL_SHADOW_BLUR_PS"));
+		directional_shadow_blur_vertical_buffer.Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 3, null_inputs);
+		Render_State::instance().set_blend_state(ctx, Blend_State::Alpha);
+	}
+	else
+	{
+		directional_shadow_blur_vertical_buffer.Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+	}
+
 	ID3D11ShaderResourceView* srvs[GBUFFER_COUNT + 4]{};
 	Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(srvs);
 	srvs[GBUFFER_COUNT + 0] = shadower->get_point_shadow_front_map();
 	srvs[GBUFFER_COUNT + 1] = shadower->get_point_shadow_back_map();
 	srvs[GBUFFER_COUNT + 2] = shadower->get_directional_shadow_map();
 	srvs[GBUFFER_COUNT + 3] = ssao_filtered_buffer.GetColorMap();
+	ID3D11ShaderResourceView* filtered_shadow_mask =
+		directional_shadow_blur_vertical_buffer.GetColorMap();
+	ctx->PSSetShaderResources(15, 1, &filtered_shadow_mask);
 
 	DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Lighting Pass"); {
 		Graphics_Core::instance().get_fullscreen_quad()->Blit(
@@ -355,6 +443,8 @@ void Post_Process_Manager::begin()
 	// input before the shadow pass binds that texture as a depth output next frame.
 	ID3D11ShaderResourceView* null_lighting_srvs[GBUFFER_COUNT + 4]{};
 	ctx->PSSetShaderResources(0, GBUFFER_COUNT + 4, null_lighting_srvs);
+	ID3D11ShaderResourceView* null_shadow_mask = nullptr;
+	ctx->PSSetShaderResources(15, 1, &null_shadow_mask);
 }
 
 // ─── 終了 ─────────────────────────────────────────────────────────
@@ -453,11 +543,13 @@ void Post_Process_Manager::draw()
 	}
 	if (taa_enabled && !(dlss && dlss->IsEnabled()) && taa_constant_buffer) {
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process: TAA");
-		ID3D11ShaderResourceView* null_taa_inputs[3]{};
-		ctx->PSSetShaderResources(0, 3, null_taa_inputs);
+		ID3D11ShaderResourceView* null_taa_inputs[5]{};
+		ctx->PSSetShaderResources(0, 5, null_taa_inputs);
 		if (!taa_history_valid) {
 			taa_history[0].Clear(ctx);
 			taa_history[1].Clear(ctx);
+			taa_shadow_history[0].Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+			taa_shadow_history[1].Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
 		}
 		const UINT write_index = 1u - taa_history_index;
 		taa_constants.history_weight = taa_history_weight;
@@ -466,17 +558,34 @@ void Post_Process_Manager::draw()
 		taa_constants.inverse_height = 1.0f / static_cast<float>(render_height);
 		ctx->UpdateSubresource(taa_constant_buffer.Get(), 0, nullptr, &taa_constants, 0, 0);
 		ctx->PSSetConstantBuffers(12, 1, taa_constant_buffer.GetAddressOf());
-		ID3D11ShaderResourceView* taa_inputs[3] = {
+		ID3D11ShaderResourceView* taa_inputs[5] = {
 			current,
 		taa_history[taa_history_index].GetColorMap(),
-		Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors()
+			Graphics_Core::instance().get_geometry_buffer()->GetMotionVectors(),
+			directional_shadow_blur_vertical_buffer.GetColorMap(),
+			taa_shadow_history[taa_history_index].GetColorMap()
 		};
 		taa_history[write_index].Clear(ctx);
 		taa_history[write_index].Activate(ctx);
-		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, taa_inputs, 0, 3,
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, taa_inputs, 0, 5,
 			Resource_Manager::instance().get_native_shader<Pixel_Shader>("TAA_PS"));
 		taa_history[write_index].Deactivate(ctx);
-		ctx->PSSetShaderResources(0, 3, null_taa_inputs);
+		ctx->PSSetShaderResources(0, 5, null_taa_inputs);
+		Microsoft::WRL::ComPtr<ID3D11BlendState> previous_blend_state;
+		FLOAT previous_blend_factor[4]{};
+		UINT previous_sample_mask = 0;
+		ctx->OMGetBlendState(previous_blend_state.GetAddressOf(),
+			previous_blend_factor, &previous_sample_mask);
+		Render_State::instance().set_blend_state(ctx, Blend_State::Opaque);
+		taa_shadow_history[write_index].Clear(ctx, 1.0f, 1.0f, 1.0f, 1.0f);
+		taa_shadow_history[write_index].Activate(ctx);
+		ID3D11ShaderResourceView* current_shadow_mask =
+			directional_shadow_blur_vertical_buffer.GetColorMap();
+		Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx, &current_shadow_mask, 0, 1);
+		taa_shadow_history[write_index].Deactivate(ctx);
+		ctx->PSSetShaderResources(0, 1, null_taa_inputs);
+		ctx->OMSetBlendState(previous_blend_state.Get(), previous_blend_factor,
+			previous_sample_mask);
 		current = taa_history[write_index].GetColorMap();
 		taa_history_index = write_index;
 		taa_history_valid = true;
@@ -753,7 +862,7 @@ bool Post_Process_Manager::savePipelineSettings() const
 	SAVE_PARAM("bloom", "enabled", bloomer->is_bloom); SAVE_PARAM("bloom", "threshold", bloomer->bloom_extraction_threshold); SAVE_PARAM("bloom", "intensity", bloomer->bloom_intensity);
 	SAVE_PARAM("adaptation", "target_lum", adaptation->target_lum); SAVE_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); SAVE_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark); SAVE_PARAM("adaptation", "max_exposure", adaptation->max_exposure);
 	SAVE_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); SAVE_PARAM("tone_mapping", "mapping_type", static_cast<int>(tone_mapper->mapping_type)); SAVE_PARAM("tone_mapping", "exposure", tone_mapper->exposure); SAVE_PARAM("tone_mapping", "gamma", tone_mapper->gamma); SAVE_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); SAVE_PARAM("tone_mapping", "max_white", tone_mapper->max_white); SAVE_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); SAVE_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); SAVE_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); SAVE_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
-	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("dof", "blur_strength", dofer->blur_strength); SAVE_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); SAVE_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled);
+	SAVE_PARAM("dof", "enabled", dofer->is_dof); SAVE_PARAM("dof", "blur_strength", dofer->blur_strength); SAVE_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); SAVE_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); SAVE_PARAM("exposure", "enabled", exposurer->is_enabled); SAVE_PARAM("exposure", "reference_ev100", exposurer->reference_ev100);
 	SAVE_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); SAVE_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); SAVE_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
 	SAVE_PARAM("lens_distortion", "enabled", lens_distortion->is_enabled); SAVE_PARAM("lens_distortion", "scale", lens_distortion->distortion_scale); SAVE_PARAM("lens_distortion", "physical_link", lens_distortion->physical_link);
 	SAVE_PARAM("vignetting", "enabled", vignetting->is_enabled); SAVE_PARAM("vignetting", "physical_link", vignetting->physical_link); SAVE_PARAM("vignetting", "intensity", vignetting->intensity); SAVE_PARAM("vignetting", "inner_radius", vignetting->inner_radius); SAVE_PARAM("vignetting", "outer_radius", vignetting->outer_radius); SAVE_PARAM("vignetting", "smoothness", vignetting->smoothness);
@@ -825,7 +934,8 @@ bool Post_Process_Manager::loadPipelineSettings()
 	LOAD_PARAM("adaptation", "target_lum", adaptation->target_lum); LOAD_PARAM("adaptation", "speed_to_light", adaptation->speed_to_light); LOAD_PARAM("adaptation", "speed_to_dark", adaptation->speed_to_dark); LOAD_PARAM("adaptation", "max_exposure", adaptation->max_exposure);
 	adaptation->max_exposure = std::clamp(adaptation->max_exposure, 0.05f, 10.0f);
 	LOAD_PARAM("tone_mapping", "enabled", tone_mapper->is_enabled); { int type = static_cast<int>(tone_mapper->mapping_type); LOAD_PARAM("tone_mapping", "mapping_type", type); if (type >= 0 && type < 34) tone_mapper->mapping_type = static_cast<ToneMapping::ToneMappingType>(type); } LOAD_PARAM("tone_mapping", "exposure", tone_mapper->exposure); LOAD_PARAM("tone_mapping", "gamma", tone_mapper->gamma); LOAD_PARAM("tone_mapping", "gt_param", tone_mapper->gt_param); LOAD_PARAM("tone_mapping", "max_white", tone_mapper->max_white); LOAD_PARAM("tone_mapping", "shoulder", tone_mapper->shoulder); LOAD_PARAM("tone_mapping", "linear_strength", tone_mapper->linear_strength); LOAD_PARAM("tone_mapping", "linear_angle", tone_mapper->linear_angle); LOAD_PARAM("tone_mapping", "toe_strength", tone_mapper->toe_strength);
-	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("dof", "blur_strength", dofer->blur_strength); LOAD_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); LOAD_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled);
+	LOAD_PARAM("dof", "enabled", dofer->is_dof); LOAD_PARAM("dof", "blur_strength", dofer->blur_strength); LOAD_PARAM("dof", "debug_threshold_px", dofer->debug_blur_threshold_px); LOAD_PARAM("dof", "show_range_overlay", dofer->show_debug_overlay); LOAD_PARAM("exposure", "enabled", exposurer->is_enabled); LOAD_PARAM("exposure", "reference_ev100", exposurer->reference_ev100);
+	exposurer->reference_ev100 = std::clamp(exposurer->reference_ev100, -4.0f, 16.0f);
 	dofer->blur_strength = std::clamp(dofer->blur_strength, 0.0f, 4.0f);
 	dofer->debug_blur_threshold_px = std::clamp(dofer->debug_blur_threshold_px, 0.25f, 4.0f);
 	LOAD_PARAM("chromatic_aberration", "enabled", ca_effect->is_enabled); LOAD_PARAM("chromatic_aberration", "intensity", ca_effect->intensity); LOAD_PARAM("chromatic_aberration", "physical_link", ca_effect->physical_link);
@@ -859,7 +969,7 @@ void Post_Process_Manager::drawDebugView()
 	const float left_w = available_w * 0.4f;
 	const float right_w = available_w * 0.6f;
 
-	enum class DebugTex { None, GBuffer, PointFront, PointBack, DirShadow };
+	enum class DebugTex { None, GBuffer, PointFront, PointBack, DirShadow, RawDirShadow, FilteredDirShadow, SSAO };
 	static DebugTex selected_type = DebugTex::None;
 	static int      selected_gbuffer_idx = 0;
 
@@ -890,8 +1000,16 @@ void Post_Process_Manager::drawDebugView()
 		drawShadowSelectable("Point Front Depth", DebugTex::PointFront, shadower->get_point_shadow_front_map());
 		drawShadowSelectable("Point Back Depth", DebugTex::PointBack, shadower->get_point_shadow_back_map());
 		drawShadowSelectable("Directional Depth", DebugTex::DirShadow, shadower->get_directional_shadow_map());
+		drawShadowSelectable("Directional Mask (Raw)", DebugTex::RawDirShadow,
+			directional_shadow_mask_buffer.GetColorMap());
+		drawShadowSelectable("Directional Mask (Filtered)", DebugTex::FilteredDirShadow,
+			directional_shadow_blur_vertical_buffer.GetColorMap());
 		ImGui::Separator();
 		shadower->shadow_gui();
+	}
+	if (ImGui::CollapsingHeader("Ambient Occlusion")) {
+		if (ImGui::Selectable("SSAO Mask", selected_type == DebugTex::SSAO))
+			selected_type = DebugTex::SSAO;
 	}
 
 	ImGui::EndChild();
@@ -919,6 +1037,12 @@ void Post_Process_Manager::drawDebugView()
 		preview_srv = shadower->get_point_shadow_back_map();
 	else if (selected_type == DebugTex::DirShadow)
 		preview_srv = shadower->get_directional_shadow_map();
+	else if (selected_type == DebugTex::RawDirShadow)
+		preview_srv = directional_shadow_mask_buffer.GetColorMap();
+	else if (selected_type == DebugTex::FilteredDirShadow)
+		preview_srv = directional_shadow_blur_vertical_buffer.GetColorMap();
+	else if (selected_type == DebugTex::SSAO)
+		preview_srv = ssao_filtered_buffer.GetColorMap();
 
 	if (preview_srv) {
 		ImVec2 avail = ImGui::GetContentRegionAvail();

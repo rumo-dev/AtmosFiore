@@ -118,7 +118,14 @@ void Scene_Indoor::initialize()
 	if (_voxel_gi)
 	{
 		_ddgi = std::make_unique<DDGI>();
-		_ddgi->set_probe_bounds({ 20.0f, 0.0f, -8.0f }, { 36.0f, 10.0f, 7.0f });
+		// ボクセル化と同じ Structure の実際の範囲へプローブを配置する。
+		dx::XMFLOAT3 probe_min, probe_max;
+		indoor_model->compute_instance_aabb(_indoor_world, false, 0.0f,
+			Gltf_Model::animation_mode::single, 0, probe_min, probe_max, "Structure");
+		constexpr float probe_margin = 0.5f;
+		probe_min.x -= probe_margin; probe_min.y -= probe_margin; probe_min.z -= probe_margin;
+		probe_max.x += probe_margin; probe_max.y += probe_margin; probe_max.z += probe_margin;
+		_ddgi->set_probe_bounds(probe_min, probe_max);
 		if (!_ddgi->initialize(device)) _ddgi.reset();
 	}
 
@@ -146,7 +153,11 @@ void Scene_Indoor::initialize()
 		return camera;
 	};
 	camera_mgr.register_camera("Spectator", indoor_camera(std::make_shared<SpectatorCamera>(hwnd)));
-	camera_mgr.register_camera("ThirdPerson", indoor_camera(std::make_shared<ThirdPersonCamera>(hwnd)));
+	_third_person_camera = std::make_shared<ThirdPersonCamera>(hwnd);
+	_third_person_camera->set_collision_resolver([this](dx::XMVECTOR focus, dx::XMVECTOR desired, float radius) {
+		return _player.camera_clear_distance(focus, desired, radius);
+	});
+	camera_mgr.register_camera("ThirdPerson", indoor_camera(_third_person_camera));
 	camera_mgr.register_camera("FirstPerson", indoor_camera(std::make_shared<FirstPersonCamera>(hwnd)));
 
 	dx::XMVECTOR target_pos = dx::XMVectorSet(0.0f, 3.5f, 0.0f, 1.0f);
@@ -173,6 +184,10 @@ void Scene_Indoor::initialize()
 
 // 終了化
 void Scene_Indoor::finalize() {
+	if (_third_person_camera) {
+		_third_person_camera->clear_collision_resolver();
+		_third_person_camera.reset();
+	}
 	Graphics_Core::instance().post_procss.UseSettingsFile("data/post_process_settings.json");
 	ID3D11DeviceContext* context = Graphics_Core::instance().get_device_context();
 	ID3D11ShaderResourceView* null_probe_srvs[ReflectionProbeCount]{};
@@ -273,7 +288,6 @@ void Scene_Indoor::render(float elapsedTime)
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Scene Indoor");
 		render_shadowmap(elapsedTime);
-		Graphics_Core::instance().update_constants();
 		capture_reflection_probe(immediate_context);
 		if (_voxel_gi)
 			_voxel_gi->render(immediate_context,
@@ -302,6 +316,8 @@ void Scene_Indoor::render_shadowmap(float elapsedTime) {
 		TRACY_GPU_ZONE_C("DirectionalShadow_GPU", TracyCategory::Shadow);
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Directional Shadow");
 		shadower.make_directional_shadow_begin();
+		// 深度を書き込む VS と後段の影判定が同じフレームの行列を使う。
+		Graphics_Core::instance().update_constants();
 		Resource_Manager::instance().render_models(pass_mode::directional_shadow);
 		shadower.make_shadow_end();
 	}

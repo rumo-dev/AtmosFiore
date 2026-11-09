@@ -19,6 +19,7 @@ Texture2D<float> point_shadow_front_map : register(t4);
 Texture2D<float> point_shadow_back_map : register(t5);
 Texture2D<float> directional_shadow_map : register(t6);
 Texture2D<float4> ssao_texture : register(t7);
+Texture2D<float> directional_shadow_mask : register(t15);
 Texture3D<float4> voxel_gi_radiance : register(t13);
 
 cbuffer VOXEL_GI_CONSTANTS : register(b8)
@@ -33,10 +34,11 @@ cbuffer VOXEL_GI_CONSTANTS : register(b8)
     float3 voxel_padding;
 };
 
-float3 trace_voxel_cone(float3 origin, float3 direction)
+float3 trace_voxel_cone(float3 origin, float3 direction, float phase)
 {
     float voxel_size = voxel_inv_extent.w;
-    float distance_along_cone = voxel_size * 1.5;
+    // 同じ距離から全ピクセルが積分すると、明るいセルの周囲に同心円が出る。
+    float distance_along_cone = voxel_size * (1.0f + phase);
     float4 accumulated = float4(0, 0, 0, 0);
     [loop] for (uint step = 0; step < 12 && accumulated.a < 0.95; ++step)
     {
@@ -55,7 +57,7 @@ float3 trace_voxel_cone(float3 origin, float3 direction)
     return accumulated.rgb;
 }
 
-float3 sample_voxel_gi(float3 position, float3 normal)
+float3 sample_voxel_gi(float3 position, float3 normal, float2 pixel)
 {
     float3 result = float3(0, 0, 0);
     if (voxel_strength > 0 && dot(normal, normal) >= 0.5)
@@ -64,15 +66,16 @@ float3 sample_voxel_gi(float3 position, float3 normal)
             abs(normal.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0)));
         float3 bitangent = cross(normal, tangent);
         float3 origin = position + normal * voxel_inv_extent.w * 1.5;
-        result = trace_voxel_cone(origin, normal);
-        result += trace_voxel_cone(origin, normalize(normal + tangent));
-        result += trace_voxel_cone(origin, normalize(normal - tangent));
-        result += trace_voxel_cone(origin, normalize(normal + bitangent));
-        result += trace_voxel_cone(origin, normalize(normal - bitangent));
-        result += trace_voxel_cone(origin, normalize(normal + tangent + bitangent));
-        result += trace_voxel_cone(origin, normalize(normal + tangent - bitangent));
-        result += trace_voxel_cone(origin, normalize(normal - tangent + bitangent));
-        result += trace_voxel_cone(origin, normalize(normal - tangent - bitangent));
+        float phase = frac(52.9829189f * frac(dot(pixel, float2(0.06711056f, 0.00583715f))));
+        result = trace_voxel_cone(origin, normal, phase);
+        result += trace_voxel_cone(origin, normalize(normal + tangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal - tangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal + bitangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal - bitangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal + tangent + bitangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal + tangent - bitangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal - tangent + bitangent), phase);
+        result += trace_voxel_cone(origin, normalize(normal - tangent - bitangent), phase);
     }
     return result * (voxel_strength / 9.0);
 }
@@ -303,7 +306,8 @@ float4 main(VS_OUT pin) : SV_TARGET
         float3 H = normalize(V + L);
         float NoH = max(0.0f, dot(N, H));
         float HoV = max(0.0f, dot(H, V));
-        float directional_shadow = SampleDirectionalShadow(directional_shadow_map, position, N, L);
+        float directional_shadow = directional_shadow_mask.SampleLevel(
+            sampler_states[POINT_CLAMP], pin.texcoord, 0);
 
 
         diffuse += Li * directional_shadow * NoL * brdf_lambertian(f0, f90, c_diff, HoV);
@@ -437,13 +441,11 @@ float4 main(VS_OUT pin) : SV_TARGET
     }
 
     diffuse += ibl_radiance_lambertian(N, V, roughness, c_diff, f0);
-    float3 voxel_indirect = sample_voxel_gi(position, N);
+    float3 voxel_indirect = sample_voxel_gi(position, N, pin.position.xy);
     float4 probe_indirect = sample_ddgi(position, N);
     float probe_weight = probe_indirect.a * saturate(ddgi_blend);
-    // Sparse probes can miss thin emitters. Keep the voxel contribution when
-    // a probe has less radiance, while still accepting brighter probe bounce.
     float3 probe_radiance = probe_indirect.rgb * ddgi_strength;
-    diffuse += (voxel_indirect + probe_weight * max(probe_radiance - voxel_indirect, 0.0)) * c_diff;
+    diffuse += lerp(voxel_indirect, probe_radiance, probe_weight) * c_diff;
     specular += ibl_radiance_ggx(position, N, V, roughness, f0);
 
     // Material AO and SSAO attenuate the accumulated lighting.

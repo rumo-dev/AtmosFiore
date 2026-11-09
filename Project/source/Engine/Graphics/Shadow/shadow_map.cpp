@@ -5,7 +5,8 @@
 
 using namespace DirectX;
 
-shadow_map::shadow_map(ID3D11Device* device, uint32_t width, uint32_t height)
+shadow_map::shadow_map(ID3D11Device* device, uint32_t width, uint32_t height,
+	bool high_precision_depth)
 {
 	HRESULT hr{ S_OK };
 
@@ -14,7 +15,7 @@ shadow_map::shadow_map(ID3D11Device* device, uint32_t width, uint32_t height)
 	texture2d_desc.Height = height;
 	texture2d_desc.MipLevels = 1;
 	texture2d_desc.ArraySize = 1;
-	texture2d_desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
+	texture2d_desc.Format = high_precision_depth ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_R24G8_TYPELESS;
 	texture2d_desc.SampleDesc.Count = 1;
 	texture2d_desc.SampleDesc.Quality = 0;
 	texture2d_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -26,14 +27,14 @@ shadow_map::shadow_map(ID3D11Device* device, uint32_t width, uint32_t height)
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
 	D3D11_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc{};
-	depth_stencil_view_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depth_stencil_view_desc.Format = high_precision_depth ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
 	depth_stencil_view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 	depth_stencil_view_desc.Flags = 0;
 	hr = device->CreateDepthStencilView(depth_stencil_buffer.Get(), &depth_stencil_view_desc, depth_stencil_view.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc{};
-	shader_resource_view_desc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	shader_resource_view_desc.Format = high_precision_depth ? DXGI_FORMAT_R32_FLOAT : DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 	shader_resource_view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 	shader_resource_view_desc.Texture2D.MipLevels = 1;
 	hr = device->CreateShaderResourceView(depth_stencil_buffer.Get(), &shader_resource_view_desc, shader_resource_view.GetAddressOf());

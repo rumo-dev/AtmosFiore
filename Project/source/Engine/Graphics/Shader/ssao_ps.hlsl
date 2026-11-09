@@ -28,7 +28,7 @@ float4 main(VS_OUT pin) : SV_TARGET
     if (dot(world_normal, world_normal) < 1.0e-4f)
         return float4(1.0f, 1.0f, 1.0f, 1.0f);
 
-    const int sample_count = 16;
+    const int sample_count = 24;
     const float radius = max(ssao_radius, 1.0e-3f);
 
     float3 position = mul(float4(center_position.xyz, 1.0f), view).xyz;
@@ -66,7 +66,9 @@ float4 main(VS_OUT pin) : SV_TARGET
 
         // Equation (10): signed normal distance, depth-scaled bias and
         // inverse-square falloff, with the paper's finite-radius cutoff.
-        occlusion += max(0.0f, dot(normal, v) - position.z * ssao_bias) / (distance_squared + 1.0e-4f);
+        float range_weight = saturate(1.0f - distance_squared / (radius * radius));
+        occlusion += range_weight * max(0.0f, dot(normal, v) - position.z * ssao_bias)
+            / (distance_squared + 0.01f);
     }
 
     float ao = pow(saturate(1.0f - (2.0f * ssao_intensity * occlusion / sample_count)), ssao_contrast);

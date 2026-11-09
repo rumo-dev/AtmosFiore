@@ -1,6 +1,7 @@
 #include "area_light_manager.h"
 #include "Engine/System/render_state.h"
 #include "Game/World/camera/camera_manager.h"
+#include "Game/World/camera/light_camera_tools.h"
 #include "Engine/Utilities/math_util.h"
 #include "Engine/Graphics/Shader/ltc_matrix.hpp"
 
@@ -61,6 +62,13 @@ void AreaLightManager::draw_imgui()
 	{
 		add_light({ 0, 5, 0 }, { 0, -1, 0 }, { 1, 0, 0 }, 2.0f, 2.0f, 3500.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("Add at Camera##Area"))
+	{
+		const CameraLightPlacement camera = GetCameraLightPlacement();
+		add_light(camera.position, camera.forward, camera.right, 2.0f, 2.0f,
+			3500.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
+	}
 
 	ImGui::Separator();
 
@@ -74,6 +82,7 @@ void AreaLightManager::draw_imgui()
 		if (ImGui::CollapsingHeader(label.c_str()))
 		{
 			l.draw_imgui("Parameters");
+			if (ImGui::Button("Go to Light")) GoToLightPosition(l.position, &l.direction);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(removeButtonLabel.c_str()))

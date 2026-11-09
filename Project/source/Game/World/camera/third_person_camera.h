@@ -3,6 +3,8 @@
 #include <Windows.h>
 #include <DirectXMath.h>
 #include <algorithm>
+#include <functional>
+#include <utility>
 #include "Engine/Graphics/UI/ImGui/ImGui.h"
 
 namespace dx = DirectX;
@@ -31,6 +33,11 @@ private:
 	// 追従対象の最新座標を保持する変数
 	dx::XMVECTOR _target_position{ dx::XMVectorSet(0,0,0,1) };
 	dx::XMVECTOR _smoothed_target{ dx::XMVectorSet(0,0,0,1) };
+	std::function<float(dx::XMVECTOR, dx::XMVECTOR, float)> _collision_resolver;
+	float _collision_radius = 0.25f;
+	float _current_distance = 5.0f;
+	float _distance_return_speed = 4.0f;
+	bool _target_initialized = false;
 public:
 	ThirdPersonCamera(HWND hwnd = nullptr) : _hwnd(hwnd) {
 		camera_.position = dx::XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
@@ -44,7 +51,16 @@ public:
 	 */
 	void set_target_position(const dx::XMVECTOR& target_pos) {
 		_target_position = target_pos;
+		if (!_target_initialized) {
+			_smoothed_target = target_pos;
+			_target_initialized = true;
+		}
 	}
+
+	void set_collision_resolver(std::function<float(dx::XMVECTOR, dx::XMVECTOR, float)> resolver) {
+		_collision_resolver = std::move(resolver);
+	}
+	void clear_collision_resolver() { _collision_resolver = {}; }
 
 	/**
 	 * @brief マネージャーから毎フレーム呼ばれる主更新処理
@@ -125,21 +141,19 @@ public:
 		);
 
 
-		//=========================================
-		// 4. 目標カメラ位置
-		//=========================================
-		dx::XMVECTOR desired_position =
-			dx::XMVectorAdd(_smoothed_target, offset);
-
-
-		//=========================================
-		// 5. カメラ位置も滑らかに補間
-		//=========================================
-		camera_.position = dx::XMVectorLerp(
-			camera_.position,
-			desired_position,
-			_lerp_factor
-		);
+		// 障害物が近づいたときは即座に寄せ、離れたときだけ距離を緩やかに戻す。
+		const dx::XMVECTOR desired_position = dx::XMVectorAdd(_target_position, offset);
+		float allowed_distance = _distance;
+		if (_collision_resolver) {
+			allowed_distance = (std::min)(allowed_distance,
+				_collision_resolver(_target_position, desired_position, _collision_radius));
+		}
+		_current_distance += (allowed_distance - _current_distance) *
+			(1.0f - expf(-_distance_return_speed * (std::max)(0.0f, deltaTime)));
+		_current_distance = (std::min)(_current_distance, allowed_distance);
+		_current_distance = (std::max)(0.05f, _current_distance);
+		camera_.position = dx::XMVectorAdd(_target_position,
+			dx::XMVectorScale(dx::XMVector3Normalize(offset), _current_distance));
 
 
 		//=========================================
@@ -188,10 +202,14 @@ public:
 
 		camera_.position = pos;
 		camera_.target = tar;
+		_target_position = tar;
+		_smoothed_target = tar;
+		_target_initialized = true;
 
 		// ターゲット（キャラクター）とカメラの間の物理的な距離を計算して同期
 		dx::XMVECTOR sub = dx::XMVectorSubtract(pos, tar);
 		_distance = dx::XMVectorGetX(dx::XMVector3Length(sub));
+		_current_distance = _distance;
 
 		// ビュー行列を即座に計算
 		camera_.view = dx::XMMatrixLookAtLH(camera_.position, camera_.target, camera_.up);
@@ -210,6 +228,8 @@ public:
 
 		// 2. 追従ラグ（滑らかさ）の調整
 		ImGui::SliderFloat("Lerp Factor (Lag)", &_lerp_factor, 0.01f, 1.0f, "%.2f");
+		ImGui::SliderFloat("Collision Radius", &_collision_radius, 0.1f, 0.5f, "%.2f m");
+		ImGui::SliderFloat("Distance Return Speed", &_distance_return_speed, 0.5f, 15.0f, "%.1f /s");
 		ImGui::TextDisabled("*(1.0f = Rigid/No Delay, Lower = Smooth/Elastic)");
 
 		// 3. マウス回転感度

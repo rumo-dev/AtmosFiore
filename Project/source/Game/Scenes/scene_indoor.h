@@ -18,6 +18,8 @@
 #include "Game/World/Player/player.h"
 #include <array>
 
+class ThirdPersonCamera;
+
 // ゲームシーン
 class Scene_Indoor : public Scene_Base
 {
@@ -96,4 +98,5 @@ private:
 
 	/// プレイヤー
 	Player _player;
+	std::shared_ptr<ThirdPersonCamera> _third_person_camera;
 };

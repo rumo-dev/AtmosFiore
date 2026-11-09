@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include "Engine/Graphics/UI/DebugMenu/CustomWidgets.h"
+#include "Game/World/camera/light_camera_tools.h"
 class DirectionalLight : public LightBase
 {
 public:
@@ -121,6 +122,20 @@ public:
 			update();
 
 		CustomUI::Checkbox("Auto Day Cycle", &auto_rotate);
+		if (ImGui::Button("Set Direction from Camera"))
+		{
+			const dx::XMFLOAT3 forward = GetCameraLightPlacement().forward;
+			auto_rotate = false;
+			pitch = dx::XMConvertToDegrees(asinf((std::clamp)(forward.y, -1.0f, 1.0f)));
+			yaw = dx::XMConvertToDegrees(atan2f(forward.x, forward.z));
+			update_from_angles();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Face Sun Direction"))
+		{
+			const dx::XMFLOAT3 toward_sun{ -direction.x, -direction.y, -direction.z };
+			GoToLightPosition(GetCameraLightPlacement().position, &toward_sun);
+		}
 
 		if (CustomUI::SliderFloat("Time", &time_of_day, 0.0f, 24.0f, "%.1f h"))
 		{

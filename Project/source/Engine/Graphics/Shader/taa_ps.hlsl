@@ -4,6 +4,8 @@
 Texture2D<float4> current_color : register(t0);
 Texture2D<float4> history_color : register(t1);
 Texture2D<float2> motion_vectors : register(t2);
+Texture2D<float> current_shadow_mask : register(t3);
+Texture2D<float> history_shadow_mask : register(t4);
 
 cbuffer TAA_CONSTANT_BUFFER : register(b12)
 {
@@ -41,6 +43,15 @@ float4 main(VS_OUT pin) : SV_TARGET
         sampler_states[LINEAR_CLAMP], previous_uv, 0).rgb;
     history = clamp(history, neighborhood_min, neighborhood_max);
     const float motion_pixels = length(velocity / float2(inverse_width, inverse_height));
-    const float weight = history_weight * (1.0f - saturate(motion_pixels / 32.0f));
+    // Shadow edges can shift when LiSPSM refits to the camera. Reusing the
+    // old color there leaves parallel dark trails even after spatial blur.
+    const float current_shadow = current_shadow_mask.SampleLevel(
+        sampler_states[LINEAR_CLAMP], pin.texcoord, 0);
+    const float previous_shadow = history_shadow_mask.SampleLevel(
+        sampler_states[LINEAR_CLAMP], previous_uv, 0);
+    const float shadow_change = abs(current_shadow - previous_shadow);
+    const float shadow_history_weight = 1.0f - saturate(shadow_change * 8.0f);
+    const float weight = history_weight * (1.0f - saturate(motion_pixels / 32.0f)) *
+        shadow_history_weight;
     return float4(lerp(current.rgb, history, weight), current.a);
 }

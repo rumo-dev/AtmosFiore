@@ -1,18 +1,18 @@
 {
   "adaptation": {
     "target_lum": 0.17,
-    "speed_to_light": 1.25,
-    "speed_to_dark": 5,
+    "speed_to_light": 1.5,
+    "speed_to_dark": 2,
     "max_exposure": 2
   },
   "bloom": {
     "enabled": 1,
     "threshold": 1.5,
-    "intensity": 0.22
+    "intensity": 0.18
   },
   "chromatic_aberration": {
-    "enabled": false,
-    "intensity": 0.1,
+    "enabled": true,
+    "intensity": 0.08,
     "physical_link": false
   },
   "distance_fog": {
@@ -21,15 +21,15 @@
       0.800000011920929,
       0.8999999761581421
     ],
-    "density": 0.5,
-    "enabled": 0,
-    "end": 80,
-    "intensity": 0.15,
-    "start": 15
+    "density": 0.1,
+    "enabled": 1,
+    "end": 100,
+    "intensity": 0.9,
+    "start": 18
   },
   "dof": {
-    "enabled": 0,
-    "blur_strength": 0.5,
+    "enabled": 1,
+    "blur_strength": 0.25,
     "debug_threshold_px": 1,
     "show_range_overlay": false
   },
@@ -38,14 +38,14 @@
     true,
     true,
     true,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
     true
   ],
   "exponential_fog": {
@@ -54,13 +54,14 @@
       0.800000011920929,
       0.8999999761581421
     ],
-    "density": 0.001,
-    "enabled": 0,
-    "intensity": 0.1,
+    "density": 0.0007,
+    "enabled": 1,
+    "intensity": 0.95,
     "mode": 1
   },
   "exposure": {
-    "enabled": false
+    "enabled": true,
+    "reference_ev100": 9.9
   },
   "height_fog": {
     "base_height": 0,
@@ -69,21 +70,21 @@
       0.800000011920929,
       0.8999999761581421
     ],
-    "density": 0.15,
-    "enabled": 0,
-    "falloff": 1.5490000247955322,
-    "intensity": 0.01,
+    "density": 0.08,
+    "enabled": 1,
+    "falloff": 1.5,
+    "intensity": 0.9,
     "noise_scale": 0.6305000185966492,
-    "noise_strength": 2.7850000858306885,
+    "noise_strength": 0.25,
     "wind_velocity": [
-      0.4729999899864197,
+      0.1,
       0,
       0
     ]
   },
   "lens_distortion": {
-    "enabled": false,
-    "scale": 0.15,
+    "enabled": true,
+    "scale": 0.08,
     "physical_link": false
   },
   "order": [
@@ -93,19 +94,19 @@
     5,
     6,
     7,
-    2,
-    1,
     8,
+    1,
+    2,
     9,
     10,
     11,
     12
   ],
   "ssgi": {
-    "enabled": false,
-    "radius": 2,
-    "intensity": 0.15,
-    "thickness": 0.2
+    "enabled": true,
+    "radius": 1.5,
+    "intensity": 0.08,
+    "thickness": 0.15
   },
   "tone_mapping": {
     "enabled": 1,
@@ -125,44 +126,44 @@
     "history_weight": 0.84
   },
   "vignetting": {
-    "enabled": false,
-    "intensity": 0.15,
-    "inner_radius": 0.45,
-    "outer_radius": 0.9,
+    "enabled": true,
+    "intensity": 0.18,
+    "inner_radius": 0.48,
+    "outer_radius": 1.1,
     "smoothness": 1.5,
     "physical_link": false
   },
   "volumetric_fog": {
-    "absorption": 0.008,
-    "anisotropy": 0.55,
-    "density": 0.005,
+    "absorption": 0.006,
+    "anisotropy": 0.5,
+    "density": 0.004,
     "enabled": 1,
-    "fog_far": 30,
+    "fog_far": 35,
     "fog_near": 0.2,
     "grid_depth": 96,
     "grid_height": 54,
     "grid_width": 96,
-    "intensity": 0.35,
+    "intensity": 0.25,
     "noise_scale": 0,
-    "scattering": 0.55,
-    "gi_scattering": 0.2
+    "scattering": 0.45,
+    "gi_scattering": 0.15
   },
   "ssao": {
     "enabled": true,
-    "radius": 0.45,
-    "bias": 0.02,
-    "intensity": 0.6,
-    "contrast": 1,
+    "radius": 1,
+    "bias": 0.0015,
+    "intensity": 1.6,
+    "contrast": 1.25,
     "spatial_sigma": 3,
     "position_sigma": 8
   },
   "ssr": {
-    "enabled": false,
+    "enabled": true,
     "max_distance": 16,
     "surface_thickness": 0.2,
-    "reflection_strength": 0.5,
+    "reflection_strength": 0.35,
     "roughness_cutoff": 0.45,
     "metallic_cutoff": 0.03,
-    "max_steps": 40
+    "max_steps": 32
   }
 }

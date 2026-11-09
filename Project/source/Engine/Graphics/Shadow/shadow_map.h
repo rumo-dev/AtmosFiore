@@ -50,7 +50,8 @@ public:
 	 * 内部ではTypelessフォーマット（例: R32_TYPELESS）を使用し、
 	 * DSV / SRV を用途に応じて生成する。
 	 */
-	shadow_map(ID3D11Device* device, uint32_t width, uint32_t height);
+	shadow_map(ID3D11Device* device, uint32_t width, uint32_t height,
+		bool high_precision_depth = false);
 
 	virtual ~shadow_map() = default;
 

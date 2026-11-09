@@ -1,18 +1,19 @@
 {
   "adaptation": {
-    "speed_to_dark": 1.0,
-    "speed_to_light": 2.0,
-    "target_lum": 0.18000000715255737
+    "speed_to_dark": 2,
+    "speed_to_light": 1.5,
+    "target_lum": 0.18,
+    "max_exposure": 2
   },
   "bloom": {
     "enabled": 1,
-    "intensity": 0.6729999780654907,
-    "threshold": 1.0
+    "intensity": 0.22,
+    "threshold": 1.35
   },
   "chromatic_aberration": {
     "enabled": true,
-    "intensity": 1.0,
-    "physical_link": true
+    "intensity": 0.1,
+    "physical_link": false
   },
   "distance_fog": {
     "color": [
@@ -20,14 +21,17 @@
       0.800000011920929,
       0.8999999761581421
     ],
-    "density": 1.0,
+    "density": 0.2,
     "enabled": 1,
-    "end": 1000.0,
-    "intensity": 1.0,
-    "start": 10.0
+    "end": 150,
+    "intensity": 0.95,
+    "start": 30
   },
   "dof": {
-    "enabled": 1
+    "enabled": 1,
+    "blur_strength": 0.3,
+    "debug_threshold_px": 1,
+    "show_range_overlay": false
   },
   "enabled": [
     true,
@@ -50,97 +54,116 @@
       0.800000011920929,
       0.8999999761581421
     ],
-    "density": 0.0026000000070780516,
+    "density": 0.0012,
     "enabled": 1,
-    "intensity": 1.0,
+    "intensity": 0.95,
     "mode": 1
   },
   "exposure": {
-    "enabled": true
+    "enabled": true,
+    "reference_ev100": 4.9
   },
   "height_fog": {
-    "base_height": 0.0,
+    "base_height": 0,
     "color": [
       0.699999988079071,
       0.800000011920929,
       0.8999999761581421
     ],
-    "density": 0.800000011920929,
+    "density": 0.12,
     "enabled": 1,
-    "falloff": 1.5490000247955322,
-    "intensity": 0.02199999988079071,
+    "falloff": 1.5,
+    "intensity": 0.9,
     "noise_scale": 0.6305000185966492,
-    "noise_strength": 2.7850000858306885,
+    "noise_strength": 0.35,
     "wind_velocity": [
-      0.4729999899864197,
-      0.0,
-      0.0
+      0.1,
+      0,
+      0
     ]
   },
   "lens_distortion": {
     "enabled": true,
-    "physical_link": true,
-    "scale": 1.0
+    "physical_link": false,
+    "scale": 0.1
   },
   "order": [
     0,
-    1,
     3,
     4,
     5,
     6,
     7,
     8,
+    1,
+    2,
     9,
     10,
     11,
-    2,
     12
   ],
   "ssgi": {
     "enabled": true,
-    "radius": 2.5,
-    "intensity": 0.25,
-    "thickness": 0.2
+    "radius": 2,
+    "intensity": 0.12,
+    "thickness": 0.15
   },
-
   "tone_mapping": {
     "enabled": 1,
-    "exposure": 1.0,
+    "exposure": 1,
     "gamma": 2.200000047683716,
     "gt_param": 0.2199999988079071,
     "linear_angle": 0.10000000149011612,
     "linear_strength": 0.30000001192092896,
     "mapping_type": 7,
-    "max_white": 10.0,
+    "max_white": 10,
     "shoulder": 0.2199999988079071,
     "toe_strength": 0.20000000298023224
   },
   "version": 1,
   "taa": {
     "enabled": true,
-    "history_weight": 0.9
+    "history_weight": 0.86
   },
   "vignetting": {
     "enabled": true,
-    "inner_radius": 0.3499999940395355,
-    "intensity": 1.0,
-    "outer_radius": 0.75,
-    "physical_link": true,
-    "smoothness": 2.0
+    "inner_radius": 0.48,
+    "intensity": 0.2,
+    "outer_radius": 1.1,
+    "physical_link": false,
+    "smoothness": 1.5
   },
   "volumetric_fog": {
-    "absorption": 0.0020000000949949026,
-    "anisotropy": 0.6499999761581421,
-    "density": 0.019999999552965164,
+    "absorption": 0.004,
+    "anisotropy": 0.5,
+    "density": 0.008,
     "enabled": 1,
-    "fog_far": 60.0,
-    "fog_near": 0.10000000149011612,
-    "grid_depth": 128,
-    "grid_height": 90,
-    "grid_width": 160,
-    "intensity": 1.0,
-    "noise_scale": 0.0,
-    "scattering": 0.800000011920929
+    "fog_far": 60,
+    "fog_near": 0.1,
+    "grid_depth": 96,
+    "grid_height": 68,
+    "grid_width": 120,
+    "intensity": 0.4,
+    "noise_scale": 0,
+    "scattering": 0.6,
+    "gi_scattering": 0.15
+  },
+  "ssao": {
+    "enabled": true,
+    "radius": 0.75,
+    "bias": 0.0015,
+    "intensity": 1.3,
+    "contrast": 1.2,
+    "spatial_sigma": 3,
+    "position_sigma": 8
+  },
+  "ssr": {
+    "enabled": true,
+    "max_distance": 16,
+    "surface_thickness": 0.2,
+    "reflection_strength": 0.4,
+    "roughness_cutoff": 0.55,
+    "metallic_cutoff": 0.03,
+    "max_steps": 32
   }
 }

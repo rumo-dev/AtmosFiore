@@ -23,7 +23,7 @@
  * @note
  * ・出力は依然 R16G16B16A16_FLOAT の線形HDR
  * ・Bloom の前段・後段どちらにも挿入可能
- * ・b1 の Camera_Constants を参照するため追加の定数バッファ不要
+ * ・b1 の Camera_Constants と b9 の基準 EV100 を参照
  */
 class Exposure
 {
@@ -73,6 +73,7 @@ public:
 
 
 	bool  is_enabled = true;          ///< 無効時はパススルー
+	float reference_ev100 = 5.0f;    ///< この EV100 で露出倍率 1.0
 
 private:
 	std::unique_ptr<FullscreenQuad> bit_block_transfer;
@@ -84,7 +85,8 @@ private:
 	struct alignas(16) ExposureConstants
 	{
 		int   is_enabled;       // 有効フラグ
-		float pad[3];
+		float reference_ev100;
+		float pad[2];
 	};
 	static_assert(sizeof(ExposureConstants) % 16 == 0,
 		"ExposureConstants must be 16-byte aligned");

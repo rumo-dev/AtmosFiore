@@ -123,11 +123,15 @@ private:
 	static Framebuffer ssao_blur_buffer;
 	static Framebuffer ssao_vertical_buffer;
 	static Framebuffer ssao_filtered_buffer;
+	static Framebuffer directional_shadow_mask_buffer;
+	static Framebuffer directional_shadow_blur_horizontal_buffer;
+	static Framebuffer directional_shadow_blur_vertical_buffer;
 	static Framebuffer ssr_buffer;
 	static Framebuffer ssr_composite_buffer;
 	static Framebuffer ssgi_buffer;
 	static Framebuffer ssgi_composite_buffer;
 	static std::array<Framebuffer, 2> taa_history;
+	static std::array<Framebuffer, 2> taa_shadow_history;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> taa_constant_buffer;
 	static bool taa_enabled;
 	static bool taa_history_valid;

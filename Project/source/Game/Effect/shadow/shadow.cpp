@@ -6,6 +6,9 @@
 
 #include <vector>
 #include <algorithm>
+#include <array>
+#include <cfloat>
+#include <cmath>
 #include "Engine/system/render_state.h"
 #include "Engine/System/graphics_core.h"
 
@@ -18,13 +21,33 @@ shadow::shadow(ID3D11Device* device, uint32_t width, uint32_t height)
 	// SHADOW MAPS
 	point_shadow_front = std::make_unique<shadow_map>(device, shadowmap_width, shadowmap_height);
 	point_shadow_back = std::make_unique<shadow_map>(device, shadowmap_width, shadowmap_height);
-	directional_shadow_map = std::make_unique<shadow_map>(device, shadowmap_width, shadowmap_height);
+	directional_shadow_map = std::make_unique<shadow_map>(device,
+		directional_shadowmap_size, directional_shadowmap_size, true);
+	D3D11_RASTERIZER_DESC shadow_rasterizer_desc{};
+	shadow_rasterizer_desc.FillMode = D3D11_FILL_SOLID;
+	// Shadow depth must include both sides of thin / single-sided room meshes.
+	// The scene uses mixed glTF winding conventions, so back-face culling here
+	// can remove an entire ceiling or wall from the light-space depth map.
+	shadow_rasterizer_desc.CullMode = D3D11_CULL_NONE;
+	shadow_rasterizer_desc.FrontCounterClockwise = FALSE;
+	shadow_rasterizer_desc.DepthClipEnable = TRUE;
+	// R32 depth removes the quantization that required a large caster offset.
+	// Keep only a tiny slope correction so the stored blocker remains aligned
+	// with the geometry that casts it.
+	shadow_rasterizer_desc.DepthBias = 0;
+	shadow_rasterizer_desc.SlopeScaledDepthBias = 0.15f;
+	shadow_rasterizer_desc.DepthBiasClamp = 0.00005f;
+	device->CreateRasterizerState(&shadow_rasterizer_desc,
+		directional_shadow_rasterizer.GetAddressOf());
 
 	D3D11_BUFFER_DESC buffer_desc{};
 	buffer_desc.ByteWidth = sizeof(Point_Shadow_Constants);
 	buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 	buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	HRESULT hr = device->CreateBuffer(&buffer_desc, nullptr, point_shadow_constant_buffer.GetAddressOf());
+	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	buffer_desc.ByteWidth = sizeof(DirectX::XMFLOAT4);
+	hr = device->CreateBuffer(&buffer_desc, nullptr, directional_pcss_constant_buffer.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
 
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
@@ -102,44 +125,148 @@ void shadow::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceVi
 void shadow::make_directional_shadow_begin()
 {
 	TRACY_CPU_ZONE_C("shadow::make_directional_shadow_begin", TracyCategory::Shadow);
+	const DirectX::XMFLOAT4 pcss_parameters = {
+		(directional_pcss_enabled ? directional_light_angular_radius : 0.0f), directional_pcss_search_radius,
+		(std::max)(directional_pcss_max_filter_radius, directional_pcss_min_filter_radius),
+		directional_pcss_min_filter_radius
+	};
+	auto* context = Graphics_Core::instance().get_device_context();
+	context->UpdateSubresource(directional_pcss_constant_buffer.Get(), 0, nullptr,
+		&pcss_parameters, 0, 0);
+	context->PSSetConstantBuffers(13, 1, directional_pcss_constant_buffer.GetAddressOf());
 
 	using namespace DirectX;
-
-	XMFLOAT4X4 VP;
-
-	// カメラオブジェクトの毎フレームコピーを防止するため const 参照(&) で受ける
 	const Camera& cam = CameraManager::instance().get_active_camera()->get_camera();
-
-	const float aspect_ratio =
-		directional_shadow_map->viewport.Width /
-		directional_shadow_map->viewport.Height;
-
-	// カメラの位置だけを使用（向きは無視）
-	XMVECTOR F = cam.position;
-
-	XMFLOAT4 directional_light_direction =
+	const float near_distance = (std::max)(cam.near_z, 0.01f);
+	const float far_distance = (std::max)(near_distance + 0.01f,
+		(std::min)(cam.far_z, light_view_size));
+	const float tan_half_fov = std::tan(cam.fov * 0.5f);
+	const XMVECTOR camera_right = XMVector3Normalize(cam.inv_view.r[0]);
+	const XMVECTOR camera_up = XMVector3Normalize(cam.inv_view.r[1]);
+	const XMVECTOR camera_forward = XMVector3Normalize(cam.inv_view.r[2]);
+	const XMFLOAT4 light_direction_value =
 		Graphics_Core::instance().get_directional_light_direction();
+	const XMVECTOR light_direction = XMVector3Normalize(
+		XMLoadFloat4(&light_direction_value));
 
-	XMVECTOR lightDir =
-		XMVector3Normalize(XMLoadFloat4(&directional_light_direction));
+	// Fit the receiver frustum in the light plane. Extend it toward the light
+	// so objects outside the camera frustum can still cast into the view.
+	std::array<XMVECTOR, 8> receivers;
+	XMVECTOR center = XMVectorZero();
+	for (int plane = 0; plane < 2; ++plane)
+	{
+		const float distance = plane ? far_distance : near_distance;
+		const float half_height = distance * tan_half_fov;
+		const float half_width = half_height * cam.aspect_ratio;
+		for (int corner = 0; corner < 4; ++corner)
+		{
+			const float x = (corner & 1) ? half_width : -half_width;
+			const float y = (corner & 2) ? half_height : -half_height;
+			const XMVECTOR point = cam.position + camera_forward * distance +
+				camera_right * x + camera_up * y;
+			receivers[plane * 4 + corner] = point;
+			center += point;
+		}
+	}
+	center *= 1.0f / 8.0f;
+	const float view_light_dot = XMVectorGetX(XMVector3Dot(camera_forward, light_direction));
+	const float sin_gamma = std::sqrt((std::max)(0.0f, 1.0f - view_light_dot * view_light_dot));
+	const bool use_lispsm = sin_gamma > 0.03f;
+	const XMVECTOR projected_forward = XMVector3Normalize(
+		camera_forward - light_direction * view_light_dot);
+	const XMVECTOR fallback_up = std::abs(XMVectorGetY(light_direction)) < 0.95f
+		? XMVectorSet(0, 1, 0, 0) : XMVectorSet(1, 0, 0, 0);
+	const XMVECTOR up = use_lispsm ? projected_forward : fallback_up;
+	const XMMATRIX light_view = XMMatrixLookToLH(
+		center - light_direction * (light_view_distance + light_view_far_z),
+		light_direction, up);
 
-	// ライト方向に離れた位置からカメラ位置を見る
-	XMVECTOR E = F - lightDir * light_view_distance;
+	float min_x = FLT_MAX, min_y = FLT_MAX, min_z = FLT_MAX;
+	float max_x = -FLT_MAX, max_y = -FLT_MAX, max_z = -FLT_MAX;
+	for (const XMVECTOR point : receivers)
+	{
+		const XMVECTOR p = XMVector3TransformCoord(point, light_view);
+		min_x = (std::min)(min_x, XMVectorGetX(p));
+		max_x = (std::max)(max_x, XMVectorGetX(p));
+		min_y = (std::min)(min_y, XMVectorGetY(p));
+		max_y = (std::max)(max_y, XMVectorGetY(p));
+		min_z = (std::min)(min_z, XMVectorGetZ(p));
+		max_z = (std::max)(max_z, XMVectorGetZ(p));
+		const XMVECTOR caster = XMVector3TransformCoord(
+			point - light_direction * light_view_far_z, light_view);
+		min_z = (std::min)(min_z, XMVectorGetZ(caster));
+	}
+	min_z = (std::max)(light_view_near_z, min_z - 1.0f);
+	max_z += 1.0f;
 
-	XMMATRIX V = XMMatrixLookAtLH(
-		E,
-		F,
-		XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
-	);
-
-	XMMATRIX P = XMMatrixOrthographicLH(
-		light_view_size * aspect_ratio,
-		light_view_size,
-		light_view_near_z,
-		light_view_far_z
-	);
-
-	XMStoreFloat4x4(&VP, V * P);
+	XMMATRIX projection;
+	if (use_lispsm)
+	{
+		// In light space Y follows the camera view direction. A perspective
+		// warp along Y assigns more map texels to nearby receivers while Z
+		// remains monotonic along every light ray for depth comparison.
+		// 小さい近接面からの過度なワープは遠方の解像度を潰し、
+		// カメラ角度によって影の縁が激しく変化する。
+		const float optimal_near = (std::max)(far_distance * 0.5f, (std::min)(
+			(near_distance + std::sqrt(near_distance * far_distance)) / sin_gamma,
+			far_distance * 10.0f));
+		const float eye_y = min_y - (std::max)(optimal_near, 0.1f);
+		const XMMATRIX warp(
+			XMVectorSet(1, 0, 0, 0), XMVectorSet(0, 1, 0, 1),
+			XMVectorSet(0, 0, 1, 0), XMVectorSet(0, 0, 0, -eye_y));
+		float bounds_min[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
+		float bounds_max[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		for (const XMVECTOR point : receivers)
+		{
+			const XMVECTOR p = XMVector3TransformCoord(point, light_view * warp);
+			const XMVECTOR caster = XMVector3TransformCoord(
+				point - light_direction * light_view_far_z, light_view * warp);
+			const float receiver_values[3] = { XMVectorGetX(p), XMVectorGetY(p), XMVectorGetZ(p) };
+			const float caster_values[3] = {
+				XMVectorGetX(caster), XMVectorGetY(caster), XMVectorGetZ(caster) };
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				bounds_min[axis] = (std::min)(bounds_min[axis], receiver_values[axis]);
+				bounds_max[axis] = (std::max)(bounds_max[axis], receiver_values[axis]);
+				// A caster can sit far outside the camera receiver frustum in
+				// light-space X/Y and still cast into it. Include the complete
+				// extrusion in the LiSPSM fit, not only its depth coordinate.
+				bounds_min[axis] = (std::min)(bounds_min[axis], caster_values[axis]);
+				bounds_max[axis] = (std::max)(bounds_max[axis], caster_values[axis]);
+			}
+		}
+		// Refit depth against the same receiver/caster extrusion used by the
+		// non-warped projection. The earlier depth range started at receiver
+		// corners and could clip casters even when their XY fit was valid.
+		bounds_min[2] = (std::min)(bounds_min[2], min_z);
+		bounds_max[2] = (std::max)(bounds_max[2], max_z);
+		// PCSS の探索・フィルタが端でサンプルを失わないように余白を取る。
+		for (int axis = 0; axis < 2; ++axis)
+		{
+			const float padding = (bounds_max[axis] - bounds_min[axis]) * 0.05f;
+			bounds_min[axis] -= padding;
+			bounds_max[axis] += padding;
+		}
+		const float sx = 2.0f / (std::max)(bounds_max[0] - bounds_min[0], 0.001f);
+		const float sy = 2.0f / (std::max)(bounds_max[1] - bounds_min[1], 0.001f);
+		const float sz = 1.0f / (std::max)(bounds_max[2] - bounds_min[2], 0.001f);
+		const XMMATRIX focus(
+			XMVectorSet(sx, 0, 0, 0), XMVectorSet(0, sy, 0, 0),
+			XMVectorSet(0, 0, sz, 0),
+			XMVectorSet(-(bounds_min[0] + bounds_max[0]) * sx * 0.5f,
+				-(bounds_min[1] + bounds_max[1]) * sy * 0.5f,
+				-bounds_min[2] * sz, 1));
+		projection = warp * focus;
+	}
+	else
+	{
+		const float pad_x = (max_x - min_x) * 0.05f;
+		const float pad_y = (max_y - min_y) * 0.05f;
+		projection = XMMatrixOrthographicOffCenterLH(min_x - pad_x, max_x + pad_x,
+			min_y - pad_y, max_y + pad_y, min_z, max_z);
+	}
+	XMFLOAT4X4 VP;
+	XMStoreFloat4x4(&VP, light_view * projection);
 
 	// カリング・描画用に保存
 	last_light_view_projection = VP;
@@ -150,6 +277,11 @@ void shadow::make_directional_shadow_begin()
 	auto* dc = Graphics_Core::instance().get_device_context();
 	active_shadow_map->clear(dc, 1.0f);
 	active_shadow_map->activate(dc);
+	if (directional_shadow_rasterizer)
+	{
+		dc->RSGetState(saved_directional_rasterizer.ReleaseAndGetAddressOf());
+		dc->RSSetState(directional_shadow_rasterizer.Get());
+	}
 }
 
 // ポイントライトのシャドウマップ生成開始
@@ -244,7 +376,13 @@ void shadow::make_shadow_end()
 	// 極めて軽量な終了処理のため、あえてゾーン計測は設定せずオーバーヘッドを削減
 	if (active_shadow_map)
 	{
-		active_shadow_map->deactivate(Graphics_Core::instance().get_device_context());
+		auto* context = Graphics_Core::instance().get_device_context();
+		active_shadow_map->deactivate(context);
+		if (active_shadow_map == directional_shadow_map.get() && directional_shadow_rasterizer)
+		{
+			context->RSSetState(saved_directional_rasterizer.Get());
+			saved_directional_rasterizer.Reset();
+		}
 		active_shadow_map = nullptr;
 	}
 }

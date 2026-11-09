@@ -1,6 +1,7 @@
 #include "point_light_manager.h"
 #include "Engine/System/graphics_core.h"
 #include "Game/World/camera/camera_manager.h"
+#include "Game/World/camera/light_camera_tools.h"
 #include "Engine/Utilities/math_util.h"
 
 
@@ -65,6 +66,12 @@ void PointLightManager::draw_imgui()
 	{
 		add_light({ 0, 5, 0 }, 10.0f, 10000.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("Add at Camera##Point"))
+	{
+		add_light(GetCameraLightPlacement().position, 10.0f, 10000.0f,
+			{ 1.0f, 1.0f, 1.0f, 1.0f });
+	}
 
 	ImGui::Separator();
 
@@ -78,6 +85,7 @@ void PointLightManager::draw_imgui()
 		if (ImGui::CollapsingHeader(label.c_str()))
 		{
 			l.draw_imgui("Parameters");
+			if (ImGui::Button("Go to Light")) GoToLightPosition(l.position);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(removeButtonLabel.c_str()))

@@ -118,6 +118,8 @@ void Resource_Manager::load_shaders() {
 		"DEFERRED_LIGHTING_PS",
 		"deferred_lighting_ps"
 	);
+	load_shader<Pixel_Shader>("DIRECTIONAL_SHADOW_MASK_PS", "directional_shadow_mask_ps");
+	load_shader<Pixel_Shader>("DIRECTIONAL_SHADOW_BLUR_PS", "directional_shadow_blur_ps");
 	//ssao
 	load_shader<Pixel_Shader>(
 		"SSAO_PS",

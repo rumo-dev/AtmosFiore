@@ -338,14 +338,9 @@ void ModelManager::render_all(pass_mode pass)
 			have_frustum = true;
 		}
 	}
-	// Additionally, for directional shadow pass, use the light's view-projection for culling if available
-	if (pass == pass_mode::directional_shadow) {
-		auto& shadower = Graphics_Core::instance().post_procss.GetShadow();
-		DirectX::XMFLOAT4X4 lightVP = shadower.get_light_view_projection();
-		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(&lightVP);
-		cam_frustum = ExtractFrustumFromMatrix(m);
-		have_frustum = true;
-	}
+	// LiSPSM is a projective warp, not a conventional camera frustum. The
+	// extracted six-plane frustum can reject valid off-screen casters, so do
+	// not apply model/meshlet frustum culling in the directional shadow pass.
 	// Point shadow: use per-face view-projection matrices
 	bool point_shadow_pass = (pass == pass_mode::shadow);
 	shadow* shadower_ptr = nullptr;
