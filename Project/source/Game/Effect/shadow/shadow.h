@@ -165,7 +165,9 @@ public: // shadow settings
 	 */
 	const uint32_t shadowmap_width = 2048;
 	const uint32_t shadowmap_height = 2048;
-	const uint32_t directional_shadowmap_size = 3072;
+	// 3072^2 was expensive when the LiSPSM pass had to draw uncullled casters.
+	// 2048^2 cuts depth fill and bandwidth by 56% while retaining ample detail.
+	const uint32_t directional_shadowmap_size = 2048;
 
 	///< ポイントライト用双放物面シャドウマップ（前後）
 	std::unique_ptr<shadow_map> point_shadow_front;
@@ -185,7 +187,7 @@ public: // shadow settings
 	float light_view_distance{ 35.0f };
 
 	///< 平行光源のシャドウを割り当てるカメラからの最大距離
-	float light_view_size{ 100.0f };
+	float light_view_size{ 60.0f };
 
 	///< ニアクリップ
 	float light_view_near_z{ 0.1f };

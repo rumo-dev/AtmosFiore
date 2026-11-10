@@ -101,8 +101,9 @@ void Scene_Indoor::initialize()
 				light.intensity = small_hotspot ? 800.0f : (bulb ? 4000.0f : 8000.0f);
 				light.diffuseColor = small_hotspot || bulb ? warm_white : neutral_white;
 				// 影はモデル内のポイント光だけに割り当てる。アトラスの上限は 16 灯。
-				light.cast_shadows = bulb ? bulb_hotspots++ == 0 :
-					!small_hotspot && normal_hotspots++ % 3 == 0 && normal_hotspots <= 24;
+				light.cast_shadows = false;
+				//light.cast_shadows = bulb ? bulb_hotspots++ == 0 :
+				//	!small_hotspot && normal_hotspots++ % 3 == 0 && normal_hotspots <= 24;
 				points.add_light(light);
 			}
 		}
@@ -138,25 +139,25 @@ void Scene_Indoor::initialize()
 	auto& camera_mgr = CameraManager::instance();
 
 	auto indoor_camera = [](const std::shared_ptr<ICamera>& camera)
-	{
-		auto& lens = camera->get_camera();
-		lens.FocalLength = 35.0f;
-		lens.SensorSize = 36.0f;
-		lens.near_z = 0.08f;
-		lens.far_z = 250.0f;
-		lens.FNumber = 8.0f;
-		lens.FocusDist = 6.0f;
-		lens.shutterDenominator = 60.0f;
-		lens.ISO = 400.0f;
-		lens.EV_Compensation = 0.0f;
-		lens.autoSettingsEnabled = false;
-		return camera;
-	};
+		{
+			auto& lens = camera->get_camera();
+			lens.FocalLength = 35.0f;
+			lens.SensorSize = 36.0f;
+			lens.near_z = 0.08f;
+			lens.far_z = 250.0f;
+			lens.FNumber = 8.0f;
+			lens.FocusDist = 6.0f;
+			lens.shutterDenominator = 60.0f;
+			lens.ISO = 400.0f;
+			lens.EV_Compensation = 0.0f;
+			lens.autoSettingsEnabled = false;
+			return camera;
+		};
 	camera_mgr.register_camera("Spectator", indoor_camera(std::make_shared<SpectatorCamera>(hwnd)));
 	_third_person_camera = std::make_shared<ThirdPersonCamera>(hwnd);
 	_third_person_camera->set_collision_resolver([this](dx::XMVECTOR focus, dx::XMVECTOR desired, float radius) {
 		return _player.camera_clear_distance(focus, desired, radius);
-	});
+		});
 	camera_mgr.register_camera("ThirdPerson", indoor_camera(_third_person_camera));
 	camera_mgr.register_camera("FirstPerson", indoor_camera(std::make_shared<FirstPersonCamera>(hwnd)));
 

@@ -194,14 +194,18 @@ void Post_Process_Manager::initialize()
 	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	const uint32_t ssao_width = (std::max)(1u, w / 2);
 	const uint32_t ssao_height = (std::max)(1u, h / 2);
+	// Directional visibility is smooth enough for half-resolution storage; the
+	// depth/normal-aware blur also runs at this size before linear upsampling.
+	const uint32_t shadow_mask_width = (std::max)(1u, w / 2);
+	const uint32_t shadow_mask_height = (std::max)(1u, h / 2);
 	// AO is a single scalar; storing RGBA wastes three quarters of these targets.
 	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
-	directional_shadow_mask_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
-	directional_shadow_blur_horizontal_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
-	directional_shadow_blur_vertical_buffer = Framebuffer(device, w, h, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_mask_buffer = Framebuffer(device, shadow_mask_width, shadow_mask_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_horizontal_buffer = Framebuffer(device, shadow_mask_width, shadow_mask_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_vertical_buffer = Framebuffer(device, shadow_mask_width, shadow_mask_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssr_buffer = Framebuffer{};
 	ssr_composite_buffer = Framebuffer{};
 	ssgi_buffer = Framebuffer(device, (std::max)(1u, w / 2), (std::max)(1u, h / 2), DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
@@ -266,13 +270,15 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 	fsquad = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
 	const UINT ssao_width = (std::max)(1u, width / 2);
 	const UINT ssao_height = (std::max)(1u, height / 2);
+	const UINT shadow_mask_width = (std::max)(1u, width / 2);
+	const UINT shadow_mask_height = (std::max)(1u, height / 2);
 	ssao_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_blur_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_vertical_buffer = Framebuffer(device, ssao_width, ssao_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	ssao_filtered_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
-	directional_shadow_mask_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
-	directional_shadow_blur_horizontal_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
-	directional_shadow_blur_vertical_buffer = Framebuffer(device, width, height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_mask_buffer = Framebuffer(device, shadow_mask_width, shadow_mask_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_horizontal_buffer = Framebuffer(device, shadow_mask_width, shadow_mask_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
+	directional_shadow_blur_vertical_buffer = Framebuffer(device, shadow_mask_width, shadow_mask_height, DXGI_FORMAT_R16_FLOAT, 1, false, false);
 	// SSR targets are allocated when the effect is actually enabled.
 	ssr_buffer = Framebuffer{};
 	ssr_composite_buffer = Framebuffer{};
@@ -387,7 +393,7 @@ void Post_Process_Manager::begin()
 		ctx->PSSetShaderResources(0, 3, null_inputs);
 
 		directional_shadow_blur_constants.radius_pixels =
-			shadower->get_directional_screen_blur_radius();
+			shadower->get_directional_screen_blur_radius() * 0.5f;
 		ctx->PSSetConstantBuffers(12, 1, directional_shadow_blur_constant_buffer.GetAddressOf());
 		directional_shadow_blur_constants.direction_x = 1.0f;
 		directional_shadow_blur_constants.direction_y = 0.0f;
