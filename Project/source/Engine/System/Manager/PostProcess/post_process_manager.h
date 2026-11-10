@@ -122,6 +122,7 @@ private:
 	static Framebuffer adaptation_input;
 	static ID3D11ShaderResourceView* final_color_map;
 	static Framebuffer fsquad;
+	static Framebuffer pbr_background_buffer;
 	static Framebuffer ssao_buffer;
 	static Framebuffer ssao_blur_buffer;
 	static Framebuffer ssao_vertical_buffer;

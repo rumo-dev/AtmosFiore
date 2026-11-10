@@ -5,6 +5,8 @@
 // @VertexInput TEXCOORD float2
 // @VertexInput JOINTS uint4
 // @VertexInput WEIGHTS float4
+// @VertexInput TEXCOORD1 float2
+// @VertexInput COLOR float4
 
 VS_OUT main(VS_IN vin)
 {
@@ -26,14 +28,19 @@ VS_OUT main(VS_IN vin)
     vout.w_position = mul(vin.position, world);
 
     vin.normal.w = 0;
-    vout.w_normal = normalize(mul(vin.normal, world));
+    float3x3 model_linear = (float3x3)world;
+    float determinant = dot(model_linear[0], cross(model_linear[1], model_linear[2]));
+    float3x3 cofactor = float3x3(cross(model_linear[1], model_linear[2]), cross(model_linear[2], model_linear[0]), cross(model_linear[0], model_linear[1]));
+    vout.w_normal = float4(normalize(mul(vin.normal.xyz, cofactor) / (abs(determinant)>1e-10?determinant:1)), 0);
 
 	//float sigma = vin.tangent.w;
     vin.tangent.w = 0;
     vout.w_tangent = normalize(mul(vin.tangent, world));
-    vout.w_tangent.w = sigma;
+    vout.w_tangent.w = sigma * (determinant < 0 ? -1 : 1);
 
     vout.texcoord = vin.texcoord;
+    vout.texcoord1 = (vertex_flags & 2) ? vin.texcoord1 : vin.texcoord;
+    vout.color = (vertex_flags & 1) ? vin.color : 1.0f.xxxx;
 
     return vout;
 }

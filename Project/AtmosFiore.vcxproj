@@ -417,6 +417,7 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Engine\Graphics\UI\text\text.h" />
     <ClInclude Include="source\Engine\Graphics\Model\debug_primitive.h" />
     <ClInclude Include="source\Engine\Graphics\Model\gltf_model.h" />
+    <ClInclude Include="source\Engine\Graphics\Model\gltf_pbr_material.h" />
     <ClInclude Include="source\Engine\Graphics\Model\obj_model.h" />
     <ClInclude Include="source\Engine\SharedData.h" />
     <ClInclude Include="source\Engine\System\Manager\Audio\AudioVisualizer.h" />
@@ -635,6 +636,8 @@ if exist export rmdir /s /q export</Command>
     <None Include="source\Engine\Graphics\Shader\bidirectional_reflectance_distribution_function.hlsli" />
     <None Include="source\Engine\Graphics\Shader\debug_primitive.hlsli" />
     <None Include="source\Engine\Graphics\Shader\gltf_model.hlsli" />
+    <None Include="source\Engine\Graphics\Shader\gltf_pbr_data.hlsli" />
+    <None Include="source\Engine\Graphics\Shader\gltf_pbr_forward.hlsli" />
     <None Include="source\Engine\Graphics\Shader\image_based_lighting.hlsli" />
     <None Include="source\Engine\Graphics\Shader\obj_model.hlsli" />
     <None Include="source\Engine\Graphics\Shader\constants.hlsli" />

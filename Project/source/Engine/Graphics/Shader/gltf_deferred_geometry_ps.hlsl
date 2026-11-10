@@ -1,6 +1,7 @@
 // DEFERRED_RENDERING
 #include "gltf_model.hlsli"
 #include "samplers.hlsli"
+#include "gltf_pbr_data.hlsli"
 
 
 // UNIT.35
@@ -120,13 +121,15 @@ PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
     const float GAMMA = 2.2;
 
     const material_constants m = materials[material];
+    const PbrMaterial pm = pbr_materials[material];
+    if(!is_front_face && pm.flags.y==0)discard;
 
-    float4 basecolor_factor = m.pbr_metallic_roughness.basecolor_factor;
+    float4 basecolor_factor = m.pbr_metallic_roughness.basecolor_factor * pin.color;
     const int basecolor_texture = m.pbr_metallic_roughness.basecolor_texture.index;
     if (basecolor_texture > -1)
     {
-        float4 sampled = material_textures[BASECOLOR_TEXTURE].Sample(sampler_states[ANISOTROPIC_WRAP], pin.texcoord);
-        sampled.rgb = pow(sampled.rgb, GAMMA);
+        float4 sampled = PbrTex(0,pm.textures[0],pin.texcoord,pin.texcoord1,1);
+        sampled.rgb = PbrLinear(sampled.rgb);
         basecolor_factor *= sampled;
     }
     if (m.alpha_mode == 0 /*OPAQUE*/)
@@ -144,8 +147,8 @@ PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
     const int emissive_texture = m.emissive_texture.index;
     if (emissive_texture > -1)
     {
-        float4 sampled = material_textures[EMISSIVE_TEXTURE].Sample(sampler_states[ANISOTROPIC_WRAP], pin.texcoord);
-        sampled.rgb = pow(sampled.rgb, GAMMA);
+        float4 sampled = PbrTex(3,pm.textures[3],pin.texcoord,pin.texcoord1,1);
+        sampled.rgb = PbrLinear(sampled.rgb);
         emissive_factor *= sampled.rgb;
     }
 
@@ -154,7 +157,7 @@ PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
     const int metallic_roughness_texture = m.pbr_metallic_roughness.metallic_roughness_texture.index;
     if (metallic_roughness_texture > -1)
     {
-        float4 sampled = material_textures[METALLIC_ROUGHNESS_TEXTURE].Sample(sampler_states[LINEAR_WRAP], pin.texcoord);
+        float4 sampled = PbrTex(1,pm.textures[1],pin.texcoord,pin.texcoord1,1);
         roughness_factor *= sampled.g;
         metallic_factor *= sampled.b;
     }
@@ -163,8 +166,8 @@ PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
     const int occlusion_texture = m.occlusion_texture.index;
     if (occlusion_texture > -1)
     {
-        float4 sampled = material_textures[OCCLUSION_TEXTURE].Sample(sampler_states[LINEAR_WRAP], pin.texcoord);
-        occlusion_factor *= sampled.r;
+        float4 sampled = PbrTex(4,pm.textures[4],pin.texcoord,pin.texcoord1,1);
+        occlusion_factor *= lerp(1.0, sampled.r, m.occlusion_texture.strength);
     }
 	//const float occlusion_strength = m.occlusion_texture.strength;
 
@@ -187,7 +190,7 @@ PS_OUT_GBUFFER main(VS_OUT pin, bool is_front_face : SV_IsFrontFace)
     const int normal_texture = m.normal_texture.index;
     if (normal_texture > -1)
     {
-        float4 sampled = material_textures[NORMAL_TEXTURE].Sample(sampler_states[LINEAR_WRAP], pin.texcoord);
+        float4 sampled = PbrTex(2,pm.textures[2],pin.texcoord,pin.texcoord1,float4(0.5,0.5,1,1));
         float3 normal_factor = sampled.xyz;
         normal_factor = (normal_factor * 2.0) - 1.0;
         normal_factor = normalize(normal_factor * float3(m.normal_texture.scale, m.normal_texture.scale, 1.0));

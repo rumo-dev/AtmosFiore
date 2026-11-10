@@ -119,6 +119,10 @@ for(const [id,category,title,layout,description] of definitions){
  if(id==='animation'){catalog.at(-1).camera=[0,2.4,-5];catalog.at(-1).target=[0,1.5,0];}
  if(['ibl','ssr','reflection_probes','area','vignette'].includes(id)){catalog.at(-1).camera=[0,2.5,-7];catalog.at(-1).target=[0,1.2,1];catalog.at(-1).focus=8;}
 }
-fs.writeFileSync(path.join(out,'catalog.json'),JSON.stringify(catalog,null,2)+'\n');
+// Keep separately maintained, downloaded Khronos exhibits when regenerating
+// the procedural technology models.
+const catalogPath=path.join(out,'catalog.json');
+if(fs.existsSync(catalogPath))catalog.push(...JSON.parse(fs.readFileSync(catalogPath)).filter(e=>e.pbr_asset));
+fs.writeFileSync(catalogPath,JSON.stringify(catalog,null,2)+'\n');
 fs.writeFileSync(path.join(out,'actor.gltf'),JSON.stringify(geometry('actor'))+'\n');
 console.log('Generated '+catalog.length+' technology exhibits and ON/OFF profiles.');

@@ -346,6 +346,9 @@
     <ClInclude Include="source\Engine\Graphics\Model\gltf_model.h">
       <Filter>source\Engine\Graphics\Model</Filter>
     </ClInclude>
+    <ClInclude Include="source\Engine\Graphics\Model\gltf_pbr_material.h">
+      <Filter>source\Engine\Graphics\Model</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\Graphics\Model\obj_model.h">
       <Filter>source\Engine\Graphics\Model</Filter>
     </ClInclude>
@@ -684,6 +687,12 @@
       <Filter>source\Engine\Graphics\Shader</Filter>
     </None>
     <None Include="source\Engine\Graphics\Shader\gltf_model.hlsli">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </None>
+    <None Include="source\Engine\Graphics\Shader\gltf_pbr_data.hlsli">
+      <Filter>source\Engine\Graphics\Shader</Filter>
+    </None>
+    <None Include="source\Engine\Graphics\Shader\gltf_pbr_forward.hlsli">
       <Filter>source\Engine\Graphics\Shader</Filter>
     </None>
     <None Include="source\Engine\Graphics\Shader\image_based_lighting.hlsli">

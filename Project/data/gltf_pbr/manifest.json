@@ -1,0 +1,670 @@
+{
+  "sourcePage": "https://www.khronos.org/gltf/pbr/",
+  "repository": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+  "commit": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
+  "features": [
+    {
+      "id": "alpha",
+      "title": "Alpha Coverage",
+      "name": "CompareAlphaCoverage",
+      "model": "data/gltf_pbr/CompareAlphaCoverage/glTF-Binary/CompareAlphaCoverage.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareAlphaCoverage/glTF-Binary/CompareAlphaCoverage.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/glTF-Binary/CompareAlphaCoverage.glb",
+          "bytes": 3872604,
+          "sha256": "c61a2aa562b4dae987c246202d1a1d20a36a8cc92d38e10c2dc89adc403b0e6c"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAlphaCoverage/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/LICENSE.md",
+          "bytes": 866,
+          "sha256": "25c60b30dbba429a88da9b7f98623f13cb4ed9fcec79cee50160315baf4e9d6d"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAlphaCoverage/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/metadata.json",
+          "bytes": 1000,
+          "sha256": "9a2e4238ac5d6955eaf753b310aa91a1ae1f1d28af94e8655538218db0071eb0"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAlphaCoverage/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/README.body.md",
+          "bytes": 414,
+          "sha256": "3f14ddab20faf0aec70914b5058ac473994f008b2854eff1359e207790acbc04"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAlphaCoverage/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/README.md",
+          "bytes": 1498,
+          "sha256": "78174d5c3abb90e94836455129f9939b90dcf6f8c233262ef0185de4a5336f85"
+        }
+      ]
+    },
+    {
+      "id": "occlusion",
+      "title": "Ambient Occlusion",
+      "name": "CompareAmbientOcclusion",
+      "model": "data/gltf_pbr/CompareAmbientOcclusion/glTF-Binary/CompareAmbientOcclusion.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareAmbientOcclusion/glTF-Binary/CompareAmbientOcclusion.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/glTF-Binary/CompareAmbientOcclusion.glb",
+          "bytes": 4828680,
+          "sha256": "abdbb1427ccfa0bb12308d0e796a4d82640d8a4898e0ab8599cd379ef255df45"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAmbientOcclusion/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/LICENSE.md",
+          "bytes": 1011,
+          "sha256": "d375f99f8b7f985bf3e4bc908318e12a6669136b750a6d892813625f1f2b49e6"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAmbientOcclusion/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/metadata.json",
+          "bytes": 1388,
+          "sha256": "a5e4f879421619d6f1224c635a05ee111a29d32ee511030eb3397acd452a1d41"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAmbientOcclusion/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/README.body.md",
+          "bytes": 307,
+          "sha256": "e194812eebe6aa00a532db9caa37094a8761d3ef9e4bbbd6cdcb896bbffd9128"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAmbientOcclusion/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/README.md",
+          "bytes": 1568,
+          "sha256": "44394407840cc20185733fed2f145c1270f386c7047efc7155192f404a6043c2"
+        }
+      ]
+    },
+    {
+      "id": "base_color",
+      "title": "Base Color",
+      "name": "CompareBaseColor",
+      "model": "data/gltf_pbr/CompareBaseColor/glTF-Binary/CompareBaseColor.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareBaseColor/glTF-Binary/CompareBaseColor.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/glTF-Binary/CompareBaseColor.glb",
+          "bytes": 1507816,
+          "sha256": "1fd21e793652874eaa20e9c3723c508c4f1039bf8d84c09e4d0998b97691f77b"
+        },
+        {
+          "path": "data/gltf_pbr/CompareBaseColor/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/LICENSE.md",
+          "bytes": 862,
+          "sha256": "9bfa234ac3b1e893492b7050ac0f0ffab9502ac3d302ac16356a3e2f87683571"
+        },
+        {
+          "path": "data/gltf_pbr/CompareBaseColor/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/metadata.json",
+          "bytes": 976,
+          "sha256": "eeec0dbfcc8c5a96827f20eaa748b9dfc18e7f0caa8ab62af6512f330f77fecc"
+        },
+        {
+          "path": "data/gltf_pbr/CompareBaseColor/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/README.body.md",
+          "bytes": 412,
+          "sha256": "2f7ae162b968f97109604fcb2283d720493d11d4c42cc4669bf0b05025a1e649"
+        },
+        {
+          "path": "data/gltf_pbr/CompareBaseColor/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/README.md",
+          "bytes": 1490,
+          "sha256": "0b56be5a872f0337e21a3ff26163f373363b91e4e06f21803ac0bc2629abddb0"
+        }
+      ]
+    },
+    {
+      "id": "emissive",
+      "title": "Emissive",
+      "name": "CompareEmissiveStrength",
+      "model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+          "bytes": 111796,
+          "sha256": "e40d8e1d98345ae16211814bab097307c8710f1ae4f9399fe14e01049f3e7bd8"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/LICENSE.md",
+          "bytes": 869,
+          "sha256": "0a33726a51561f6e6f6e60dc9e5fbf72805075a5876003b5cfa56750380a07e4"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/metadata.json",
+          "bytes": 1036,
+          "sha256": "56f90996407f7a49a3bdba1823f5414dbcb044b6c983118ba122e867e187ddb5"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/README.body.md",
+          "bytes": 337,
+          "sha256": "f374acdcbdf479c9b36bd0c58160667d429f0d0fa348eb424cb200ec746e29cb"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/README.md",
+          "bytes": 1526,
+          "sha256": "c178ed1bafccce0d5f6c3e037ea9c26e5969e8253df2f656da0a459172fd9111"
+        }
+      ]
+    },
+    {
+      "id": "metallic",
+      "title": "Metallic",
+      "name": "CompareMetallic",
+      "model": "data/gltf_pbr/CompareMetallic/glTF-Binary/CompareMetallic.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareMetallic/glTF-Binary/CompareMetallic.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/glTF-Binary/CompareMetallic.glb",
+          "bytes": 172180,
+          "sha256": "5b57f1358c886fa33736c07adad0a76e693a6cf1d7f1bae4b70533b5de119b78"
+        },
+        {
+          "path": "data/gltf_pbr/CompareMetallic/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/LICENSE.md",
+          "bytes": 860,
+          "sha256": "64608500854ad8b1bdeaeab1d43a18842fcf587a1e0208ff7f44e9676c7f3184"
+        },
+        {
+          "path": "data/gltf_pbr/CompareMetallic/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/metadata.json",
+          "bytes": 983,
+          "sha256": "324735e27a7e2b2b3fbd1fe0e86770200acaacbcc24cbc71924d11c77600cdd0"
+        },
+        {
+          "path": "data/gltf_pbr/CompareMetallic/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/README.body.md",
+          "bytes": 298,
+          "sha256": "9dc2dd134a89c971bfc51c913f41ce7fac4ea844515412a5591881dadbf2a74d"
+        },
+        {
+          "path": "data/gltf_pbr/CompareMetallic/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/README.md",
+          "bytes": 1350,
+          "sha256": "4e504a049ab4d4684941bc2472a51b452c743de95c4cc1255767fe027a44d3a2"
+        }
+      ]
+    },
+    {
+      "id": "normal",
+      "title": "Normal",
+      "name": "CompareNormal",
+      "model": "data/gltf_pbr/CompareNormal/glTF-Binary/CompareNormal.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareNormal/glTF-Binary/CompareNormal.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/glTF-Binary/CompareNormal.glb",
+          "bytes": 220900,
+          "sha256": "076ab65c1ed62ad3097766c0dc74e41783e5f44a0711f9b2755bde892ec5075f"
+        },
+        {
+          "path": "data/gltf_pbr/CompareNormal/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/LICENSE.md",
+          "bytes": 858,
+          "sha256": "c39f4fe59e4509b061ee667daf2e44219d25af145706a0d5ce8690018fc6ff15"
+        },
+        {
+          "path": "data/gltf_pbr/CompareNormal/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/metadata.json",
+          "bytes": 977,
+          "sha256": "2e46f47904eaca0f6f679ece1aba4aa1eac58e41c0d903f23f24ea9a2be52201"
+        },
+        {
+          "path": "data/gltf_pbr/CompareNormal/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/README.body.md",
+          "bytes": 296,
+          "sha256": "da1132e899e7117daeab9f7b1f0d7024cab8d0a8d5525332052bc093279bf7d0"
+        },
+        {
+          "path": "data/gltf_pbr/CompareNormal/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/README.md",
+          "bytes": 1336,
+          "sha256": "64749b28a5aba557cad362784b0a3559410b411637b14bb8f55a4adf2326d052"
+        }
+      ]
+    },
+    {
+      "id": "roughness",
+      "title": "Roughness",
+      "name": "CompareRoughness",
+      "model": "data/gltf_pbr/CompareRoughness/glTF-Binary/CompareRoughness.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareRoughness/glTF-Binary/CompareRoughness.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/glTF-Binary/CompareRoughness.glb",
+          "bytes": 155660,
+          "sha256": "6b47b85d117f2e1951546e9a46bffa6cb91c8436441a1ec913feaac0f646f5b3"
+        },
+        {
+          "path": "data/gltf_pbr/CompareRoughness/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/LICENSE.md",
+          "bytes": 861,
+          "sha256": "deae1598fe37c161c944fd1774d645b09822681ad2c3beaf7dcf2c1849ceeeda"
+        },
+        {
+          "path": "data/gltf_pbr/CompareRoughness/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/metadata.json",
+          "bytes": 986,
+          "sha256": "31496a6355c6ce2d71bce26a53dd915d480ae82f244bdbb975e4e0bdef7e6e6c"
+        },
+        {
+          "path": "data/gltf_pbr/CompareRoughness/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/README.body.md",
+          "bytes": 299,
+          "sha256": "f3be87f3b3101d24af3eea2e10f43f2627c115d849740d9447b7fa9a3248ad8e"
+        },
+        {
+          "path": "data/gltf_pbr/CompareRoughness/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/README.md",
+          "bytes": 1357,
+          "sha256": "4e5e158dedbaf91b29ea0a7652ebbce73131d9ea28bc19cf2c82d0d20f5e6a67"
+        }
+      ]
+    },
+    {
+      "id": "anisotropy",
+      "title": "Anisotropy",
+      "name": "CompareAnisotropy",
+      "model": "data/gltf_pbr/CompareAnisotropy/glTF-Binary/CompareAnisotropy.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareAnisotropy/glTF-Binary/CompareAnisotropy.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/glTF-Binary/CompareAnisotropy.glb",
+          "bytes": 1085084,
+          "sha256": "5b4d9c7e99f85054983697112bab468c344b8984feb7299702ea6c93ddab292e"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAnisotropy/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/LICENSE.md",
+          "bytes": 862,
+          "sha256": "a6aee38c88f5a0a7b728a0a0dff2880d30cb8476d55226a47f7f2c5623b5572b"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAnisotropy/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/metadata.json",
+          "bytes": 1014,
+          "sha256": "05367f38bcd13fa1c8c5765cfc2768aa9fac1c907ee8a02b6f62679d6b68c879"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAnisotropy/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/README.body.md",
+          "bytes": 300,
+          "sha256": "857197809b424b6fd93e9c55228fe4a62ee5f9bd28191297557626f051ef5acd"
+        },
+        {
+          "path": "data/gltf_pbr/CompareAnisotropy/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/README.md",
+          "bytes": 1466,
+          "sha256": "d73505ca6fea4f4ec8855ecae4dc2f227b563f52e0efef1e899b9d56bd34bf4c"
+        }
+      ]
+    },
+    {
+      "id": "clearcoat",
+      "title": "Clearcoat",
+      "name": "CompareClearcoat",
+      "model": "data/gltf_pbr/CompareClearcoat/glTF-Binary/CompareClearcoat.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareClearcoat/glTF-Binary/CompareClearcoat.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/glTF-Binary/CompareClearcoat.glb",
+          "bytes": 193920,
+          "sha256": "9dc6879f797c7dd9dd1322dc6a392ff66952855f329ac5239b9c58a68f804a88"
+        },
+        {
+          "path": "data/gltf_pbr/CompareClearcoat/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/LICENSE.md",
+          "bytes": 861,
+          "sha256": "267a7cd35ee9308d283351c6313621747e4ce43b7802fa9a60ec208b57bfcdbe"
+        },
+        {
+          "path": "data/gltf_pbr/CompareClearcoat/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/metadata.json",
+          "bytes": 991,
+          "sha256": "56ecb001abf56c7a7dfdc51a604afe0862d472117e315172766216ecdb6bc76f"
+        },
+        {
+          "path": "data/gltf_pbr/CompareClearcoat/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/README.body.md",
+          "bytes": 443,
+          "sha256": "257dbd189f0add272f755827ec863833f0b0050852acfa5743735b63cb487b28"
+        },
+        {
+          "path": "data/gltf_pbr/CompareClearcoat/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/README.md",
+          "bytes": 1578,
+          "sha256": "b1003018e3a8be5b0c8eb4e55a6336fabc639e4740a2c625968905a4e27bf0c8"
+        }
+      ]
+    },
+    {
+      "id": "dispersion",
+      "title": "Dispersion",
+      "name": "CompareDispersion",
+      "model": "data/gltf_pbr/CompareDispersion/glTF-Binary/CompareDispersion.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareDispersion/glTF-Binary/CompareDispersion.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/glTF-Binary/CompareDispersion.glb",
+          "bytes": 60432,
+          "sha256": "1c3eff819615d7e6d06e605f728907006eb6c36ef2ead53cc328e65d38a215c4"
+        },
+        {
+          "path": "data/gltf_pbr/CompareDispersion/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/LICENSE.md",
+          "bytes": 862,
+          "sha256": "807c125f52a33ab5995639431a816bf67bca9da8ea9492789ba6bc6c0f1e1736"
+        },
+        {
+          "path": "data/gltf_pbr/CompareDispersion/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/metadata.json",
+          "bytes": 994,
+          "sha256": "4ebf93f8dd96872008ef6745f70e270c362a8b9b25128f4675fbc9f98a46436b"
+        },
+        {
+          "path": "data/gltf_pbr/CompareDispersion/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/README.body.md",
+          "bytes": 300,
+          "sha256": "97eb6be716429e9524ef82f4c2d5bcbb7d56523b6672dc8c3ac993ff8417da4b"
+        },
+        {
+          "path": "data/gltf_pbr/CompareDispersion/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/README.md",
+          "bytes": 1494,
+          "sha256": "6f8a0104af629024fa85e7ccf818899a011877243f55caf4b573118eade536ad"
+        }
+      ]
+    },
+    {
+      "id": "emissive_strength",
+      "title": "Emissive Strength",
+      "name": "CompareEmissiveStrength",
+      "model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+          "bytes": 111796,
+          "sha256": "e40d8e1d98345ae16211814bab097307c8710f1ae4f9399fe14e01049f3e7bd8"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/LICENSE.md",
+          "bytes": 869,
+          "sha256": "0a33726a51561f6e6f6e60dc9e5fbf72805075a5876003b5cfa56750380a07e4"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/metadata.json",
+          "bytes": 1036,
+          "sha256": "56f90996407f7a49a3bdba1823f5414dbcb044b6c983118ba122e867e187ddb5"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/README.body.md",
+          "bytes": 337,
+          "sha256": "f374acdcbdf479c9b36bd0c58160667d429f0d0fa348eb424cb200ec746e29cb"
+        },
+        {
+          "path": "data/gltf_pbr/CompareEmissiveStrength/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/README.md",
+          "bytes": 1526,
+          "sha256": "c178ed1bafccce0d5f6c3e037ea9c26e5969e8253df2f656da0a459172fd9111"
+        }
+      ]
+    },
+    {
+      "id": "ior",
+      "title": "Index of Refraction",
+      "name": "CompareIor",
+      "model": "data/gltf_pbr/CompareIor/glTF-Binary/CompareIor.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareIor/glTF-Binary/CompareIor.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/glTF-Binary/CompareIor.glb",
+          "bytes": 213104,
+          "sha256": "3588b4b522d2a756809b337353c017a412b9e38793b60355fdc6eb162b360019"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIor/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/LICENSE.md",
+          "bytes": 855,
+          "sha256": "1b29bf806bd1426aa4277e7be4cf9ca0cc7662438153774d3ac824b4beb57029"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIor/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/metadata.json",
+          "bytes": 973,
+          "sha256": "128a9731be83f57d5a51207136b1cd5b1d27fc92ee3d7e5b6dde586ea4c0922c"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIor/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/README.body.md",
+          "bytes": 293,
+          "sha256": "334b677e0c4f4d59ed05fa4fd22b08cfdcee16fe52adb817ba09ae8423190aa9"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIor/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/README.md",
+          "bytes": 1418,
+          "sha256": "06c29a36f534df7ad04d3b1ca6aa35f2b6e3e6d8819a0a706e9d29570cb82052"
+        }
+      ]
+    },
+    {
+      "id": "iridescence",
+      "title": "Iridescence",
+      "name": "CompareIridescence",
+      "model": "data/gltf_pbr/CompareIridescence/glTF-Binary/CompareIridescence.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareIridescence/glTF-Binary/CompareIridescence.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/glTF-Binary/CompareIridescence.glb",
+          "bytes": 214756,
+          "sha256": "abda6e8bcb13ad04534c90bc4ce9b21e80f2d8b74ac4d911800269f0009ff073"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIridescence/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/LICENSE.md",
+          "bytes": 863,
+          "sha256": "36b9fb3f3f019d923494d05e26b1df76669356b87486066e9db83e822528395d"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIridescence/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/metadata.json",
+          "bytes": 997,
+          "sha256": "69d02fe8a9dbae67f0d232a862485412de1b40bdf2e3a6c49e6aee6c007ac569"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIridescence/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/README.body.md",
+          "bytes": 301,
+          "sha256": "1d16428eebe12e7692e3a04260cedc746573a16028d71764b0eae16122d07b96"
+        },
+        {
+          "path": "data/gltf_pbr/CompareIridescence/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/README.md",
+          "bytes": 1430,
+          "sha256": "40bdb689e4560d9647f7a9ad31aa2c8bfcded0ecd836d2232885b14de28477a0"
+        }
+      ]
+    },
+    {
+      "id": "sheen",
+      "title": "Sheen",
+      "name": "CompareSheen",
+      "model": "data/gltf_pbr/CompareSheen/glTF-Binary/CompareSheen.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareSheen/glTF-Binary/CompareSheen.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/glTF-Binary/CompareSheen.glb",
+          "bytes": 883968,
+          "sha256": "70b6ab5ba8006aa71079b567783a81cfe778a11cca8abc44c45e5e0b1f4252cc"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSheen/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/LICENSE.md",
+          "bytes": 857,
+          "sha256": "f4aa1496c4bea16fbfd53767b629ad5d436cbe2626871d26c4c7e45d0993eefb"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSheen/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/metadata.json",
+          "bytes": 979,
+          "sha256": "179faf075978f6454c930763291b2f8a82d79b04b4dd5c0540c00a91631d4bf2"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSheen/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/README.body.md",
+          "bytes": 295,
+          "sha256": "c4db254eca0ce3531fd5f2732fde50187eb5cb96c7fe7e7e524a91527a97b404"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSheen/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/README.md",
+          "bytes": 1382,
+          "sha256": "f092565824996bd661e4711502cc1131a5961335a658ab7987a17f1fad27c45f"
+        }
+      ]
+    },
+    {
+      "id": "specular",
+      "title": "Specular",
+      "name": "CompareSpecular",
+      "model": "data/gltf_pbr/CompareSpecular/glTF-Binary/CompareSpecular.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareSpecular/glTF-Binary/CompareSpecular.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/glTF-Binary/CompareSpecular.glb",
+          "bytes": 1408364,
+          "sha256": "57ea169e0b9b4a4ea1cb27980226974d0da25897445c9f29c3c817698dd923d8"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSpecular/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/LICENSE.md",
+          "bytes": 860,
+          "sha256": "c38a7303da154125fea1758c0f6c72c6a78f6dd6ffa3b25f24175acbbe4aa894"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSpecular/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/metadata.json",
+          "bytes": 988,
+          "sha256": "40253111ff1ea4a7de89e8fac2ab7583b3d0801ef68500cb3e278fb25f1511ac"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSpecular/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/README.body.md",
+          "bytes": 298,
+          "sha256": "b0aeaf9453f95474ae2bb02e111dc1021c1d8aa38cd85a0d750e8493a4768a8d"
+        },
+        {
+          "path": "data/gltf_pbr/CompareSpecular/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/README.md",
+          "bytes": 1406,
+          "sha256": "b5e5e389bb1add65cdaddedad36f4cf565950b2064a4d12712adc9f899600365"
+        }
+      ]
+    },
+    {
+      "id": "transmission",
+      "title": "Transmission",
+      "name": "CompareTransmission",
+      "model": "data/gltf_pbr/CompareTransmission/glTF-Binary/CompareTransmission.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareTransmission/glTF-Binary/CompareTransmission.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/glTF-Binary/CompareTransmission.glb",
+          "bytes": 357024,
+          "sha256": "012a3ace61050f4aef77b416c56b3f8f313e1fa68c9040ce3d5037f67eea484f"
+        },
+        {
+          "path": "data/gltf_pbr/CompareTransmission/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/LICENSE.md",
+          "bytes": 864,
+          "sha256": "bc219fb739c1c3c3de7ddfee67c99ebbc514899a19fb4c5fb400d3389aef7ed1"
+        },
+        {
+          "path": "data/gltf_pbr/CompareTransmission/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/metadata.json",
+          "bytes": 1000,
+          "sha256": "da2198cb9541468e2da042d105fe77595cb18be1972e20533f37915bed8fc782"
+        },
+        {
+          "path": "data/gltf_pbr/CompareTransmission/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/README.body.md",
+          "bytes": 321,
+          "sha256": "4574abb83f94c5f7065d2ecc169ed9106581211188528a6fc33072bee97453a0"
+        },
+        {
+          "path": "data/gltf_pbr/CompareTransmission/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/README.md",
+          "bytes": 1457,
+          "sha256": "f41078ed5847bcc7b557a01e31ce0193a4373c869ea10a67ebf096bd8eb33ccd"
+        }
+      ]
+    },
+    {
+      "id": "volume",
+      "title": "Volume",
+      "name": "CompareVolume",
+      "model": "data/gltf_pbr/CompareVolume/glTF-Binary/CompareVolume.glb",
+      "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/",
+      "files": [
+        {
+          "path": "data/gltf_pbr/CompareVolume/glTF-Binary/CompareVolume.glb",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/glTF-Binary/CompareVolume.glb",
+          "bytes": 399760,
+          "sha256": "cb88f5dd70c1c2700e2a28caa5b612f4b6e8c34183d6261c681727d8bafdf7d2"
+        },
+        {
+          "path": "data/gltf_pbr/CompareVolume/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/LICENSE.md",
+          "bytes": 858,
+          "sha256": "b32655e4281ffcd4ed788e24d6495c68b9444db0f7e475ae1bc4fe874dd59375"
+        },
+        {
+          "path": "data/gltf_pbr/CompareVolume/metadata.json",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/metadata.json",
+          "bytes": 982,
+          "sha256": "d7d6e2509f55b6008a9de6f76746f802df7d73d947c7a96808fc495f5acee07c"
+        },
+        {
+          "path": "data/gltf_pbr/CompareVolume/README.body.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/README.body.md",
+          "bytes": 340,
+          "sha256": "c63b8b2d3a1aa19733ee47eade6eadaff8c05b79fdb602b5c4adb302580a7798"
+        },
+        {
+          "path": "data/gltf_pbr/CompareVolume/README.md",
+          "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/README.md",
+          "bytes": 1463,
+          "sha256": "f3b7dfe06b56d2e12dacb4ee001fc2ae2c3b9c0b657fd233d5ca318e3eb23d8b"
+        }
+      ]
+    }
+  ]
+}

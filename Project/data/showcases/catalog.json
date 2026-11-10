@@ -734,5 +734,464 @@
     "gi": false,
     "focus": 9,
     "environment": true
+  },
+  {
+    "id": "gltf_pbr_alpha",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Alpha Coverage",
+    "description": "Alpha Coverage — CompareAlphaCoverage. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareAlphaCoverage/glTF-Binary/CompareAlphaCoverage.glb",
+    "missing_model": "data/gltf_pbr/alpha_missing.glb",
+    "profile": "data/gltf_pbr/alpha.json",
+    "off_profile": "data/gltf_pbr/alpha.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 1,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/"
+  },
+  {
+    "id": "gltf_pbr_occlusion",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Ambient Occlusion",
+    "description": "Ambient Occlusion — CompareAmbientOcclusion. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareAmbientOcclusion/glTF-Binary/CompareAmbientOcclusion.glb",
+    "missing_model": "data/gltf_pbr/occlusion_missing.glb",
+    "profile": "data/gltf_pbr/occlusion.json",
+    "off_profile": "data/gltf_pbr/occlusion.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 2,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/"
+  },
+  {
+    "id": "gltf_pbr_base_color",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Base Color",
+    "description": "Base Color — CompareBaseColor. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareBaseColor/glTF-Binary/CompareBaseColor.glb",
+    "missing_model": "data/gltf_pbr/base_color_missing.glb",
+    "profile": "data/gltf_pbr/base_color.json",
+    "off_profile": "data/gltf_pbr/base_color.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 3,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/"
+  },
+  {
+    "id": "gltf_pbr_emissive",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Emissive",
+    "description": "Emissive — CompareEmissiveStrength. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+    "missing_model": "data/gltf_pbr/emissive_missing.glb",
+    "profile": "data/gltf_pbr/emissive.json",
+    "off_profile": "data/gltf_pbr/emissive.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 4,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/"
+  },
+  {
+    "id": "gltf_pbr_metallic",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Metallic",
+    "description": "Metallic — CompareMetallic. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareMetallic/glTF-Binary/CompareMetallic.glb",
+    "missing_model": "data/gltf_pbr/metallic_missing.glb",
+    "profile": "data/gltf_pbr/metallic.json",
+    "off_profile": "data/gltf_pbr/metallic.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 5,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/"
+  },
+  {
+    "id": "gltf_pbr_normal",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Normal",
+    "description": "Normal — CompareNormal. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareNormal/glTF-Binary/CompareNormal.glb",
+    "missing_model": "data/gltf_pbr/normal_missing.glb",
+    "profile": "data/gltf_pbr/normal.json",
+    "off_profile": "data/gltf_pbr/normal.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 6,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/"
+  },
+  {
+    "id": "gltf_pbr_roughness",
+    "category": "glTF PBR / Core",
+    "title": "glTF: Roughness",
+    "description": "Roughness — CompareRoughness. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareRoughness/glTF-Binary/CompareRoughness.glb",
+    "missing_model": "data/gltf_pbr/roughness_missing.glb",
+    "profile": "data/gltf_pbr/roughness.json",
+    "off_profile": "data/gltf_pbr/roughness.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 7,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/"
+  },
+  {
+    "id": "gltf_pbr_anisotropy",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Anisotropy",
+    "description": "Anisotropy — CompareAnisotropy. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareAnisotropy/glTF-Binary/CompareAnisotropy.glb",
+    "missing_model": "data/gltf_pbr/anisotropy_missing.glb",
+    "profile": "data/gltf_pbr/anisotropy.json",
+    "off_profile": "data/gltf_pbr/anisotropy.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 8,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/"
+  },
+  {
+    "id": "gltf_pbr_clearcoat",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Clearcoat",
+    "description": "Clearcoat — CompareClearcoat. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareClearcoat/glTF-Binary/CompareClearcoat.glb",
+    "missing_model": "data/gltf_pbr/clearcoat_missing.glb",
+    "profile": "data/gltf_pbr/clearcoat.json",
+    "off_profile": "data/gltf_pbr/clearcoat.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 9,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/"
+  },
+  {
+    "id": "gltf_pbr_dispersion",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Dispersion",
+    "description": "Dispersion — CompareDispersion. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareDispersion/glTF-Binary/CompareDispersion.glb",
+    "missing_model": "data/gltf_pbr/dispersion_missing.glb",
+    "profile": "data/gltf_pbr/dispersion.json",
+    "off_profile": "data/gltf_pbr/dispersion.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 10,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/"
+  },
+  {
+    "id": "gltf_pbr_emissive_strength",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Emissive Strength",
+    "description": "Emissive Strength — CompareEmissiveStrength. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+    "missing_model": "data/gltf_pbr/emissive_strength_missing.glb",
+    "profile": "data/gltf_pbr/emissive_strength.json",
+    "off_profile": "data/gltf_pbr/emissive_strength.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 11,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/"
+  },
+  {
+    "id": "gltf_pbr_ior",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Index of Refraction",
+    "description": "Index of Refraction — CompareIor. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareIor/glTF-Binary/CompareIor.glb",
+    "missing_model": "data/gltf_pbr/ior_missing.glb",
+    "profile": "data/gltf_pbr/ior.json",
+    "off_profile": "data/gltf_pbr/ior.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 12,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/"
+  },
+  {
+    "id": "gltf_pbr_iridescence",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Iridescence",
+    "description": "Iridescence — CompareIridescence. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareIridescence/glTF-Binary/CompareIridescence.glb",
+    "missing_model": "data/gltf_pbr/iridescence_missing.glb",
+    "profile": "data/gltf_pbr/iridescence.json",
+    "off_profile": "data/gltf_pbr/iridescence.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 13,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/"
+  },
+  {
+    "id": "gltf_pbr_sheen",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Sheen",
+    "description": "Sheen — CompareSheen. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareSheen/glTF-Binary/CompareSheen.glb",
+    "missing_model": "data/gltf_pbr/sheen_missing.glb",
+    "profile": "data/gltf_pbr/sheen.json",
+    "off_profile": "data/gltf_pbr/sheen.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 14,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/"
+  },
+  {
+    "id": "gltf_pbr_specular",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Specular",
+    "description": "Specular — CompareSpecular. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareSpecular/glTF-Binary/CompareSpecular.glb",
+    "missing_model": "data/gltf_pbr/specular_missing.glb",
+    "profile": "data/gltf_pbr/specular.json",
+    "off_profile": "data/gltf_pbr/specular.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 15,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/"
+  },
+  {
+    "id": "gltf_pbr_transmission",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Transmission",
+    "description": "Transmission — CompareTransmission. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareTransmission/glTF-Binary/CompareTransmission.glb",
+    "missing_model": "data/gltf_pbr/transmission_missing.glb",
+    "profile": "data/gltf_pbr/transmission.json",
+    "off_profile": "data/gltf_pbr/transmission.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 16,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/"
+  },
+  {
+    "id": "gltf_pbr_volume",
+    "category": "glTF PBR / Extensions",
+    "title": "glTF: Volume",
+    "description": "Volume — CompareVolume. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
+    "model": "data/gltf_pbr/CompareVolume/glTF-Binary/CompareVolume.glb",
+    "missing_model": "data/gltf_pbr/volume_missing.glb",
+    "profile": "data/gltf_pbr/volume.json",
+    "off_profile": "data/gltf_pbr/volume.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "sun": 3000,
+    "gi": false,
+    "environment": true,
+    "focus": 8,
+    "pbr_asset": true,
+    "pbr_feature": 17,
+    "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/"
   }
 ]

@@ -8,11 +8,34 @@
 #include "Engine/Utilities/misc.h"
 #include "Engine/Utilities/math_util.h"
 #include "Engine/System/graphics_core.h"
+#include "Engine/System/render_state.h"
+#include <WICTextureLoader.h>
 #include "Engine/System/Manager/resource_manager.h"
 #define TINYGLTF_IMPLEMENTATION
 
 namespace
 {
+	nlohmann::json pbr_json(const tinygltf::Value& v)
+	{
+		using J=nlohmann::json;
+		if(v.IsObject()){J j=J::object();for(const auto& kv:v.Get<tinygltf::Value::Object>())j[kv.first]=pbr_json(kv.second);return j;}
+		if(v.IsArray()){J j=J::array();for(const auto& x:v.Get<tinygltf::Value::Array>())j.push_back(pbr_json(x));return j;}
+		if(v.IsNumber())return v.GetNumberAsDouble();if(v.IsBool())return v.Get<bool>();if(v.IsString())return v.Get<std::string>();return nullptr;
+	}
+	template<class T> nlohmann::json pbr_texture_json(const T& t)
+	{
+		nlohmann::json j={{"index",t.index},{"texCoord",t.texCoord}};j["extensions"]=nlohmann::json::object();
+		for(const auto& kv:t.extensions)j["extensions"][kv.first]=pbr_json(kv.second);return j;
+	}
+	GltfPbr::Material pbr_material(const tinygltf::Material& m)
+	{
+		using J=nlohmann::json;const auto& p=m.pbrMetallicRoughness;
+		J j={{"alphaMode",m.alphaMode},{"alphaCutoff",m.alphaCutoff},{"doubleSided",m.doubleSided},{"emissiveFactor",m.emissiveFactor},
+			{"pbrMetallicRoughness",{{"baseColorFactor",p.baseColorFactor},{"metallicFactor",p.metallicFactor},{"roughnessFactor",p.roughnessFactor},{"baseColorTexture",pbr_texture_json(p.baseColorTexture)},{"metallicRoughnessTexture",pbr_texture_json(p.metallicRoughnessTexture)}}},
+			{"normalTexture",pbr_texture_json(m.normalTexture)},{"occlusionTexture",pbr_texture_json(m.occlusionTexture)},{"emissiveTexture",pbr_texture_json(m.emissiveTexture)}};
+		j["normalTexture"]["scale"]=m.normalTexture.scale;j["occlusionTexture"]["strength"]=m.occlusionTexture.strength;
+		j["extensions"]=J::object();for(const auto& kv:m.extensions)j["extensions"][kv.first]=pbr_json(kv.second);return GltfPbr::parse(j);
+	}
 	constexpr size_t meshlet_max_vertices = 64;
 	constexpr size_t meshlet_max_triangles = 126;
 	constexpr size_t occlusion_meshlets_per_group = 64;
@@ -145,9 +168,10 @@ namespace
 	}
 }
 
-bool null_load_image_data(tinygltf::Image*, const int, std::string*, std::string*,
-	int, int, const unsigned char*, int, void*)
+bool null_load_image_data(tinygltf::Image* image, const int, std::string*, std::string*,
+	int, int, const unsigned char* bytes, int count, void*)
 {
+	image->image.assign(bytes,bytes+count);image->as_is=true;
 	return true;
 }
 
@@ -323,6 +347,8 @@ Gltf_Model::Gltf_Model(ID3D11Device* device, const std::string& filename) : file
 	  { "TEXCOORD", 0, vertex_buffer_views.at("TEXCOORD_0").format, 3, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	  { "JOINTS", 0, vertex_buffer_views.at("JOINTS_0").format, 4, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	  { "WEIGHTS", 0,vertex_buffer_views.at("WEIGHTS_0").format, 5, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	  { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 6, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	  { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 7, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 
 	Resource_Manager::instance().get_shader<Vertex_Shader>("GLTF_VS")->create_input_layout(
@@ -552,7 +578,18 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				const tinygltf::Accessor& gltf_accessor{ Gltf_Model.accessors.at(gltf_attribute.second) };
 				const tinygltf::BufferView& gltf_buffer_view{ Gltf_Model.bufferViews.at(gltf_accessor.bufferView) };
 
-				buffer_view vertex_buffer_view{ make_buffer_view(gltf_accessor) };
+				buffer_view vertex_buffer_view = gltf_attribute.first=="COLOR_0"?buffer_view{}:make_buffer_view(gltf_accessor);
+				std::vector<float> color_values;
+				if(gltf_attribute.first=="COLOR_0")
+				{
+					const int components=gltf_accessor.type==TINYGLTF_TYPE_VEC3?3:4;
+					const auto* raw=Gltf_Model.buffers.at(gltf_buffer_view.buffer).data.data()+gltf_buffer_view.byteOffset+gltf_accessor.byteOffset;
+					const size_t bytes=gltf_accessor.componentType==TINYGLTF_COMPONENT_TYPE_FLOAT?4:gltf_accessor.componentType==TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT?2:1;
+					const size_t stride=gltf_buffer_view.byteStride?gltf_buffer_view.byteStride:bytes*components;
+					color_values.resize(gltf_accessor.count*4,1);
+					for(size_t i=0;i<gltf_accessor.count;++i)for(int k=0;k<components;++k){float value=0;const auto* src=raw+i*stride+k*bytes;if(bytes==4)std::memcpy(&value,src,4);else if(bytes==2){uint16_t x;std::memcpy(&x,src,2);value=gltf_accessor.normalized?x/65535.0f:float(x);}else value=gltf_accessor.normalized?*src/255.0f:float(*src);color_values[i*4+k]=value;}
+					vertex_buffer_view.format=DXGI_FORMAT_R32G32B32A32_FLOAT;vertex_buffer_view.stride_in_bytes=16;vertex_buffer_view.size_in_bytes=color_values.size()*sizeof(float);
+				}
 
 				D3D11_BUFFER_DESC buffer_desc{};
 				buffer_desc.ByteWidth = static_cast<UINT>(vertex_buffer_view.size_in_bytes);
@@ -564,7 +601,7 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 				const size_t element_size = vertex_buffer_view.stride_in_bytes;
 				const size_t source_stride = gltf_buffer_view.byteStride ? gltf_buffer_view.byteStride : element_size;
 				std::vector<uint8_t> packed;
-				if (source_stride != element_size)
+				if (source_stride != element_size && color_values.empty())
 				{
 					packed.resize(gltf_accessor.count * element_size);
 					for (size_t i = 0; i < gltf_accessor.count; ++i)
@@ -572,6 +609,7 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 					subresource_data.pSysMem = packed.data();
 				}
 				else subresource_data.pSysMem = source;
+				if(!color_values.empty())subresource_data.pSysMem=color_values.data();
 				hr = device->CreateBuffer(&buffer_desc, &subresource_data,
 					vertex_buffer_view.buffer.ReleaseAndGetAddressOf());
 				_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
@@ -597,6 +635,8 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 			  { "TEXCOORD_0", { DXGI_FORMAT_R32G32_FLOAT } },
 			  { "JOINTS_0", { DXGI_FORMAT_R16G16B16A16_UINT } },
 			  { "WEIGHTS_0", { DXGI_FORMAT_R32G32B32A32_FLOAT } },
+			  { "TEXCOORD_1", { DXGI_FORMAT_R32G32_FLOAT } },
+			  { "COLOR_0", { DXGI_FORMAT_R32G32B32A32_FLOAT } },
 			};
 			for (std::unordered_map<std::string, buffer_view>::const_reference attribute : attributes)
 			{
@@ -608,7 +648,7 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 
 			// IASetVertexBuffers用キャッシュの登録
 			const std::string attribute_keys[] = {
-				"POSITION", "NORMAL", "TANGENT", "TEXCOORD_0", "JOINTS_0", "WEIGHTS_0"
+				"POSITION", "NORMAL", "TANGENT", "TEXCOORD_0", "JOINTS_0", "WEIGHTS_0", "TEXCOORD_1", "COLOR_0"
 			};
 
 			primitive.cached_vertex_buffers.clear();
@@ -625,6 +665,7 @@ void Gltf_Model::fetch_meshes(ID3D11Device* device, const tinygltf::Model& Gltf_
 
 			// 【追加】has_tangent の初期判定とキャッシュ
 			primitive.has_tangent = (primitive.vertex_buffer_views.at("TANGENT").buffer != nullptr);
+			primitive.has_color = (primitive.vertex_buffer_views.at("COLOR_0").buffer != nullptr);
 
 			// Opaque triangles can be reordered without changing blending order.
 			// Nearby triangle centroids then produce tighter meshlet/group bounds.
@@ -755,6 +796,25 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 		std::vector<material>::reference material = materials.emplace_back();
 
 		material.name = gltf_material.name;
+		material.pbr = pbr_material(gltf_material);
+		std::vector<ID3D11SamplerState*> material_samplers{pbr_samplers_[0].Get()};
+		for(int slot=0;slot<GltfPbr::TextureCount;++slot)
+		{
+			auto& t=material.pbr.textures[slot];const int index=t.info[0];
+			if(index>=0&&index<static_cast<int>(Gltf_Model.textures.size())){
+				const auto& texture=Gltf_Model.textures[index];const int source=texture.source;
+				if(source>=0&&source<static_cast<int>(texture_resource_views.size()))material.pbr_srvs[slot]=texture_resource_views[source].Get();else t.info[0]=-1;
+				// Map the samplers actually used by this material, rather than
+				// clamping indices in a potentially much larger model-wide table.
+				const size_t sampler_index=texture.sampler>=0&&texture.sampler<static_cast<int>(Gltf_Model.samplers.size())?texture.sampler+1:0;
+				auto* sampler=pbr_samplers_[sampler_index].Get();
+				auto found=std::find(material_samplers.begin(),material_samplers.end(),sampler);
+				if(found==material_samplers.end()&&material_samplers.size()<15){material_samplers.push_back(sampler);found=material_samplers.end()-1;}
+				t.info[1]=found==material_samplers.end()?0:static_cast<int>(found-material_samplers.begin());
+				t.info[2]=static_cast<int>(sampler_index);
+				if(texture.sampler>=0&&texture.sampler<static_cast<int>(Gltf_Model.samplers.size())){const auto& sampler=Gltf_Model.samplers[texture.sampler];if(sampler.wrapS!=10497||sampler.wrapT!=10497||(sampler.magFilter>=0&&sampler.magFilter!=9729)||(sampler.minFilter>=0&&sampler.minFilter!=9987))material.pbr.flags[3]=1;}
+			}else t.info[0]=-1;
+		}
 
 		material.data.emissive_factor[0] = static_cast<float>(gltf_material.emissiveFactor.at(0));
 		material.data.emissive_factor[1] = static_cast<float>(gltf_material.emissiveFactor.at(1));
@@ -819,10 +879,10 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 
 		for (int i = 0; i < 5; ++i)
 		{
-			if (texture_indices[i] > -1)
+			if (texture_indices[i] > -1 && texture_indices[i] < static_cast<int>(textures.size()))
 			{
 				int source_index = textures.at(texture_indices[i]).source;
-				material.cached_srvs[i] = texture_resource_views.at(source_index).Get();
+				material.cached_srvs[i] = source_index>=0&&source_index<static_cast<int>(texture_resource_views.size())?texture_resource_views[source_index].Get():nullptr;
 			}
 			else
 			{
@@ -864,11 +924,29 @@ void Gltf_Model::fetch_materials(ID3D11Device* device, const tinygltf::Model& Gl
 	hr = device->CreateShaderResourceView(material_buffer.Get(),
 		&shader_resource_view_desc, material_resource_view.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), hr_trace(hr));
+	std::vector<GltfPbr::Material> pbr_data;for(const auto& m:materials)pbr_data.push_back(m.pbr);
+	buffer_desc.ByteWidth=static_cast<UINT>(sizeof(GltfPbr::Material)*pbr_data.size());buffer_desc.StructureByteStride=sizeof(GltfPbr::Material);subresource_data.pSysMem=pbr_data.data();material_buffer.Reset();
+	hr=device->CreateBuffer(&buffer_desc,&subresource_data,material_buffer.GetAddressOf());_ASSERT_EXPR(SUCCEEDED(hr),hr_trace(hr));
+	shader_resource_view_desc.Buffer.NumElements=static_cast<UINT>(pbr_data.size());
+	hr=device->CreateShaderResourceView(material_buffer.Get(),&shader_resource_view_desc,pbr_material_resource_view_.GetAddressOf());_ASSERT_EXPR(SUCCEEDED(hr),hr_trace(hr));
+}
+
+void Gltf_Model::set_pbr_feature_override(int feature)
+{
+	if(!pbr_material_resource_view_)return;
+	std::vector<GltfPbr::Material> data;for(const auto& m:materials){data.push_back(m.pbr);data.back().alpha[2]=static_cast<float>(feature);}
+	Microsoft::WRL::ComPtr<ID3D11Resource> buffer;pbr_material_resource_view_->GetResource(buffer.GetAddressOf());
+	Graphics_Core::instance().get_device_context()->UpdateSubresource(buffer.Get(),0,nullptr,data.data(),0,0);
 }
 
 void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Gltf_Model)
 {
 	HRESULT hr{ S_OK };
+	// One default sampler, then the glTF samplers. s15 remains the IBL sampler.
+	for(int index=-1;index<static_cast<int>(Gltf_Model.samplers.size());++index){D3D11_SAMPLER_DESC d{};d.MaxAnisotropy=1;d.MaxLOD=D3D11_FLOAT32_MAX;d.AddressU=d.AddressV=d.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
+		if(index>=0){const auto& s=Gltf_Model.samplers[index];auto address=[](int x){return x==33071?D3D11_TEXTURE_ADDRESS_CLAMP:x==33648?D3D11_TEXTURE_ADDRESS_MIRROR:D3D11_TEXTURE_ADDRESS_WRAP;};d.AddressU=address(s.wrapS);d.AddressV=address(s.wrapT);const int min=s.minFilter<0?9987:s.minFilter;d.Filter=static_cast<D3D11_FILTER>(((min==9729||min==9985||min==9987)?16:0)|(s.magFilter==9728?0:4)|((min==9986||min==9987)?1:0));if(min==9728||min==9729)d.MaxLOD=0;}
+		else d.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler;device->CreateSamplerState(&d,sampler.GetAddressOf());pbr_samplers_.push_back(std::move(sampler));}
 	for (const tinygltf::Texture& gltf_texture : Gltf_Model.textures)
 	{
 		texture& texture{ textures.emplace_back() };
@@ -877,6 +955,8 @@ void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Glt
 	}
 	for (const tinygltf::Image& gltf_image : Gltf_Model.images)
 	{
+		texture_resource_views.emplace_back();
+		pbr_mip_sources_.emplace_back();
 		image& image{ images.emplace_back() };
 		image.name = gltf_image.name;
 		image.width = gltf_image.width;
@@ -889,17 +969,23 @@ void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Glt
 		image.uri = gltf_image.uri;
 		image.as_is = gltf_image.as_is;
 
-		if (gltf_image.bufferView > -1)
+		if (!gltf_image.image.empty())
+		{
+			hr=DirectX::CreateWICTextureFromMemoryEx(device,gltf_image.image.data(),gltf_image.image.size(),0,D3D11_USAGE_DEFAULT,D3D11_BIND_SHADER_RESOURCE,0,0,DirectX::WIC_LOADER_IGNORE_SRGB,nullptr,texture_resource_views.back().GetAddressOf());
+			if(FAILED(hr))Resource_Manager::instance().load_texture_memory(gltf_image.image.data(),gltf_image.image.size(),texture_resource_views.back().GetAddressOf());
+		}
+		else if (gltf_image.bufferView > -1)
 		{
 			const tinygltf::BufferView& buffer_view{ Gltf_Model.bufferViews.at(gltf_image.bufferView) };
 			const tinygltf::Buffer& buffer{ Gltf_Model.buffers.at(buffer_view.buffer) };
 			const ::byte* data = buffer.data.data() + buffer_view.byteOffset;
 
 			ID3D11ShaderResourceView* texture_resource_view{};
-			hr = Resource_Manager::instance().load_texture_memory(data, buffer_view.byteLength, &texture_resource_view);
+			hr = DirectX::CreateWICTextureFromMemoryEx(device,reinterpret_cast<const uint8_t*>(data),buffer_view.byteLength,0,D3D11_USAGE_DEFAULT,D3D11_BIND_SHADER_RESOURCE,0,0,DirectX::WIC_LOADER_IGNORE_SRGB,nullptr,&texture_resource_view);
+			if(FAILED(hr))hr=Resource_Manager::instance().load_texture_memory(data,buffer_view.byteLength,&texture_resource_view);
 			if (hr == S_OK)
 			{
-				texture_resource_views.emplace_back().Attach(texture_resource_view);
+				texture_resource_views.back().Attach(texture_resource_view);
 			}
 		}
 		else
@@ -910,13 +996,29 @@ void Gltf_Model::fetch_textures(ID3D11Device* device, const tinygltf::Model& Glt
 			std::wstring filename{
 			  path.parent_path().concat(L"/").wstring() +
 			  std::wstring(gltf_image.uri.begin(), gltf_image.uri.end()) };
-			hr = Resource_Manager::instance().load_texture(filename, &shader_resource_view, &texture2d_desc);
+			hr = DirectX::CreateWICTextureFromFileEx(device,filename.c_str(),0,D3D11_USAGE_DEFAULT,D3D11_BIND_SHADER_RESOURCE,0,0,DirectX::WIC_LOADER_IGNORE_SRGB,nullptr,&shader_resource_view);
+			if(FAILED(hr))hr=Resource_Manager::instance().load_texture(filename,&shader_resource_view,&texture2d_desc);
 			if (hr == S_OK)
 			{
-				texture_resource_views.emplace_back().Attach(shader_resource_view);
+				texture_resource_views.back().Attach(shader_resource_view);
+			}
+		}
+		if(texture_resource_views.back())
+		{
+			Microsoft::WRL::ComPtr<ID3D11Resource> original;texture_resource_views.back()->GetResource(original.GetAddressOf());
+			Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;if(SUCCEEDED(original.As(&tex))){D3D11_TEXTURE2D_DESC d{};tex->GetDesc(&d);UINT support=0;device->CheckFormatSupport(d.Format,&support);
+				if(d.MipLevels==1&&(support&D3D11_FORMAT_SUPPORT_MIP_AUTOGEN)){d.MipLevels=0;d.BindFlags=D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET;d.MiscFlags=D3D11_RESOURCE_MISC_GENERATE_MIPS;Microsoft::WRL::ComPtr<ID3D11Texture2D> chain;
+					if(SUCCEEDED(device->CreateTexture2D(&d,nullptr,chain.GetAddressOf()))){Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> view;if(SUCCEEDED(device->CreateShaderResourceView(chain.Get(),nullptr,view.GetAddressOf()))){pbr_mip_sources_.back()=original;texture_resource_views.back()=view;}}}
 			}
 		}
 	}
+}
+
+void Gltf_Model::initialize_texture_mips(ID3D11DeviceContext* context)
+{
+	if(pbr_mips_ready_)return;
+	for(size_t i=0;i<pbr_mip_sources_.size();++i)if(pbr_mip_sources_[i]){Microsoft::WRL::ComPtr<ID3D11Resource> target;texture_resource_views[i]->GetResource(target.GetAddressOf());context->CopySubresourceRegion(target.Get(),0,0,0,0,pbr_mip_sources_[i].Get(),0,nullptr);context->GenerateMips(texture_resource_views[i].Get());pbr_mip_sources_[i].Reset();}
+	pbr_mips_ready_=true;
 }
 
 void Gltf_Model::fetch_animations(const tinygltf::Model& Gltf_Model)
@@ -1115,7 +1217,13 @@ void Gltf_Model::render_node(
 		for (const auto& primitive : mesh.primitives)
 		{
 			const material& material = materials[primitive.material];
-			if (!is_material_in_pass(material.data.alpha_mode, pass))
+			const bool transmission=material.pbr.transmission[0]>0;
+			const bool full_pbr=force_full_pbr_||material.pbr.flags[3]!=0||primitive.has_color;
+			bool in_pass=is_material_in_pass(material.data.alpha_mode,pass);
+			if(pass==pass_mode::pbr_opaque)in_pass=full_pbr&&material.data.alpha_mode!=2&&!transmission;
+			if(pass==pass_mode::forward_transparency)in_pass=material.data.alpha_mode==2||transmission;
+			if(transmission&&(pass==pass_mode::deferred_geometry||pass==pass_mode::directional_shadow||pass==pass_mode::shadow))in_pass=false;
+			if (!in_pass)
 			{
 				continue;
 			}
@@ -1304,13 +1412,28 @@ void Gltf_Model::render_node(
 			primitive_data.material = primitive.material;
 			primitive_data.has_tangent = primitive.has_tangent ? 1 : 0; // キャッシュ値を利用
 			primitive_data.skin = node.skin;
+			primitive_data.pad=(primitive.has_color?1:0)|(primitive.vertex_buffer_views.at("TEXCOORD_1").buffer?2:0);
 			XMStoreFloat4x4(&primitive_data.world,
 				XMLoadFloat4x4(&node.global_transform) * XMLoadFloat4x4(&world));
+			if(pass==pass_mode::deferred_geometry||pass==pass_mode::pbr_opaque||pass==pass_mode::forward_opaque||pass==pass_mode::forward_transparency)
+			{
+				const float determinant=XMVectorGetX(XMMatrixDeterminant(XMLoadFloat4x4(&primitive_data.world)));
+				Render_State::instance().set_rasterizer_state(immediate_context,determinant<0?Rasterizer_State::Cull_None_CCW:Rasterizer_State::Cull_None_CW);
+			}
 
 			immediate_context->UpdateSubresource(primitive_cbuffer.Get(), 0, 0, &primitive_data, 0, 0);
 			immediate_context->VSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
 			if (pass != pass_mode::directional_shadow && pass != pass_mode::shadow)
 				immediate_context->PSSetConstantBuffers(0, 1, primitive_cbuffer.GetAddressOf());
+			if(pass==pass_mode::deferred_geometry||pass==pass_mode::pbr_opaque||pass==pass_mode::forward_opaque||pass==pass_mode::forward_transparency)
+			{
+				immediate_context->PSSetShaderResources(47,1,pbr_material_resource_view_.GetAddressOf());
+				immediate_context->PSSetShaderResources(48,GltfPbr::TextureCount,material.pbr_srvs);
+				ID3D11SamplerState* samplers[15]{};for(auto& sampler:samplers)sampler=pbr_samplers_[0].Get();
+				for(const auto& texture:material.pbr.textures)if(texture.info[0]>=0&&texture.info[1]>0)samplers[texture.info[1]]=pbr_samplers_[texture.info[2]].Get();
+				immediate_context->PSSetSamplers(0,15,samplers);
+				auto* environment_sampler=pbr_samplers_[0].Get();immediate_context->PSSetSamplers(15,1,&environment_sampler);
+			}
 
 			if (visible_ranges.empty())
 			{
@@ -1334,11 +1457,12 @@ void Gltf_Model::render_node(
 
 void Gltf_Model::render(ID3D11DeviceContext* immediate_context, const DirectX::XMFLOAT4X4& world, pass_mode pass, bool is_animation, float delta_time, animation_mode anim_mode, int animation_index, const Frustum* frustum, meshlet_culling_stats* culling_stats, occlusion_state* occlusion, bool use_occlusion)
 {
+	initialize_texture_mips(immediate_context);
 	if (pass == pass_mode::deferred_geometry)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
 	}
-	else if (pass == pass_mode::forward_opaque)
+	else if (pass == pass_mode::forward_opaque || pass == pass_mode::pbr_opaque)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
 	}
@@ -1441,12 +1565,13 @@ void Gltf_Model::render_with_nodes(
 		render(immediate_context, world, pass, false, 0.0f, animation_mode::single, 0, frustum, culling_stats, occlusion, use_occlusion);
 		return;
 	}
+	initialize_texture_mips(immediate_context);
 
 	if (pass == pass_mode::deferred_geometry)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_DEFERRED_GEOMETRY_PS"), NULL, 0);
 	}
-	else if (pass == pass_mode::forward_opaque)
+	else if (pass == pass_mode::forward_opaque || pass == pass_mode::pbr_opaque)
 	{
 		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("GLTF_FORWARD_OPAQUE_PS"), NULL, 0);
 	}

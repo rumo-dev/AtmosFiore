@@ -1,5 +1,6 @@
+param([string]$AuditDirectory = (Join-Path $PSScriptRoot '..\data\showcases\audit'))
 Add-Type -AssemblyName System.Drawing
-$showcaseRoot = Join-Path $PSScriptRoot '..\data\showcases\audit'
+$showcaseRoot = $AuditDirectory
 $entries = Get-Content -LiteralPath (Join-Path $showcaseRoot 'report.json') -Raw | ConvertFrom-Json | Where-Object enabled
 for ($page = 0; $page -lt [Math]::Ceiling($entries.Count / 16); $page++) {
     $canvas = [Drawing.Bitmap]::new(1600, 1000)

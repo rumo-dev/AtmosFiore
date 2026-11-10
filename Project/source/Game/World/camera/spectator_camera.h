@@ -30,6 +30,7 @@ private:
 	float _mouse_sensitivity = 0.1f;
 
 public:
+	void set_move_speed(float speed) { _base_move_speed = (std::max)(speed, 0.001f); }
 	SpectatorCamera(HWND hwnd = Graphics_Core::instance().get_window_handle())
 		: _hwnd(hwnd)
 	{

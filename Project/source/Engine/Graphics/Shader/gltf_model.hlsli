@@ -6,6 +6,8 @@
     float2 texcoord : TEXCOORD;
     uint4 joints : JOINTS;
     float4 weights : WEIGHTS;
+    float2 texcoord1 : TEXCOORD1;
+    float4 color : COLOR0;
 };
 
 struct VS_OUT
@@ -15,6 +17,8 @@ struct VS_OUT
     float4 w_normal : NORMAL;
     float4 w_tangent : TANGENT;
     float2 texcoord : TEXCOORD;
+    float2 texcoord1 : TEXCOORD1;
+    float4 color : COLOR0;
 };
 
 cbuffer PRIMITIVE_CONSTANT_BUFFER : register(b0)
@@ -23,7 +27,7 @@ cbuffer PRIMITIVE_CONSTANT_BUFFER : register(b0)
     int material;
     bool has_tangent;
     int skin;
-    int pad;
+    int vertex_flags;
 };
 static const uint PRIMITIVE_MAX_JOINTS = 512;
 cbuffer PRIMITIVE_JOINT_CONSTANTS : register(b3)

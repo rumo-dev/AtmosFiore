@@ -22,9 +22,10 @@ bool Frame_Work::initialize()
 	//static ImGui_Util::ThemeType theme = ImGui_Util::ThemeType::seeing;
 	//ImGui_Util::set_theme(theme);
 
-	const bool showcase_audit = std::wstring(GetCommandLineW()).find(L"--showcase-audit") != std::wstring::npos;
+	const bool pbr_audit = std::wstring(GetCommandLineW()).find(L"--pbr-audit") != std::wstring::npos;
+	const bool showcase_audit = pbr_audit || std::wstring(GetCommandLineW()).find(L"--showcase-audit") != std::wstring::npos;
 	_hide_imgui = showcase_audit;
-	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit());
+	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit(pbr_audit));
 	else Scene_Manager::instance().change_scene(new Scene_Splash());
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();

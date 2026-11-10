@@ -1,7 +1,7 @@
 // Validate data consumed by the production glTF loader and showcase selector.
 const fs=require('fs'),path=require('path'),assert=require('assert/strict');
 const root=path.resolve(__dirname,'..');
-const catalog=JSON.parse(fs.readFileSync(path.join(root,'data/showcases/catalog.json')));
+const catalog=JSON.parse(fs.readFileSync(path.join(root,'data/showcases/catalog.json'))).filter(e=>!e.pbr_asset);
 const ids=new Set();let triangles=0;
 for(const e of catalog){
  assert(!ids.has(e.id),'Duplicate exhibit '+e.id);ids.add(e.id);

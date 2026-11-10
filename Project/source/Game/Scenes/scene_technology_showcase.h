@@ -85,6 +85,19 @@ public:
         ModelInstance instance{};
         instance.model_key = model_key_;
         dx::XMStoreFloat4x4(&instance.world_transform, dx::XMMatrixIdentity());
+        if(exhibit_.value("pbr_asset",false))
+        {
+            model->set_full_pbr_enabled(true);
+            dx::XMFLOAT3 minimum,maximum;dx::XMFLOAT4X4 conversion;dx::XMStoreFloat4x4(&conversion,dx::XMMatrixScaling(1,1,-1));
+            model->compute_instance_aabb(conversion,false,0,Gltf_Model::animation_mode::single,0,minimum,maximum);
+            const float width=(std::max)(maximum.x-minimum.x,0.01f),height=(std::max)(maximum.y-minimum.y,0.01f),depth=(std::max)(maximum.z-minimum.z,0.01f);
+            const float extent=(std::max)({width,height,depth});
+            const float distance=(std::max)(width/1.05f,height/0.6f)+depth*0.5f+extent*0.15f;
+            dx::XMStoreFloat4x4(&instance.world_transform,dx::XMMatrixScaling(1,1,-1)*dx::XMMatrixTranslation(-(minimum.x+maximum.x)*0.5f,-minimum.y,-(minimum.z+maximum.z)*0.5f));
+            exhibit_["camera"]={0,height*0.5f+extent*0.02f,-distance};exhibit_["target"]={0,height*0.5f,0};exhibit_["focus"]=distance;
+            exhibit_["near"]=(std::max)(distance*0.001f,0.0001f);exhibit_["far"]=distance*10;exhibit_["move_speed"]=extent*0.7f;
+            shadow.light_view_size=(std::max)(extent*6,10.0f);
+        }
         r.add_model_instance("Showcase_Main", instance);
         if(id_=="reflection_probes") { probe_=std::make_unique<ShowcaseReflectionProbe>();if(!probe_->initialize(g.get_device())){probe_.reset();error_="Local probe initialization failed.";} }
         if(id_=="frustum")for(int i=-3;i<=3;++i)if(i!=0) {
@@ -235,6 +248,7 @@ private:
         const float yaw=dx::XMConvertToDegrees(std::atan2(t[2]-p[2],t[0]-p[0]));
         camera_->set_rotation(yaw,pitch,dx::XMVectorSet(p[0],p[1],p[2],1),dx::XMVectorSet(t[0],t[1],t[2],1));
         auto& lens=camera_->get_camera(); lens.FocalLength=28; lens.SensorSize=36; lens.FNumber=id_=="dof"?1.4f:8; lens.FocusDist=exhibit_.value("focus",9.0f); lens.ISO=400; lens.shutterDenominator=60; lens.EV_Compensation=0; lens.autoSettingsEnabled=false; lens.near_z=0.08f; lens.far_z=120;
+        lens.near_z=exhibit_.value("near",0.08f);lens.far_z=exhibit_.value("far",120.0f);camera_->set_move_speed(exhibit_.value("move_speed",10.0f));
         CameraManager::instance().register_camera("Technology Showcase",camera_); CameraManager::instance().switch_camera("Technology Showcase"); Post_Process_Manager::ResetTemporalHistory();
     }
     void apply_comparison()
@@ -249,6 +263,7 @@ private:
         if(id_=="area")for(auto& a:g.get_area_light_manager().get_lights())a.intensity=enabled_?8000.0f:0;
         if(id_=="spot")for(auto& a:g.get_spot_light_manager().get_lights())a.intensity=enabled_?14000.0f:0;
         auto& resources=Resource_Manager::instance();
+        if(exhibit_.value("pbr_asset",false))if(auto* model=resources.get_model(model_key_))model->set_pbr_feature_override(enabled_?0:exhibit_.value("pbr_feature",0));
         if(id_=="frustum") {
             resources.set_meshlet_culling_enabled(false);resources.set_occlusion_culling_enabled(false);
             if(auto* m=resources.get_model_instance("Showcase_Main"))m->disable_frustum_culling=!enabled_;

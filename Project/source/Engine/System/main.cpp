@@ -21,6 +21,7 @@ int WINAPI WinMain(
 	LPSTR cmd_line,
 	int cmd_show)
 {
+	struct ComScope { HRESULT result=CoInitializeEx(nullptr,COINIT_MULTITHREADED);~ComScope(){if(SUCCEEDED(result))CoUninitialize();} } com_scope;
 	// Assets are loaded with paths relative to the working directory.  Explorer,
 	// shortcuts and launchers do not necessarily start us in the exe directory.
 	std::wstring executable_path(MAX_PATH, L'\0');

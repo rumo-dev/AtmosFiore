@@ -17,6 +17,7 @@
 #include "Engine/Graphics/Model/Tiny/tiny_gltf.h"
 #include "Engine/Graphics/shader/shader.h"
 #include "Engine/Graphics/texture/texture.h"
+#include "gltf_pbr_material.h"
 
 struct Frustum;
 
@@ -27,6 +28,7 @@ enum class pass_mode
 {
 	deferred_geometry,      ///< GBuffer書き込み
 	forward_opaque,         ///< 不透明フォワード描画
+	pbr_opaque,             ///< 拡張マテリアルの不透明レイヤー
 	forward_transparency,   ///< 透明描画
 	voxel_gi,               ///< 静的な不透明ジオメトリのボクセル化
 	directional_shadow,     ///< 平行光源シャドウマップ生成
@@ -130,6 +132,7 @@ private:
 			std::vector<UINT>          cached_strides;
 			std::vector<UINT>          cached_offsets;
 			bool                       has_tangent{ false }; // 【追加】Tangent有無フラグ
+			bool has_color{ false };
 		};
 		std::vector<primitive> primitives;
 	};
@@ -186,12 +189,17 @@ private:
 			texture_info emissive_texture;
 		};
 		cbuffer data;
+		GltfPbr::Material pbr;
+		ID3D11ShaderResourceView* pbr_srvs[GltfPbr::TextureCount]{};
 
 		// 【追加】描画用 SRV キャッシュ（ベースカラー、メタリックラフネス、法線、エミッシブ、オクルージョン）
 		ID3D11ShaderResourceView* cached_srvs[5]{ nullptr, nullptr, nullptr, nullptr, nullptr };
 	};
 	std::vector<material> materials;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> material_resource_view;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> pbr_material_resource_view_;
+	std::vector<Microsoft::WRL::ComPtr<ID3D11SamplerState>> pbr_samplers_;
+	bool force_full_pbr_ = false;
 
 	void fetch_materials(ID3D11Device* device, const tinygltf::Model& Gltf_Model);
 
@@ -218,6 +226,9 @@ private:
 	};
 	std::vector<image> images;
 	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> texture_resource_views;
+	std::vector<Microsoft::WRL::ComPtr<ID3D11Resource>> pbr_mip_sources_;
+	bool pbr_mips_ready_=false;
+	void initialize_texture_mips(ID3D11DeviceContext* context);
 
 	void fetch_textures(ID3D11Device* device, const tinygltf::Model& Gltf_Model);
 
@@ -362,6 +373,8 @@ private:
 	std::vector<node> animated_nodes_cache;
 
 public:
+	void set_full_pbr_enabled(bool enabled) { force_full_pbr_ = enabled; }
+	void set_pbr_feature_override(int feature);
 	Gltf_Model(ID3D11Device* device, const std::string& filename);
 	virtual ~Gltf_Model() = default;
 

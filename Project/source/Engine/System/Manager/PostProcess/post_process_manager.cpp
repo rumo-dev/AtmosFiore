@@ -66,6 +66,7 @@ namespace {
 
 // ─── 静的メンバ定義 ───────────────────────────────────────────────
 Framebuffer                  Post_Process_Manager::fsquad;
+Framebuffer                  Post_Process_Manager::pbr_background_buffer;
 Framebuffer                  Post_Process_Manager::ssao_buffer;
 Framebuffer                  Post_Process_Manager::ssao_blur_buffer;
 Framebuffer                  Post_Process_Manager::ssao_vertical_buffer;
@@ -206,6 +207,7 @@ void Post_Process_Manager::initialize()
 	auto  h = static_cast<uint32_t>(Graphics_Core::instance().get_screen_height());
 
 	fsquad = Framebuffer(device, w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	pbr_background_buffer = Framebuffer(device,w,h,DXGI_FORMAT_R16G16B16A16_FLOAT,0,false,false);
 	const uint32_t ssao_width = (std::max)(1u, w / 2);
 	const uint32_t ssao_height = (std::max)(1u, h / 2);
 	// Directional visibility is smooth enough for half-resolution storage; the
@@ -282,6 +284,7 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 
 	// Reduce geometry, deferred-lighting, and forward-transparent pixel work.
 	fsquad = Framebuffer(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false, false);
+	pbr_background_buffer = Framebuffer(device,width,height,DXGI_FORMAT_R16G16B16A16_FLOAT,0,false,false);
 	const UINT ssao_width = (std::max)(1u, width / 2);
 	const UINT ssao_height = (std::max)(1u, height / 2);
 	const UINT shadow_mask_width = (std::max)(1u, width / 2);
@@ -465,11 +468,38 @@ void Post_Process_Manager::begin()
 	ctx->PSSetShaderResources(0, GBUFFER_COUNT + 4, null_lighting_srvs);
 	ID3D11ShaderResourceView* null_shadow_mask = nullptr;
 	ctx->PSSetShaderResources(15, 1, &null_shadow_mask);
+
+	// Material extensions are evaluated in a forward layer after opaque deferred
+	// lighting. Keep the original G-buffer for AO, depth effects and diagnostics.
+	ID3D11ShaderResourceView* pbr_mask=directional_shadow_blur_vertical_buffer.GetColorMap();
+	ctx->PSSetShaderResources(41,1,&pbr_mask);
+	auto* pbr_ao=ssao_filtered_buffer.GetColorMap();ctx->PSSetShaderResources(40,1,&pbr_ao);
+	Render_State::instance().set_3d_render_states(ctx,Rasterizer_State::Cull_None_CW,Depth_State::Test_Enable_Write_Disable);
+	// This layer shades the same surfaces already stored in the G-buffer.
+	// LESS would reject every equal-depth opaque fragment.
+	static Microsoft::WRL::ComPtr<ID3D11DepthStencilState> pbr_read_depth;
+	if(!pbr_read_depth){D3D11_DEPTH_STENCIL_DESC d{};d.DepthEnable=TRUE;d.DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ZERO;d.DepthFunc=D3D11_COMPARISON_LESS_EQUAL;Graphics_Core::instance().get_device()->CreateDepthStencilState(&d,pbr_read_depth.GetAddressOf());}
+	ctx->OMSetDepthStencilState(pbr_read_depth.Get(),0);
+	Render_State::instance().set_blend_state(ctx,Blend_State::Opaque);
+	Resource_Manager::instance().render_models(pass_mode::pbr_opaque);
+	Render_State::instance().set_sampler_state(ctx);
+	// A separate mip chain makes rough transmission legal: never sample the
+	// HDR render target while it is being written by the transparent pass.
+	pbr_background_buffer.Activate(ctx);
+	auto* opaque_color=fsquad.GetColorMap();
+	Graphics_Core::instance().get_fullscreen_quad()->Blit(ctx,&opaque_color,0,1);
+	pbr_background_buffer.Deactivate(ctx);
+	ID3D11ShaderResourceView* null_pbr_source=nullptr;ctx->PSSetShaderResources(0,1,&null_pbr_source);
+	auto* background=pbr_background_buffer.GetColorMap();ctx->GenerateMips(background);ctx->PSSetShaderResources(43,1,&background);
+	ID3D11ShaderResourceView* pbr_gbuffer[GBUFFER_COUNT]{};Graphics_Core::instance().get_geometry_buffer()->GetShaderResourceViews(pbr_gbuffer);ctx->PSSetShaderResources(44,1,&pbr_gbuffer[0]);
 }
 
 // ─── 終了 ─────────────────────────────────────────────────────────
 void Post_Process_Manager::end()
 {
+	auto* context=Graphics_Core::instance().get_device_context();
+	ID3D11ShaderResourceView* null_pbr[5]{};context->PSSetShaderResources(40,5,null_pbr);
+	Render_State::instance().set_sampler_state(context);
 	fsquad.Deactivate(Graphics_Core::instance().get_device_context());
 }
 
