@@ -1,0 +1,8 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const root=path.resolve(__dirname,'..'),catalog=JSON.parse(fs.readFileSync(path.join(root,'data/showcases/catalog.json')));
+const report=JSON.parse(fs.readFileSync(path.join(root,'data/showcases/audit/report.json')));
+assert.equal(report.length,catalog.length*2,'Incomplete GPU audit');
+for(const e of catalog){for(const enabled of [true,false]){const r=report.find(r=>r.id===e.id&&r.enabled===enabled);assert(r,'Missing capture '+e.id);assert.equal(r.capture_hresult,0);assert.equal(r.error,'');assert(r.geometry_fraction>0.08,'No visible exhibit geometry: '+e.id);if(enabled){assert(r.mean_rgb>5&&r.mean_rgb<250,'Under/overexposed exhibit: '+e.id);assert(r.visible_fraction>0.08,'Black exhibit: '+e.id);}assert(fs.existsSync(path.join(root,r.image)));}}
+for(const id of ['ibl','ssao','ssr','reflection_probes','ssgi','voxel','ddgi','ddgi_fog','sun_shadow','point_shadow','area','spot','volumetric','height','distance','exponential','bloom','exposure','adaptation','tone','dof','chromatic','distortion','vignette'])assert(report.find(r=>r.id===id&&!r.enabled).mean_absolute_on_off_difference>0.05,'Technique has no measurable effect: '+id);
+console.table(report.filter(r=>r.enabled).map(r=>({scene:r.id,geometry:(r.geometry_fraction*100).toFixed(1)+'%',brightness:r.mean_rgb.toFixed(1),difference:report.find(q=>q.id===r.id&&!q.enabled).mean_absolute_on_off_difference.toFixed(3)})));
+console.log('All '+catalog.length+' exhibits render geometry with valid exposure, both ON and OFF.');

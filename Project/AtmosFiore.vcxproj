@@ -499,6 +499,9 @@ if exist export rmdir /s /q export</Command>
     <ClInclude Include="source\Game\Scenes\scene_splash.h" />
     <ClInclude Include="source\Game\Scenes\loading.h" />
     <ClInclude Include="source\Game\Scenes\scene_manager.h" />
+    <ClInclude Include="source\Game\Scenes\scene_technology_showcase.h" />
+    <ClInclude Include="source\Game\Scenes\scene_showcase_audit.h" />
+    <ClInclude Include="source\Game\Scenes\showcase_reflection_probe.h" />
     <ClInclude Include="source\Engine\System\framework.h" />
     <ClInclude Include="source\Engine\System\graphics_constants.h" />
     <ClInclude Include="source\Engine\System\graphics_core.h" />

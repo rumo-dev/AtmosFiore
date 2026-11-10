@@ -17,9 +17,6 @@ float4 main(VS_OUT pin) : SV_TARGET
 
     normal = normalize(normal);
     float3 light_direction = normalize(-directional_light_direction.xyz);
-    if (dot(normal, light_direction) <= 0.0f)
-        return 1.0f.xxxx;
-
     float3 position = gbuffer_position.SampleLevel(
         sampler_states[POINT_CLAMP], pin.texcoord, 0).xyz;
     float visibility = SampleDirectionalShadow(

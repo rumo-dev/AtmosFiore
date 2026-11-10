@@ -195,6 +195,10 @@ public:
 	 * @brief ImGuiデバッグ描画
 	 */
 	void draw_imgui();
+	bool meshlet_culling_enabled() const { return meshlet_culling_enabled_; }
+	bool occlusion_culling_enabled() const { return occlusion_culling_enabled_; }
+	void set_meshlet_culling_enabled(bool enabled) { meshlet_culling_enabled_ = enabled; }
+	void set_occlusion_culling_enabled(bool enabled) { occlusion_culling_enabled_ = enabled; }
 
 	// culling stats
 	int last_culled_count = 0;

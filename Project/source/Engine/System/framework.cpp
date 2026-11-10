@@ -4,6 +4,7 @@
 #include "Engine/Utilities/misc.h"
 #include "Engine/Graphics/UI/DebugMenu/Dashboard.h"
 #include "Engine/Extentions/Tracy/tracy/Tracy.hpp"
+#include "Game/Scenes/scene_showcase_audit.h"
 Frame_Work::Frame_Work(HWND hwnd, int show_command) : hwnd(hwnd), _show_command(show_command)
 {
 }
@@ -21,7 +22,10 @@ bool Frame_Work::initialize()
 	//static ImGui_Util::ThemeType theme = ImGui_Util::ThemeType::seeing;
 	//ImGui_Util::set_theme(theme);
 
-	Scene_Manager::instance().change_scene(new Scene_Splash());
+	const bool showcase_audit = std::wstring(GetCommandLineW()).find(L"--showcase-audit") != std::wstring::npos;
+	_hide_imgui = showcase_audit;
+	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit());
+	else Scene_Manager::instance().change_scene(new Scene_Splash());
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();
 	AudioSystem::instance().Initialize(

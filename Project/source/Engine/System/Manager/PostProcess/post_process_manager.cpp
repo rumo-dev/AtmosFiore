@@ -117,6 +117,20 @@ bool Post_Process_Manager::UseSettingsFile(const std::string& path)
 	ResetTemporalHistory();
 	return true;
 }
+bool Post_Process_Manager::WriteSettingsSnapshot(const std::string& path)
+{
+	const std::string original = settings_path;
+	settings_path = path;
+	const bool result = Post_Process_Manager{}.savePipelineSettings();
+	settings_path = original;
+	return result;
+}
+bool Post_Process_Manager::RestoreSettingsSnapshot(const std::string& snapshot, const std::string& originalPath)
+{
+	const bool result = UseSettingsFile(snapshot);
+	settings_path = originalPath;
+	return result;
+}
 void Post_Process_Manager::SetVolumetricFogEffectEnabled(bool enabled)
 {
 	effect_enabled[static_cast<size_t>(EffectId::VolumetricFog)] = enabled;

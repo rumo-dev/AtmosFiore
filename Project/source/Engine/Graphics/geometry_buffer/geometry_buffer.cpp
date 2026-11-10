@@ -12,7 +12,9 @@ GeometryBuffer::GeometryBuffer(ID3D11Device* device, UINT width, UINT height)
 	{
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		// World positions feed shadow depth comparisons and receiver gradients.
+		// FP16 rounds coordinates near 32 metres in centimetre-sized steps.
+		DXGI_FORMAT_R32G32B32A32_FLOAT,
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 	};
 

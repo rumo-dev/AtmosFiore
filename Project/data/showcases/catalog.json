@@ -1,0 +1,738 @@
+[
+  {
+    "id": "pbr",
+    "category": "Materials",
+    "title": "PBR metal / roughness",
+    "description": "Compare dielectric, silver and gold rows; roughness increases to the right.",
+    "model": "data/showcases/pbr.gltf",
+    "profile": "data/showcases/pbr.json",
+    "off_profile": "data/showcases/pbr_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "ibl",
+    "category": "Materials",
+    "title": "Image based lighting",
+    "description": "Inspect environment illumination and reflections on one polished metal sphere with no direct light.",
+    "model": "data/showcases/ibl.gltf",
+    "profile": "data/showcases/ibl.json",
+    "off_profile": "data/showcases/ibl_off.json",
+    "camera": [
+      0,
+      2.5,
+      -7
+    ],
+    "target": [
+      0,
+      1.2,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 8,
+    "environment": true
+  },
+  {
+    "id": "ssao",
+    "category": "Lighting",
+    "title": "SSAO contact occlusion",
+    "description": "Compare box contacts and the wall-floor corner.",
+    "model": "data/showcases/ssao.gltf",
+    "profile": "data/showcases/ssao.json",
+    "off_profile": "data/showcases/ssao_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "ssr",
+    "category": "Reflections",
+    "title": "Screen space reflections",
+    "description": "The polished floor reflects the visible warm and cyan objects. Move sideways to see screen-space limits.",
+    "model": "data/showcases/ssr.gltf",
+    "profile": "data/showcases/ssr.json",
+    "off_profile": "data/showcases/ssr_off.json",
+    "camera": [
+      0,
+      2.5,
+      -7
+    ],
+    "target": [
+      0,
+      1.2,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 8,
+    "environment": true
+  },
+  {
+    "id": "reflection_probes",
+    "category": "Reflections",
+    "title": "Local reflection probes",
+    "description": "A local cubemap captures this generated gallery. Inspect off-screen objects reflected by one polished metal sphere. SSR is disabled.",
+    "model": "data/showcases/reflection_probes.gltf",
+    "profile": "data/showcases/reflection_probes.json",
+    "off_profile": "data/showcases/reflection_probes_off.json",
+    "camera": [
+      0,
+      2.5,
+      -7
+    ],
+    "target": [
+      0,
+      1.2,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 8,
+    "environment": true
+  },
+  {
+    "id": "ssgi",
+    "category": "GI",
+    "title": "Screen space GI",
+    "description": "Inspect red and blue diffuse transfer onto the white floor and spheres.",
+    "model": "data/showcases/ssgi.gltf",
+    "profile": "data/showcases/ssgi.json",
+    "off_profile": "data/showcases/ssgi_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "voxel",
+    "category": "GI",
+    "title": "Voxel GI",
+    "description": "Emission lights the floor and partition, including surfaces outside the screen.",
+    "model": "data/showcases/voxel.gltf",
+    "profile": "data/showcases/voxel.json",
+    "off_profile": "data/showcases/voxel_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 80,
+    "gi": true,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "ddgi",
+    "category": "GI",
+    "title": "DDGI surface probes",
+    "description": "Probe interpolation carries indirect light behind the white partition.",
+    "model": "data/showcases/ddgi.gltf",
+    "profile": "data/showcases/ddgi.json",
+    "off_profile": "data/showcases/ddgi_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 80,
+    "gi": true,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "ddgi_fog",
+    "category": "GI",
+    "title": "DDGI illuminated fog",
+    "description": "Compare warm and cyan light scattered in fog; only GI illuminates this fog view.",
+    "model": "data/showcases/ddgi_fog.gltf",
+    "profile": "data/showcases/ddgi_fog.json",
+    "off_profile": "data/showcases/ddgi_fog_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 80,
+    "gi": true,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "sun_shadow",
+    "category": "Shadows",
+    "title": "Directional PCSS",
+    "description": "Compare PCSS against 3x3 PCF. Tall pillars have wider penumbrae; overhead beams remain casters.",
+    "model": "data/showcases/sun_shadow.gltf",
+    "profile": "data/showcases/sun_shadow.json",
+    "off_profile": "data/showcases/sun_shadow_off.json",
+    "camera": [
+      0,
+      2.8,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "point_shadow",
+    "category": "Shadows",
+    "title": "Point light shadows",
+    "description": "A moving point light casts pillar shadows on the floor and walls.",
+    "model": "data/showcases/point_shadow.gltf",
+    "profile": "data/showcases/point_shadow.json",
+    "off_profile": "data/showcases/point_shadow_off.json",
+    "camera": [
+      0,
+      2.8,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      1
+    ],
+    "sun": 300,
+    "gi": false,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "area",
+    "category": "Lighting",
+    "title": "Area lights",
+    "description": "A large rectangular emitter produces a broad rectangular highlight on one moderately rough metal sphere.",
+    "model": "data/showcases/area.gltf",
+    "profile": "data/showcases/area.json",
+    "off_profile": "data/showcases/area_off.json",
+    "camera": [
+      0,
+      2.5,
+      -7
+    ],
+    "target": [
+      0,
+      1.2,
+      1
+    ],
+    "sun": 300,
+    "gi": false,
+    "focus": 8,
+    "environment": false
+  },
+  {
+    "id": "spot",
+    "category": "Lighting",
+    "title": "Spot lights",
+    "description": "Warm and cool cones reveal inner/outer cone falloff on the floor.",
+    "model": "data/showcases/spot.gltf",
+    "profile": "data/showcases/spot.json",
+    "off_profile": "data/showcases/spot_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 300,
+    "gi": false,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "volumetric",
+    "category": "Atmosphere",
+    "title": "Froxel volumetric fog",
+    "description": "Beams and pillars interrupt light shafts through the fog.",
+    "model": "data/showcases/volumetric.gltf",
+    "profile": "data/showcases/volumetric.json",
+    "off_profile": "data/showcases/volumetric_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 2000,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "height",
+    "category": "Atmosphere",
+    "title": "Height fog",
+    "description": "Low fog hides pillar feet while upper portions stay clear.",
+    "model": "data/showcases/height.gltf",
+    "profile": "data/showcases/height.json",
+    "off_profile": "data/showcases/height_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 2000,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "distance",
+    "category": "Atmosphere",
+    "title": "Distance fog",
+    "description": "Repeated pillars at known intervals fade between the start and end distance.",
+    "model": "data/showcases/distance.gltf",
+    "profile": "data/showcases/distance.json",
+    "off_profile": "data/showcases/distance_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 2000,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "exponential",
+    "category": "Atmosphere",
+    "title": "Exponential fog",
+    "description": "The long corridor demonstrates progressive exponential extinction.",
+    "model": "data/showcases/exponential.gltf",
+    "profile": "data/showcases/exponential.json",
+    "off_profile": "data/showcases/exponential_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 2000,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "bloom",
+    "category": "HDR and camera",
+    "title": "HDR bloom",
+    "description": "The emissive intensity ramp blooms without blurring unlit geometry.",
+    "model": "data/showcases/bloom.gltf",
+    "profile": "data/showcases/bloom.json",
+    "off_profile": "data/showcases/bloom_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 300,
+    "gi": false,
+    "focus": 9,
+    "environment": false
+  },
+  {
+    "id": "exposure",
+    "category": "HDR and camera",
+    "title": "Physical exposure",
+    "description": "Change aperture, shutter and ISO in the camera panel; compare exposure on/off.",
+    "model": "data/showcases/exposure.gltf",
+    "profile": "data/showcases/exposure.json",
+    "off_profile": "data/showcases/exposure_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "adaptation",
+    "category": "HDR and camera",
+    "title": "Eye adaptation",
+    "description": "Animated illumination alternates bright and dark; observe adaptation lag.",
+    "model": "data/showcases/adaptation.gltf",
+    "profile": "data/showcases/adaptation.json",
+    "off_profile": "data/showcases/adaptation_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "tone",
+    "category": "HDR and camera",
+    "title": "Tone mapping",
+    "description": "Compare the HDR intensity ramp with tone mapping and linear clipping.",
+    "model": "data/showcases/tone.gltf",
+    "profile": "data/showcases/tone.json",
+    "off_profile": "data/showcases/tone_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "dof",
+    "category": "HDR and camera",
+    "title": "Depth of field",
+    "description": "The middle spheres are in focus. Near and distant spheres blur; change focus distance.",
+    "model": "data/showcases/dof.gltf",
+    "profile": "data/showcases/dof.json",
+    "off_profile": "data/showcases/dof_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 13,
+    "environment": true
+  },
+  {
+    "id": "chromatic",
+    "category": "Lens",
+    "title": "Chromatic aberration",
+    "description": "Inspect color separation on thin high-contrast lines at the frame edges.",
+    "model": "data/showcases/chromatic.gltf",
+    "profile": "data/showcases/chromatic.json",
+    "off_profile": "data/showcases/chromatic_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "distortion",
+    "category": "Lens",
+    "title": "Lens distortion",
+    "description": "Straight columns bend with lens distortion. Compare the same camera on/off.",
+    "model": "data/showcases/distortion.gltf",
+    "profile": "data/showcases/distortion.json",
+    "off_profile": "data/showcases/distortion_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "vignette",
+    "category": "Lens",
+    "title": "Vignetting",
+    "description": "Compare center and corner brightness while keeping scene illumination fixed.",
+    "model": "data/showcases/vignette.gltf",
+    "profile": "data/showcases/vignette.json",
+    "off_profile": "data/showcases/vignette_off.json",
+    "camera": [
+      0,
+      2.5,
+      -7
+    ],
+    "target": [
+      0,
+      1.2,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 8,
+    "environment": true
+  },
+  {
+    "id": "taa",
+    "category": "Reconstruction",
+    "title": "Temporal anti-aliasing",
+    "description": "Thin bars and a moving object expose shimmer and temporal history behavior.",
+    "model": "data/showcases/taa.gltf",
+    "profile": "data/showcases/taa.json",
+    "off_profile": "data/showcases/taa_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "dlss",
+    "category": "Reconstruction",
+    "title": "DLSS reconstruction",
+    "description": "Compare native TAA and DLSS Quality on the same fine geometry. Requires supported NVIDIA hardware.",
+    "model": "data/showcases/dlss.gltf",
+    "profile": "data/showcases/dlss.json",
+    "off_profile": "data/showcases/dlss_off.json",
+    "camera": [
+      0,
+      2,
+      -8
+    ],
+    "target": [
+      0,
+      1.6,
+      8
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "frustum",
+    "category": "Performance",
+    "title": "Frustum culling",
+    "description": "Seven separate courts span the camera frustum. Compare rejected instances while turning the camera. Meshlet and occlusion culling are disabled.",
+    "model": "data/showcases/frustum.gltf",
+    "profile": "data/showcases/frustum.json",
+    "off_profile": "data/showcases/frustum_off.json",
+    "camera": [
+      2.4,
+      3.8,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      5
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "meshlets",
+    "category": "Performance",
+    "title": "Spatial meshlet culling",
+    "description": "Turn away from parts of the dense court. Inspect skipped triangles and draw ranges; occlusion queries are disabled.",
+    "model": "data/showcases/meshlets.gltf",
+    "profile": "data/showcases/meshlets.json",
+    "off_profile": "data/showcases/meshlets_off.json",
+    "camera": [
+      2.4,
+      3.8,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      5
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "occlusion",
+    "category": "Performance",
+    "title": "Hardware occlusion queries",
+    "description": "Stand still behind the large occluder for queries to settle, then move around it. Compare queries and skipped triangle counts.",
+    "model": "data/showcases/occlusion.gltf",
+    "profile": "data/showcases/occlusion.json",
+    "off_profile": "data/showcases/occlusion_off.json",
+    "camera": [
+      2.4,
+      3.8,
+      -8
+    ],
+    "target": [
+      0,
+      1,
+      5
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "sky",
+    "category": "Atmosphere",
+    "title": "Dynamic sky / sun",
+    "description": "Animated time of day changes sun direction and sky color.",
+    "model": "data/showcases/sky.gltf",
+    "profile": "data/showcases/sky.json",
+    "off_profile": "data/showcases/sky_off.json",
+    "camera": [
+      0,
+      3.2,
+      -11
+    ],
+    "target": [
+      0,
+      1.8,
+      1
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  },
+  {
+    "id": "animation",
+    "category": "Animation",
+    "title": "glTF node animation",
+    "description": "A generated rotorcraft plays its generated translation/rotation animation above a plinth. Pause motion to compare.",
+    "model": "data/showcases/animation.gltf",
+    "profile": "data/showcases/animation.json",
+    "off_profile": "data/showcases/animation_off.json",
+    "camera": [
+      0,
+      2.4,
+      -5
+    ],
+    "target": [
+      0,
+      1.5,
+      0
+    ],
+    "sun": 6500,
+    "gi": false,
+    "focus": 9,
+    "environment": true
+  }
+]

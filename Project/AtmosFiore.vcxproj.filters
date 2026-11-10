@@ -518,6 +518,15 @@
     <ClInclude Include="source\Game\Scenes\scene_manager.h">
       <Filter>source\Game\Scenes</Filter>
     </ClInclude>
+    <ClInclude Include="source\Game\Scenes\scene_technology_showcase.h">
+      <Filter>source\Game\Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Game\Scenes\scene_showcase_audit.h">
+      <Filter>source\Game\Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Game\Scenes\showcase_reflection_probe.h">
+      <Filter>source\Game\Scenes</Filter>
+    </ClInclude>
     <ClInclude Include="source\Engine\System\framework.h">
       <Filter>source\Engine\System</Filter>
     </ClInclude>

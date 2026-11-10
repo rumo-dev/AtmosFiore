@@ -104,6 +104,10 @@ public:
 	void issue_model_occlusion_queries(ID3D11DeviceContext* context) { model_manager_.issue_occlusion_queries(context); }
 	void draw_shader_debug() { shader_manager_.draw_imgui(); }
 	void draw_model_debug() { model_manager_.draw_imgui(); }
+	bool meshlet_culling_enabled() const { return model_manager_.meshlet_culling_enabled(); }
+	bool occlusion_culling_enabled() const { return model_manager_.occlusion_culling_enabled(); }
+	void set_meshlet_culling_enabled(bool enabled) { model_manager_.set_meshlet_culling_enabled(enabled); }
+	void set_occlusion_culling_enabled(bool enabled) { model_manager_.set_occlusion_culling_enabled(enabled); }
 	HRESULT load_texture(const std::wstring& path, ID3D11ShaderResourceView** view,
 		D3D11_TEXTURE2D_DESC* desc = nullptr);
 	HRESULT load_texture_memory(const void* data, size_t size, ID3D11ShaderResourceView** view);

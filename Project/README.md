@@ -12,6 +12,8 @@ AtmosFiore は Windows 向けの C++ / Direct3D 11 アプリケーションで�
 
 ## プロジェクトの構成
 
+技術ごとの専用シーンは [技術別ショーケース](TECHNOLOGY_SHOWCASES.md) を参照してください。デバッグ GUI の `Render Test Scenes` から切り替えられます。
+
 | パス | 内容 |
 | --- | --- |
 | `AtmosFiore.sln` / `AtmosFiore.vcxproj` | アプリ本体の Visual Studio ソリューションとプロジェクト |

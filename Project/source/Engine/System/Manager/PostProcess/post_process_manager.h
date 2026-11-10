@@ -71,6 +71,9 @@ public:
 	static bool IsTAAEnabled() { return taa_enabled; }
 	static void ResetTemporalHistory();
 	static bool UseSettingsFile(const std::string& path);
+	static const std::string& GetSettingsFile() { return settings_path; }
+	static bool WriteSettingsSnapshot(const std::string& path);
+	static bool RestoreSettingsSnapshot(const std::string& snapshot, const std::string& originalPath);
 	// Returns the current Halton jitter in NDC and advances the sequence once per frame.
 	static DirectX::XMFLOAT2 GetTAAJitterNdc();
 	static void SetDLSSRenderResolution(UINT width, UINT height);

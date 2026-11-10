@@ -42,7 +42,9 @@ float SampleDirectionalShadow(Texture2D<float> shadow_map, float3 world_position
 
     float2 uv = light_view_position.xy * float2(0.5f, -0.5f) + 0.5f;
     bool outside_shadow_map = behind_warp_eye || any(uv < 0.0f) || any(uv > 1.0f) || light_view_position.z < 0.0f || light_view_position.z > 1.0f;
-    uv = saturate(uv);
+    // Keep the projected UV unclamped for receiver-plane derivatives. Clamping
+    // a neighbouring lane at the map edge flattens the gradient and removes
+    // the self-shadow correction just where the projection is most stretched.
 
     float2 shadow_map_size = float2(1.0f, 1.0f);
     shadow_map.GetDimensions(shadow_map_size.x, shadow_map_size.y);
@@ -66,10 +68,18 @@ float SampleDirectionalShadow(Texture2D<float> shadow_map, float3 world_position
     float2 disk_rotation = float2(cos(angle), sin(angle));
     // Fit the receiver plane in shadow UV space. Comparing every search tap
     // against the center depth mistakes a sloped floor for a blocker.
-    float2 uv_dx = ddx(uv);
-    float2 uv_dy = ddy(uv);
-    float depth_dx = ddx(light_view_position.z);
-    float depth_dy = ddy(light_view_position.z);
+    // Transform position differences as directions, then differentiate the
+    // projective divide. This avoids subtracting almost equal projected depths.
+    float4 clip_dx = mul(float4(ddx(world_position), 0.0f), light_view_projection);
+    float4 clip_dy = mul(float4(ddy(world_position), 0.0f), light_view_projection);
+    float3 ndc_dx = (clip_dx.xyz - light_view_position.xyz * clip_dx.w) /
+        max(light_clip.w, 1.0e-6f);
+    float3 ndc_dy = (clip_dy.xyz - light_view_position.xyz * clip_dy.w) /
+        max(light_clip.w, 1.0e-6f);
+    float2 uv_dx = ndc_dx.xy * float2(0.5f, -0.5f);
+    float2 uv_dy = ndc_dy.xy * float2(0.5f, -0.5f);
+    float depth_dx = ndc_dx.z;
+    float depth_dy = ndc_dy.z;
     float jacobian = uv_dx.x * uv_dy.y - uv_dx.y * uv_dy.x;
     float2 receiver_depth_gradient = 0.0f;
     float derivative_area = max(length(uv_dx) * length(uv_dy), 1.0e-20f);
@@ -79,6 +89,14 @@ float SampleDirectionalShadow(Texture2D<float> shadow_map, float3 world_position
             (depth_dx * uv_dy.y - depth_dy * uv_dx.y) / jacobian,
             (uv_dx.x * depth_dy - uv_dy.x * depth_dx) / jacobian);
     }
+    // The shadow depth represents a texel-sized footprint, while the G-buffer
+    // position is a single point. On a sloped receiver their depths can differ
+    // within that footprint, producing the repeating self-shadow pattern in
+    // the raw mask. Cover the full comparison-filter footprint. A fixed
+    // world-distance cap truncates this correction in stretched areas of
+    // LiSPSM, leaving acne near the view edges.
+    float texel_depth_span = dot(abs(receiver_depth_gradient), texel_size);
+    depth = saturate(depth - texel_depth_span);
     float pcss_result = 1.0f;
     if (!outside_shadow_map)
     {
@@ -104,8 +122,9 @@ float SampleDirectionalShadow(Texture2D<float> shadow_map, float3 world_position
         }
         else
         {
-        // Search near the receiver and across the light footprint. Rotated
-        // Poisson taps avoid the repeated grid pattern on wide floor areas.
+        // Spread the blocker search over the whole disk. The old 1.5-texel
+        // center cluster plus outer ring left most radii unsampled and made
+        // the search boundary visible as a circular halo.
         float blocker_gap_sum = 0.0f;
         float blocker_count = 0.0f;
         // Ignore depth differences smaller than the shadow map's practical
@@ -122,7 +141,8 @@ float SampleDirectionalShadow(Texture2D<float> shadow_map, float3 world_position
         [unroll]
         for (int i = 0; i < 24; ++i)
         {
-            float sample_radius = i < 8 ? 1.5f : pcss_search_radius_texels;
+            float sample_radius = pcss_search_radius_texels *
+                sqrt((i + 0.5f) / 24.0f);
             float2 disk = RotateShadowDisk(pcss_disk[i & 15], disk_rotation);
             float2 sample_uv = uv + disk * texel_size * sample_radius;
             if (any(sample_uv < 0.0f) || any(sample_uv > 1.0f))
@@ -164,7 +184,8 @@ float SampleDirectionalShadow(Texture2D<float> shadow_map, float3 world_position
             [unroll]
             for (int i = 0; i < 24; ++i)
             {
-                float sample_radius = i < 8 ? 0.5f : 1.0f;
+                // Fill the penumbra disk rather than sampling two rings.
+                float sample_radius = sqrt((i + 0.5f) / 24.0f);
                 float2 disk = RotateShadowDisk(pcss_disk[i & 15], disk_rotation) *
                     (filter_radius_metres * sample_radius);
                 float2 offset = disk.x * tangent_uv + disk.y * bitangent_uv;

@@ -70,7 +70,7 @@ Texture2D<float4> material_textures[5] : register(t1);
 		rgb = Base color (albedo, sRGB)
 		a   = Metalness (0 for dielectric, 1 for metal)
 
-	GBuffer2 : R16G16B16A16_FLOAT
+	GBuffer2 : R32G32B32A32_FLOAT
 		xyz = World-space position (high precision)
 		w   = Ambient occlusion (AO)
 
