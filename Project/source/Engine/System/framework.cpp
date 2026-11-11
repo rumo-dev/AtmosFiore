@@ -23,9 +23,11 @@ bool Frame_Work::initialize()
 	//ImGui_Util::set_theme(theme);
 
 	const bool pbr_audit = std::wstring(GetCommandLineW()).find(L"--pbr-audit") != std::wstring::npos;
-	const bool showcase_audit = pbr_audit || std::wstring(GetCommandLineW()).find(L"--showcase-audit") != std::wstring::npos;
+	const bool capture_indoor = std::wstring(GetCommandLineW()).find(L"--capture-indoor") != std::wstring::npos;
+	const bool capture_all = capture_indoor || std::wstring(GetCommandLineW()).find(L"--capture-scenes") != std::wstring::npos;
+	const bool showcase_audit = capture_all || pbr_audit || std::wstring(GetCommandLineW()).find(L"--showcase-audit") != std::wstring::npos;
 	_hide_imgui = showcase_audit;
-	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit(pbr_audit));
+	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit(pbr_audit,capture_all,true,capture_indoor));
 	else Scene_Manager::instance().change_scene(new Scene_Splash());
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();
@@ -87,7 +89,7 @@ void Frame_Work::render(float elapsed_time) {
 
 	// --- ImGuiの描画 ---
 #ifdef USE_IMGUI
-	if (!_hide_imgui) {
+	if (!_hide_imgui && !Scene_ShowcaseAudit::capture_active()) {
 		Dashboard::Instance().data.UpdateFPS(1.0f / elapsed_time);
 		Dashboard::Instance().Render();
 	}
@@ -96,7 +98,7 @@ void Frame_Work::render(float elapsed_time) {
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render IMGUI");
 		ImGui::Render();
-		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+		if(!Scene_ShowcaseAudit::capture_active())ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 		if (ImGui::GetIO().ConfigFlags /*& ImGuiConfigFlags_ViewportsEnable*/) {
 			// 別ウィンドウの描画
@@ -118,6 +120,8 @@ void Frame_Work::render(float elapsed_time) {
 
 bool Frame_Work::uninitialize()
 {
+	Scene_Manager::instance().clear();
+	Post_Process_Manager::shutdown();
 	AudioSystem::instance().Shutdown();
 
 

@@ -13,6 +13,7 @@
 #include <memory>
 #include <algorithm>
 #include "scene_technology_showcase.h"
+#include "scene_showcase_audit.h"
 
 namespace
 {
@@ -94,6 +95,8 @@ void Scene_Manager::draw_gui()
 	if (ImGui::CollapsingHeader("Render Test Scenes", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::TextDisabled("Select a scene to inspect rendering conditions.");
+		if(ImGui::Button("Capture all scenes (no ImGui)"))change_scene(new Scene_ShowcaseAudit(false,true,false));
+		ImGui::TextDisabled("Saves feature_on/off.png to data/capture/screenshots; returns to Indoor.");
 		if (ImGui::Button("Indoor")) change_scene(new Scene_Loading(new Scene_Indoor()));
 		Scene_TechnologyShowcase::draw_selector(*this);
 		ImGui::Separator();

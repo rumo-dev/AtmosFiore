@@ -227,7 +227,7 @@ public:
         ImGui::TextWrapped("%s",exhibit_.at("description").get<std::string>().c_str());
         if(!error_.empty())ImGui::TextWrapped("%s",error_.c_str());
         const char* comparison=id_=="sun_shadow"?"PCSS (off = PCF reference)":id_=="sky"?"Animate sun / sky":"Technique enabled";
-        if(id_!="pbr" && ImGui::Checkbox(comparison,&enabled_))apply_comparison();
+        if(ImGui::Checkbox(comparison,&enabled_))apply_comparison();
         ImGui::SameLine(); if(ImGui::Button("Reset camera"))reset_camera();
         ImGui::Checkbox("Animate demonstration",&animate_);
         ImGui::TextDisabled("Move: W/A/S/D, Q/E. Look: right mouse. Shift: faster.");
@@ -264,6 +264,7 @@ private:
         if(id_=="spot")for(auto& a:g.get_spot_light_manager().get_lights())a.intensity=enabled_?14000.0f:0;
         auto& resources=Resource_Manager::instance();
         if(exhibit_.value("pbr_asset",false))if(auto* model=resources.get_model(model_key_))model->set_pbr_feature_override(enabled_?0:exhibit_.value("pbr_feature",0));
+        if(id_=="pbr")if(auto* model=resources.get_model(model_key_)){model->set_full_pbr_enabled(true);model->set_pbr_feature_override(enabled_?0:18);}
         if(id_=="frustum") {
             resources.set_meshlet_culling_enabled(false);resources.set_occlusion_culling_enabled(false);
             if(auto* m=resources.get_model_instance("Showcase_Main"))m->disable_frustum_culling=!enabled_;

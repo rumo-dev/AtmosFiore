@@ -146,7 +146,7 @@ float4 main(VS_OUT pin,bool front:SV_IsFrontFace) : SV_TARGET
     float thickness=disabled==17?0:m.transmission.y*PbrTex(9,m.textures[9],pin.texcoord,pin.texcoord1,1).g;
     float ao=disabled==2?1:lerp(1,PbrTex(4,m.textures[4],pin.texcoord,pin.texcoord1,1).r,m.surface.w);
     s.emissive=disabled==4?0:m.emissive.rgb*(disabled==11?1:m.emissive.a)*PbrLinear(PbrTex(3,m.textures[3],pin.texcoord,pin.texcoord1,1).rgb);
-    if(m.flags.z!=0)return float4(base.rgb,base.a);
+    if(m.flags.z!=0||disabled==18)return float4(base.rgb,base.a);
     float3 opaqueBase=s.base;s.base*=1-transmission;
     uint sw,sh;pbr_shadow_mask.GetDimensions(sw,sh);float shadow=1;
     if(sw>0){float4 clipPos=mul(float4(pin.w_position.xyz,1),view_projection);float2 screen=clipPos.xy/clipPos.w*float2(0.5,-0.5)+0.5;shadow=pbr_shadow_mask.SampleLevel(pbr_environment_sampler,screen,0);}

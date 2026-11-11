@@ -55,6 +55,7 @@ public:
 	~Post_Process_Manager() = default;
 
 	static void initialize();
+	static void shutdown();
 	static void update(float elapsedtime);
 	static void begin();
 	static void end();

@@ -312,6 +312,13 @@ void Post_Process_Manager::SetDLSSRenderResolution(UINT width, UINT height)
 }
 
 // ─── 更新 ─────────────────────────────────────────────────────────
+void Post_Process_Manager::shutdown()
+{
+	// NGX owns a raw device/context reference. Release it before Graphics_Core
+	// destroys those objects, rather than during global static destruction.
+	dlss.reset();
+}
+
 void Post_Process_Manager::update(float elapsedtime)
 {
 	fogger->fog_constans.Time += elapsedtime;

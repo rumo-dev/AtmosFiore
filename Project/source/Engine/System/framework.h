@@ -193,13 +193,17 @@ public:
 			}
 		}
 
+		// Release scenes and audio while their UI and graphics dependencies live.
+		const bool shutdown_ok=uninitialize();
 #ifdef USE_IMGUI
+		ImNodes::DestroyContext();
+		ImPlot::DestroyContext();
 		ImGui_ImplDX11_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
 #endif
 
-		return uninitialize() ? static_cast<int>(msg.wParam) : 0;
+		return shutdown_ok ? static_cast<int>(msg.wParam) : 1;
 	}
 
 	/**

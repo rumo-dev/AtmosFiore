@@ -24,7 +24,7 @@ class ThirdPersonCamera;
 class Scene_Indoor : public Scene_Base
 {
 public:
-	Scene_Indoor() {}
+	Scene_Indoor(bool captureMode=false,bool captureFeatures=true) : _capture_mode(captureMode),_capture_features(captureFeatures) {}
 	~Scene_Indoor() override {}
 
 	// 初期化
@@ -53,6 +53,8 @@ public:
 	void draw_gui() override;
 
 private:
+	bool _capture_mode=false;
+	bool _capture_features=true;
 	static constexpr unsigned int ReflectionProbeCount = 3;
 	struct ReflectionProbe
 	{

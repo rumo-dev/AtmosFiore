@@ -4,6 +4,8 @@ Khronos PBR ページの公式モデルを使用する追加 17 シーンにつ�
 
 ビルド後、デバッグ GUI の **Render Test Scenes** から選択します。専用のモデル、照明、開始カメラ、ポストプロセス設定を持つ32シーンです。`Find technique` で検索できます。
 
+全シーンを GUI なしで ON/OFF 撮影する場合は **Capture all scenes (no ImGui)** を使用します。Indoor を含む撮影内容と保存先は [SCENE_CAPTURES.md](SCENE_CAPTURES.md) を参照してください。
+
 各シーンの説明に観察ポイントを表示します。`Technique enabled` で同じカメラのまま比較し、`Reset camera` で開始位置に戻せます。W/A/S/D・Q/E で移動、右ドラッグで視点変更、Shift で高速移動します。PBR は材質チャート自体が比較対象です。方向光の影は PCSS / PCF 比較です。
 
 | シーン | 効果を観察する配置・操作 |

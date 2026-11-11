@@ -16,6 +16,7 @@
 #include "Game/World/camera/camera_manager.h"
 #include <string>
 #include <algorithm>
+#include <fstream>
 #include "Engine/Utilities/color_Util.h"
 
 // Tracy Profiler Utility Header (Tracy.hpp や D3D11マクロ、カテゴリ定義が含まれます)
@@ -179,6 +180,26 @@ void Scene_Indoor::initialize()
 	_player.setup_spotlight();
 	_player.setup_collision("Indoor", indoor.world_transform);
 	_player.setup_model_instance("Player");
+	if(_capture_mode)
+	{
+		graphics.post_procss.UseSettingsFile(_capture_features?"data/capture/indoor_on.json":"data/capture/indoor_off.json");
+		auto camera=std::make_shared<SpectatorCamera>(hwnd);
+		nlohmann::json view=nlohmann::json::object();std::ifstream input("data/capture/camera.json");if(input)input>>view;
+		const auto position=view.value("position",std::vector<float>{-9,3.2f,1});
+		const auto target=view.value("target",std::vector<float>{5,2.6f,-1.8f});
+		camera->set_rotation(0,0,dx::XMVectorSet(position.at(0),position.at(1),position.at(2),1),dx::XMVectorSet(target.at(0),target.at(1),target.at(2),1));
+		indoor_camera(camera);camera->get_camera().FocalLength=view.value("focal_length",24.0f);
+		camera_mgr.register_camera("Indoor Capture",camera);camera_mgr.switch_camera("Indoor Capture");
+		mgr.remove_model_instance("Player");
+		_reflection_probes_enabled=_capture_features&&_reflection_probes_available;
+		graphics.post_procss.GetShadow().point_shadow_enabled=_capture_features;
+		graphics.post_procss.GetShadow().directional_pcss_enabled=_capture_features;
+		for(auto& light:graphics.get_point_light_manager().get_lights())light.cast_shadows=_capture_features;
+		mgr.set_meshlet_culling_enabled(_capture_features);mgr.set_occlusion_culling_enabled(_capture_features);
+		if(auto* instance=mgr.get_model_instance("Indoor"))instance->disable_frustum_culling=!_capture_features;
+		auto& dlss=graphics.post_procss.GetDLSS();dlss.SetMode(DLSSManager::Mode::Quality);dlss.SetEnabled(_capture_features&&dlss.IsAvailable());
+		Post_Process_Manager::ResetTemporalHistory();
+	}
 
 	log_printf("ゲームシーン初期化終了\n", LogLevel::Info);
 }
@@ -211,6 +232,17 @@ void Scene_Indoor::finalize() {
 // 更新処理
 void Scene_Indoor::update(float elapsedTime)
 {
+	if(_capture_mode)
+	{
+		auto& g=Graphics_Core::instance();auto& lens=CameraManager::instance().get_active_camera()->get_camera();
+		lens.update_derived_parameters(g.get_aspect_ratio(),g.get_screen_height());lens.identity();
+		_directional_light.update();IBL::Bind(g.get_device_context());
+		if(!_capture_features){ID3D11ShaderResourceView* empty[3]{};g.get_device_context()->PSSetShaderResources(32,3,empty);}
+		g.get_point_light_manager().update();g.get_point_light_manager().upload_to_gpu(g.get_device_context());
+		g.get_spot_light_manager().update();g.get_spot_light_manager().upload_to_gpu(g.get_device_context());
+		g.get_area_light_manager().update();g.get_area_light_manager().upload_to_gpu(g.get_device_context());
+		Resource_Manager::instance().update_models(0);return;
+	}
 	// 更新ロジックカテゴリ (薄黄色)
 	TRACY_CPU_ZONE_C("Scene_Indoor::update", TracyCategory::Update);
 
@@ -290,10 +322,10 @@ void Scene_Indoor::render(float elapsedTime)
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Render Scene Indoor");
 		render_shadowmap(elapsedTime);
 		capture_reflection_probe(immediate_context);
-		if (_voxel_gi)
+		if (_voxel_gi && (!_capture_mode||_capture_features))
 			_voxel_gi->render(immediate_context,
 				Resource_Manager::instance().get_model("Indoor"), _indoor_world);
-		if (_ddgi && _voxel_gi) _ddgi->update(immediate_context, *_voxel_gi);
+		if (_ddgi && _voxel_gi && (!_capture_mode||_capture_features)) _ddgi->update(immediate_context, *_voxel_gi);
 		render_defferd(elapsedTime);
 
 		render_forward(elapsedTime);
@@ -319,7 +351,7 @@ void Scene_Indoor::render_shadowmap(float elapsedTime) {
 		shadower.make_directional_shadow_begin();
 		// 深度を書き込む VS と後段の影判定が同じフレームの行列を使う。
 		Graphics_Core::instance().update_constants();
-		Resource_Manager::instance().render_models(pass_mode::directional_shadow);
+		if(!_capture_mode||_capture_features)Resource_Manager::instance().render_models(pass_mode::directional_shadow);
 		shadower.make_shadow_end();
 	}
 
@@ -380,8 +412,9 @@ void Scene_Indoor::render_defferd(float elapsedTime) {
 	Resource_Manager::instance().issue_model_occlusion_queries(immediate_context);
 	Resource_Manager::instance().end_model_profile(immediate_context);
 	Graphics_Core::instance().get_geometry_buffer()->Deactivate(immediate_context);
-	if (_voxel_gi) _voxel_gi->bind_lighting(immediate_context);
-	if (_ddgi) _ddgi->bind_lighting(immediate_context);
+	if (_voxel_gi && (!_capture_mode||_capture_features)) _voxel_gi->bind_lighting(immediate_context);
+	else {ID3D11ShaderResourceView* empty=nullptr;ID3D11Buffer* buffer=nullptr;immediate_context->PSSetShaderResources(13,1,&empty);immediate_context->PSSetConstantBuffers(8,1,&buffer);}
+	if (_ddgi && (!_capture_mode||_capture_features)) _ddgi->bind_lighting(immediate_context);
 	else
 	{
 		ID3D11ShaderResourceView* null_srv = nullptr;
@@ -413,7 +446,7 @@ void Scene_Indoor::render_forward(float elapsedTime) {
 	Render_State::instance().set_3d_render_states(immediate_context, Rasterizer_State::Cull_None_CW, Depth_State::Test_Enable_Write_Disable);
 
 	Resource_Manager::instance().render_models(pass_mode::forward_transparency);
-	render_debug(elapsedTime);
+	if(!_capture_mode)render_debug(elapsedTime);
 }
 
 // 4. UI・ポストプロセス描画
@@ -434,22 +467,22 @@ void Scene_Indoor::render_UI(float elapsedTime) {
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Effects");
 		Graphics_Core::instance().post_procss.GetVolumetricFog().set_gi_sources(
-			_ddgi.get(), _voxel_gi.get());
+			_capture_mode&&!_capture_features?nullptr:_ddgi.get(), _capture_mode&&!_capture_features?nullptr:_voxel_gi.get());
 		Graphics_Core::instance().post_procss.draw();
 	}
 	{
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Post-Process Present");
 		Graphics_Core::instance().post_procss.render();
 	}
-	if (_voxel_gi) _voxel_gi->render_debug_3d(immediate_context);
-	if (_ddgi) _ddgi->render_debug(immediate_context);
+	if (_voxel_gi && !_capture_mode) _voxel_gi->render_debug_3d(immediate_context);
+	if (_ddgi && !_capture_mode) _ddgi->render_debug(immediate_context);
 
 	// テキスト等のUI描画はUIカテゴリに変更してプロファイリング
 	{
 		TRACY_CPU_ZONE_C("Text_Draw_CPU", TracyCategory::UI);
 		DX_SCOPED_EVENT(&Graphics_Core::instance().g_MarkerUtil, L"Text Draw");
 		Text::text_data.Color = Color_Utils::hex_to_colorF("#F2D7EE");
-		Text::draw(L"Indoor", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
+		if(!_capture_mode)Text::draw(L"Indoor", D2D1_RECT_F(Graphics_Core::instance().get_screen_width(), Graphics_Core::instance().get_screen_height()), D2D1_DRAW_TEXT_OPTIONS_NONE, true);
 	}
 }
 

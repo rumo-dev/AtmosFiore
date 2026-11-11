@@ -95,9 +95,7 @@ bool AudioSystem::Initialize(const std::string& jsonPath,
 		LoadEffectChainsFromJson();
 	}
 
-	//--- imnodes 初期化 ---
-	ImNodes::CreateContext();
-	ImNodes::StyleColorsDark();
+	// ImNodes is owned by the framework and created after ImGui's context.
 
 	AudioLog("Initialize OK  baseDir=" + m_baseDir);
 	return true;
@@ -124,8 +122,7 @@ void AudioSystem::Shutdown()
 	if (m_pBGMSubmix) { m_pBGMSubmix->DestroyVoice(); m_pBGMSubmix = nullptr; }
 	if (m_pSESubmix) { m_pSESubmix->DestroyVoice();  m_pSESubmix = nullptr; }
 	if (m_pMasterVoice) { m_pMasterVoice->DestroyVoice(); m_pMasterVoice = nullptr; }
-
-	ImNodes::DestroyContext();
+	m_pXAudio2.Reset();
 
 	AudioLog("Shutdown OK");
 }

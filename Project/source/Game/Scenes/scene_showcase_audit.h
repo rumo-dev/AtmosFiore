@@ -1,5 +1,6 @@
 #pragma once
 #include "scene_technology_showcase.h"
+#include "scene_indoor.h"
 #include <ScreenGrab.h>
 #include <wincodec.h>
 
@@ -9,30 +10,40 @@ class Scene_ShowcaseAudit final : public Scene_Base
 {
     using Json=nlohmann::json;
 public:
-    explicit Scene_ShowcaseAudit(bool pbrOnly=false):pbr_only_(pbrOnly){}
+    explicit Scene_ShowcaseAudit(bool pbrOnly=false,bool captureAll=false,bool exitWhenDone=true,bool indoorOnly=false):pbr_only_(pbrOnly),capture_all_(captureAll),exit_when_done_(exitWhenDone),indoor_only_(indoorOnly){}
+    static bool capture_active(){return capture_active_;}
     void initialize() override {
         catalog_=Scene_TechnologyShowcase::read_catalog();
+        if(indoor_only_)catalog_=Json::array();
+        if(capture_all_){auto& post=Graphics_Core::instance().post_procss;dlss_was_=post.GetDLSS().IsEnabled();dlss_mode_was_=post.GetDLSS().GetMode();point_shadow_was_=post.GetShadow().point_shadow_enabled;pcss_was_=post.GetShadow().directional_pcss_enabled;}
+        if(capture_all_){capture_active_=true;meshlets_was_=Resource_Manager::instance().meshlet_culling_enabled();occlusion_was_=Resource_Manager::instance().occlusion_culling_enabled();directory_="data/capture/screenshots";catalog_.push_back({{"id","Indoor"},{"title","Indoor"},{"indoor",true}});}
         if(pbr_only_){Json selected=Json::array();for(const auto& entry:catalog_)if(entry.value("pbr_asset",false))selected.push_back(entry);
             const auto normal=selected;for(auto entry:normal){entry["id"]=entry.at("id").get<std::string>()+"_missing";entry["model"]=entry.at("missing_model");entry["pbr_feature"]=0;entry["missing"]=true;selected.push_back(entry);}
             auto defaults=normal[4];defaults["id"]="gltf_pbr_default_material";defaults["model"]="data/gltf_pbr/default_material_missing.glb";defaults["pbr_feature"]=0;defaults["missing"]=true;selected.push_back(defaults);catalog_=selected;directory_="data/gltf_pbr/audit";}
-        std::filesystem::create_directories(directory_);start();
+        if(indoor_only_)directory_="data/capture/indoor";
+        std::filesystem::create_directories(directory_);std::ofstream(std::filesystem::path(directory_)/"report.json")<<"[]";start();
     }
-    void finalize() override { if(scene_){scene_->finalize();scene_.reset();} }
+    void finalize() override { if(scene_){scene_->finalize();scene_.reset();} if(capture_all_){Resource_Manager::instance().set_meshlet_culling_enabled(meshlets_was_);Resource_Manager::instance().set_occlusion_culling_enabled(occlusion_was_);auto& post=Graphics_Core::instance().post_procss;post.GetDLSS().SetMode(dlss_mode_was_);post.GetDLSS().SetEnabled(dlss_was_);post.GetShadow().point_shadow_enabled=point_shadow_was_;post.GetShadow().directional_pcss_enabled=pcss_was_;capture_active_=false;} }
     void update(float) override
     {
+        if(finished_)return;
         if(advance_){advance_=false;scene_->finalize();scene_.reset();if(off_){off_=false;++index_;}else off_=true;
-            if(index_>=catalog_.size()){PostQuitMessage(0);return;}start();}
-        if(scene_)scene_->update(1.0f/60.0f);
+            if(index_>=catalog_.size()){finished_=true;if(exit_when_done_)PostQuitMessage(0);else Scene_Manager::instance().change_scene(new Scene_Indoor());return;}start();}
+        if(scene_){scene_->update(1.0f/60.0f);updated_=true;}
     }
     void render(float) override
     {
         if(!scene_)return;scene_->render(1.0f/60.0f);
-        if(++frames_<90)return;
+        if(advance_||!updated_)return;
+        if(++frames_<(catalog_[index_].value("indoor",false)?180:90))return;
         auto& g=Graphics_Core::instance();auto* c=g.get_device_context();
         Microsoft::WRL::ComPtr<ID3D11Resource> back;g.get_render_target_view()->GetResource(back.GetAddressOf());
         const std::string id=catalog_[index_].at("id").get<std::string>(),name=id+(off_?"_off":"_on");
         const auto file=std::filesystem::path(directory_)/(name+".png");
-        Json record={{"id",id},{"enabled",!off_},{"error",scene_->error()},{"image",file.generic_string()}};
+        const auto* exhibit=dynamic_cast<Scene_TechnologyShowcase*>(scene_.get());
+        Json record={{"id",id},{"title",catalog_[index_].value("title",id)},{"enabled",!off_},{"error",exhibit?exhibit->error():""},{"image",file.generic_string()},{"imgui",false}};
+        const auto& lens=CameraManager::instance().get_active_camera()->get_camera();DirectX::XMFLOAT3 eye,target;DirectX::XMStoreFloat3(&eye,lens.position);DirectX::XMStoreFloat3(&target,lens.target);record["camera_position"]={eye.x,eye.y,eye.z};record["camera_target"]={target.x,target.y,target.z};
+        if(catalog_[index_].value("indoor",false)){record["mode"]=off_?"render_only":"all_features";record["dlss_available"]=g.post_procss.GetDLSS().IsAvailable();record["dlss_enabled"]=g.post_procss.GetDLSS().IsEnabled();}
         record["pbr"]=catalog_[index_].value("pbr_asset",false);record["missing"]=catalog_[index_].value("missing",false);
         const HRESULT hr=DirectX::SaveWICTextureToFile(c,back.Get(),GUID_ContainerFormatPng,file.c_str());record["capture_hresult"]=static_cast<long>(hr);
         Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;back.As(&texture);D3D11_TEXTURE2D_DESC d{};texture->GetDesc(&d);d.Usage=D3D11_USAGE_STAGING;d.BindFlags=d.MiscFlags=0;d.CPUAccessFlags=D3D11_CPU_ACCESS_READ;
@@ -50,7 +61,13 @@ public:
     }
     void draw_gui() override {}
 private:
-    void start(){frames_=0;scene_=std::make_unique<Scene_TechnologyShowcase>(catalog_[index_],true);scene_->initialize();scene_->set_enabled(!off_);}
-    Json catalog_,report_=Json::array();size_t index_=0;int frames_=0;bool off_=false,advance_=false;std::vector<unsigned char> previous_;std::unique_ptr<Scene_TechnologyShowcase> scene_;
+    void start(){frames_=0;updated_=false;if(catalog_[index_].value("indoor",false))scene_=std::make_unique<Scene_Indoor>(true,!off_);else scene_=std::make_unique<Scene_TechnologyShowcase>(catalog_[index_],true);scene_->initialize();if(auto* exhibit=dynamic_cast<Scene_TechnologyShowcase*>(scene_.get()))exhibit->set_enabled(!off_);}
+    Json catalog_,report_=Json::array();size_t index_=0;int frames_=0;bool off_=false,advance_=false,finished_=false;std::vector<unsigned char> previous_;std::unique_ptr<Scene_Base> scene_;
     bool pbr_only_=false;std::string directory_="data/showcases/audit";
+    bool capture_all_=false,exit_when_done_=true;
+    bool meshlets_was_=true,occlusion_was_=true;
+    bool indoor_only_=false,updated_=false;
+    bool dlss_was_=false,pcss_was_=true;int point_shadow_was_=1;
+    DLSSManager::Mode dlss_mode_was_=DLSSManager::Mode::Quality;
+    inline static bool capture_active_=false;
 };
