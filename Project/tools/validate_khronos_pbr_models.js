@@ -9,6 +9,10 @@ for(const feature of manifest.features){
  for(const file of feature.files)if(!checked.has(file.path)){const b=fs.readFileSync(path.join(root,file.path));assert.equal(b.length,file.bytes);assert.equal(crypto.createHash('sha256').update(b).digest('hex'),file.sha256,'Modified downloaded file: '+file.path);checked.add(file.path);}
  const entry=catalog.find(e=>e.pbr_feature===manifest.features.indexOf(feature)+1);assert.equal(entry.model,feature.model);
  const original=glb(path.join(root,feature.model)),missing=glb(path.join(root,entry.missing_model));assert.deepEqual(original.meshes,missing.meshes,'Omission fixture must preserve official geometry');assert.deepEqual(original.bufferViews,missing.bufferViews);materials+=original.materials.length;
+ const display=glb(path.join(root,entry.display_model));assert.deepEqual(display.meshes,original.meshes,'Display copy must preserve official geometry');
+ assert(display.scenes[display.scene||0].nodes.length<original.scenes[original.scene||0].nodes.length,'Display copy still contains both specimens: '+feature.id);
+ const {min,max}=entry.display_bounds;assert(min.length===3&&max.length===3&&min.every(Number.isFinite)&&max.every(Number.isFinite));
+ assert(max.every((v,i)=>v>min[i]&&v-min[i]<5),'Display camera bounds are invalid: '+feature.id);
  assert(fs.existsSync(path.join(root,entry.profile)));assert(fs.existsSync(path.join(root,entry.off_profile)));
 }
 assert(!glb(path.join(root,'data/gltf_pbr/default_material_missing.glb')).materials);

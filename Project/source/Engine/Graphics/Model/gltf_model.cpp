@@ -38,7 +38,7 @@ namespace
 	}
 	constexpr size_t meshlet_max_vertices = 64;
 	constexpr size_t meshlet_max_triangles = 126;
-	constexpr size_t occlusion_meshlets_per_group = 64;
+	constexpr size_t occlusion_meshlets_per_group = 8;
 
 	void transform_bounds(
 		const DirectX::XMFLOAT3& bounds_min, const DirectX::XMFLOAT3& bounds_max,
@@ -1250,10 +1250,12 @@ void Gltf_Model::render_node(
 						{
 							slot.visible = samples != 0;
 							slot.pending = false;
+							slot.resolved_generation = slot.generation;
 						}
 					}
-					occlusion_visible[i] = slot.generation != occlusion->generation ||
-						slot.pending || slot.visible;
+					// A refresh query must not temporarily reveal a previously rejected group.
+					// A moved camera gets a new generation and remains conservative until resolved.
+					occlusion_visible[i] = slot.resolved_generation != occlusion->generation || slot.visible;
 					if (culling_stats)
 					{
 						++culling_stats->occlusion_tested;
@@ -1691,6 +1693,7 @@ UINT Gltf_Model::issue_occlusion_queries(
 						continue;
 					slot.pending = false;
 					slot.visible = samples != 0;
+					slot.resolved_generation = slot.generation;
 				}
 
 				// Expand the proxy so a surface coincident with its box face does
@@ -1733,6 +1736,38 @@ UINT Gltf_Model::issue_occlusion_queries(
 		}
 	}
 	return issued;
+}
+
+std::vector<Gltf_Model::culled_debug_box> Gltf_Model::collect_culled_debug_boxes(
+	const DirectX::XMFLOAT4X4& world,const Frustum* frustum,const occlusion_state* occlusion,
+	bool show_frustum_rejections,bool show_occlusion_rejections) const
+{
+	using namespace DirectX;
+	std::vector<culled_debug_box> boxes;
+	for(const auto& node:nodes)
+	{
+		if(node.mesh<0||node.skin>=0)continue;
+		const auto& mesh=meshes[node.mesh];
+		const XMMATRIX transform=XMLoadFloat4x4(&node.global_transform)*XMLoadFloat4x4(&world);
+		const auto append=[&](const XMFLOAT3& minimum,const XMFLOAT3& maximum){
+			XMVECTOR lo,hi;transform_bounds(minimum,maximum,transform,lo,hi);
+			culled_debug_box box{};XMStoreFloat3(&box.minimum,lo);XMStoreFloat3(&box.maximum,hi);boxes.push_back(box);
+		};
+		for(const auto& primitive:mesh.primitives)
+		{
+			if(show_frustum_rejections&&frustum)
+				for(const auto& part:primitive.meshlets)
+					if(!meshlet_intersects_frustum(*frustum,part.bounds_min,part.bounds_max,transform))append(part.bounds_min,part.bounds_max);
+			if(show_occlusion_rejections&&occlusion&&occlusion->valid&&occlusion->model==this)
+				for(const auto& group:primitive.occlusion_groups){
+					const UINT index=node.occlusion_slot_base+group.slot-mesh.occlusion_slot_base;
+					if(index>=occlusion->slots.size())continue;
+					const auto& slot=occlusion->slots[index];
+					if(slot.resolved_generation==occlusion->generation&&!slot.visible)append(group.bounds_min,group.bounds_max);
+				}
+		}
+	}
+	return boxes;
 }
 
 void Gltf_Model::animate(size_t animation_index, float time, std::vector<node>& animated_nodes)

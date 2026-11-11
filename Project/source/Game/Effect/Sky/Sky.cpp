@@ -212,6 +212,23 @@ Sky::Sky(ID3D11Device* device, uint32_t width, uint32_t height)
 
 	bit_block_transfer = std::make_unique<FullscreenQuad>(device);
 	color_map = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
+	skybox_map = std::make_unique<Framebuffer>(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, 1, false);
+	const std::array<DirectX::XMFLOAT3,8> corners{{{-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},
+		{-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1}}};
+	const int faces[6][4]={{0,1,3,2},{5,4,6,7},{4,0,2,6},{1,5,7,3},{2,3,7,6},{4,5,1,0}};
+	std::array<DirectX::XMFLOAT3,36> vertices{};
+	for(int face=0;face<6;++face){const auto& quad=faces[face];const int indices[6]={quad[0],quad[1],quad[2],quad[0],quad[2],quad[3]};
+		for(int i=0;i<6;++i)vertices[face*6+i]=corners[indices[i]];}
+	D3D11_BUFFER_DESC vb{};vb.ByteWidth=sizeof(vertices);vb.Usage=D3D11_USAGE_IMMUTABLE;vb.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+	D3D11_SUBRESOURCE_DATA vb_data{};vb_data.pSysMem=vertices.data();
+	device->CreateBuffer(&vb,&vb_data,skybox_vertices.GetAddressOf());
+	auto vertex_shader=Resource_Manager::instance().load_shader<Vertex_Shader>("SKY_DOME_VS","sky_dome_vs");
+	Resource_Manager::instance().load_shader<Pixel_Shader>("SKY_DOME_PS","sky_dome_ps");
+	if(vertex_shader&&vertex_shader->get_byte_code()){
+		const D3D11_INPUT_ELEMENT_DESC input[]={{"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0}};
+		device->CreateInputLayout(input,1,vertex_shader->get_byte_code()->GetBufferPointer(),
+			vertex_shader->get_byte_code()->GetBufferSize(),skybox_input_layout.GetAddressOf());
+	}
 	HRESULT hr{ S_OK };
 	// 定数バッファの作成
 	D3D11_BUFFER_DESC cb_desc{};
@@ -379,19 +396,35 @@ void Sky::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceView*
 	TRACY_GPU_ZONE_C("Sky::make", TracyCategory::RenderPass);
 
 	// パイプラインの衝突を防ぐため、最初にすべての関連スロットを一度安全にクリアする
-	ID3D11ShaderResourceView* null_srvs[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-	immediate_context->PSSetShaderResources(0, 8, null_srvs);
+	ID3D11ShaderResourceView* null_srvs[9]{};
+	immediate_context->PSSetShaderResources(0, 9, null_srvs);
 	Render_State::instance().set_2d_render_states(immediate_context);
 
 	// 1. 定数バッファの更新
 	{
 		TRACY_CB_ZONE("Sky::make::UpdateConstants");
-
-		Constants cb_data{};
+		Constants cb_data = look_;
 		cb_data.gTime = time;
 		immediate_context->UpdateSubresource(constants.Get(), 0, 0, &cb_data, 0, 0);
 		immediate_context->PSSetConstantBuffers(8, 1, constants.GetAddressOf());
 	}
+	if(skybox_vertices&&skybox_input_layout){
+		skybox_map->Clear(immediate_context,0,0,0,1);
+		skybox_map->Activate(immediate_context);
+		Render_State::instance().set_render_states(immediate_context,Depth_State::Test_Disable_Write_Disable,Blend_State::Opaque,Rasterizer_State::Cull_None_CW);
+		UINT stride=sizeof(DirectX::XMFLOAT3),offset=0;auto* vb=skybox_vertices.Get();
+		immediate_context->IASetInputLayout(skybox_input_layout.Get());
+		immediate_context->IASetVertexBuffers(0,1,&vb,&stride,&offset);
+		immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		immediate_context->VSSetShader(Resource_Manager::instance().get_native_shader<Vertex_Shader>("SKY_DOME_VS"),nullptr,0);
+		immediate_context->PSSetShader(Resource_Manager::instance().get_native_shader<Pixel_Shader>("SKY_DOME_PS"),nullptr,0);
+		ID3D11ShaderResourceView* dome_inputs[5]={atmosphere_lut_srv.Get(),cloud_base_noise_srv.Get(),cloud_detail_noise_srv.Get(),transmittance_lut_srv.Get(),multiscattering_lut_srv.Get()};
+		immediate_context->PSSetShaderResources(2,5,dome_inputs);
+		immediate_context->Draw(36,0);
+		immediate_context->PSSetShaderResources(0,9,null_srvs);
+		skybox_map->Deactivate(immediate_context);
+	}
+	Render_State::instance().set_2d_render_states(immediate_context);
 
 	{
 		TRACY_CPU_ZONE_N("Sky::make::SkyPass");
@@ -399,7 +432,7 @@ void Sky::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceView*
 		color_map->Clear(immediate_context, 0, 0, 0, 1);
 		color_map->Activate(immediate_context);
 		{
-			ID3D11ShaderResourceView* srvs[8] = {
+			ID3D11ShaderResourceView* srvs[9] = {
 				input_hdr_srv,
 				Graphics_Core::instance().get_geometry_buffer()->GetDepth(),
 				atmosphere_lut_srv.Get(),
@@ -407,12 +440,13 @@ void Sky::make(ID3D11DeviceContext* immediate_context, ID3D11ShaderResourceView*
 				cloud_detail_noise_srv.Get(),
 				transmittance_lut_srv.Get(),
 				multiscattering_lut_srv.Get(),
-				aerial_perspective_lut_srv.Get()
+				aerial_perspective_lut_srv.Get(),
+				skybox_map->GetColorMap()
 			};
-			bit_block_transfer->Blit(immediate_context, srvs, 0, 8, Resource_Manager::instance().get_native_shader<Pixel_Shader>("SKY_PS"));
+			bit_block_transfer->Blit(immediate_context, srvs, 0, 9, Resource_Manager::instance().get_native_shader<Pixel_Shader>("SKY_PS"));
 		}
 		// Release G-buffer depth before restoring it as the previous depth target.
-		immediate_context->PSSetShaderResources(0, 8, null_srvs);
+		immediate_context->PSSetShaderResources(0, 9, null_srvs);
 		color_map->Deactivate(immediate_context);
 	}
 }

@@ -565,6 +565,7 @@ void ModelManager::issue_occlusion_queries(ID3D11DeviceContext* context)
 				view_projection, camera.position, frustum, instance->occlusion,
 				occlusion_box_cbuffer_.Get(), quota);
 			last_occlusion_queries_issued_ += issued;
+			total_occlusion_queries_issued_ += issued;
 			remaining_budget -= issued;
 		}
 	}

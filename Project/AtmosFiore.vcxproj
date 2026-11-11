@@ -883,6 +883,12 @@ if exist export rmdir /s /q export</Command>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
     </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\sky_dome_vs.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="source\Engine\Graphics\Shader\sky_dome_ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
     <FxCompile Include="source\Engine\Graphics\Shader\sky_ps.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='RenderDog|Win32'">Pixel</ShaderType>

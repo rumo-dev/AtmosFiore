@@ -1,0 +1,10 @@
+{
+  "version": "9.0.2",
+  "description": "FFmpeg release essentials build for showcase video encoding",
+  "homepage": "https://ffmpeg.org/",
+  "license": "GPL-3.0-or-later",
+  "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.7z",
+  "hash": "4705843ccaaf54257c16ad90f3e952ece33c17df964ecf7bfdbb0f49c7171077",
+  "extract_dir": "ffmpeg-9.0.2-essentials_build",
+  "bin": ["bin\\ffmpeg.exe", "bin\\ffprobe.exe", "bin\\ffplay.exe"]
+}

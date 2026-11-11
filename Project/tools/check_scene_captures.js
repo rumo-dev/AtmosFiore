@@ -10,6 +10,13 @@ for(const id of ids)for(const enabled of [true,false]){
  assert.equal(path.basename(r.image),name);assert.equal(r.imgui,false);assert.equal(r.capture_hresult,0);assert.equal(r.error,'');
  const b=fs.readFileSync(path.join(root,r.image));assert.equal(b.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
  assert(b.length>10000,'Invalid/empty PNG '+id);
+ if(enabled&&r.capture==='video'){
+  assert.equal(r.video_capture_hresult,0,'Video capture failed '+id);
+  assert.equal(r.video_fps,30);assert.equal(r.video_frames.length,60,'Incomplete video '+id);
+  for(const frame of r.video_frames){const f=fs.readFileSync(path.join(root,frame));assert.equal(f.subarray(0,8).toString('hex'),'89504e470d0a1a0a','Invalid video frame '+frame);}
+  assert.equal(r.video_encode_exit_code,0,'MP4 encoding failed '+id);
+  assert(fs.statSync(path.join(root,r.video)).size>10000,'Invalid MP4 '+id);
+ }
  assert(r.visible_fraction>0.08&&r.mean_rgb>5&&r.mean_rgb<250,'Empty/invalid exposure '+id);
  if(!r.pbr)assert(r.geometry_fraction>0.08,'No visible scene geometry '+id);
 }

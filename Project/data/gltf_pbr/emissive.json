@@ -7,8 +7,8 @@
   },
   "bloom": {
     "enabled": 1,
-    "threshold": 1,
-    "intensity": 0.3
+    "threshold": 0.8,
+    "intensity": 0.7
   },
   "chromatic_aberration": {
     "enabled": true,

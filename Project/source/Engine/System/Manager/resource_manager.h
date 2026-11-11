@@ -108,6 +108,16 @@ public:
 	bool occlusion_culling_enabled() const { return model_manager_.occlusion_culling_enabled(); }
 	void set_meshlet_culling_enabled(bool enabled) { model_manager_.set_meshlet_culling_enabled(enabled); }
 	void set_occlusion_culling_enabled(bool enabled) { model_manager_.set_occlusion_culling_enabled(enabled); }
+	void set_camera_culling_frustum(const Frustum& frustum) { model_manager_.set_camera_culling_frustum(frustum); }
+	const Gltf_Model::meshlet_culling_stats& camera_meshlet_stats() const { return model_manager_.camera_meshlet_stats(); }
+	UINT last_occlusion_queries_issued() const { return model_manager_.last_occlusion_queries_issued(); }
+	uint64_t total_occlusion_queries_issued() const { return model_manager_.total_occlusion_queries_issued(); }
+	UINT stationary_camera_frames() const { return model_manager_.stationary_camera_frames(); }
+	int camera_instances_culled() const { return model_manager_.last_culled_count; }
+	int camera_instances_total() const { return model_manager_.last_total_count; }
+	void restore_camera_culling_frustum(bool frozen,const Frustum& frustum) { model_manager_.restore_camera_culling_frustum(frozen,frustum); }
+	bool camera_culling_frozen() const { return model_manager_.camera_culling_frozen(); }
+	const Frustum& frozen_camera_frustum() const { return model_manager_.frozen_camera_frustum(); }
 	HRESULT load_texture(const std::wstring& path, ID3D11ShaderResourceView** view,
 		D3D11_TEXTURE2D_DESC* desc = nullptr);
 	HRESULT load_texture_memory(const void* data, size_t size, ID3D11ShaderResourceView** view);

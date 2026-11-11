@@ -4,6 +4,7 @@
 #include "Engine/Graphics/FullscreenQuad/fullscreen_effect.h"
 
 #include "Engine/Graphics/UI/ImGui/imgui.h"
+#include <string>
 
 //シーンマネージャー
 class Scene_Manager
@@ -34,6 +35,7 @@ public:
 
 	//シーン切り替え
 	void change_scene(Scene_Base* scene);
+	void capture_showcase(const std::string& id);
 
 	bool is_exit() const { return _is_exit; }
 

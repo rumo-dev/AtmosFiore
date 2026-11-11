@@ -96,7 +96,11 @@ void Scene_Manager::draw_gui()
 	{
 		ImGui::TextDisabled("Select a scene to inspect rendering conditions.");
 		if(ImGui::Button("Capture all scenes (no ImGui)"))change_scene(new Scene_ShowcaseAudit(false,true,false));
-		ImGui::TextDisabled("Saves feature_on/off.png to data/capture/screenshots; returns to Indoor.");
+		ImGui::SameLine();if(ImGui::Button("Capture Indoor"))change_scene(new Scene_ShowcaseAudit(false,true,false,true));
+		if(auto* exhibit=dynamic_cast<Scene_TechnologyShowcase*>(_current_scene)){
+			if(ImGui::Button("Capture current scene ON/OFF"))capture_showcase(exhibit->id());
+		}
+		ImGui::TextDisabled("Capture saves PNGs without ImGui; video scenes also save frames. See data/capture/screenshots.");
 		if (ImGui::Button("Indoor")) change_scene(new Scene_Loading(new Scene_Indoor()));
 		Scene_TechnologyShowcase::draw_selector(*this);
 		ImGui::Separator();
@@ -144,4 +148,10 @@ void Scene_Manager::change_scene(Scene_Base* scene)
 	_transition_time = 0.0f;
 	_transition_switched = false;
 	_transition_seed += 17.0f;
+}
+
+void Scene_Manager::capture_showcase(const std::string& id)
+{
+	if(id.empty())return;
+	change_scene(new Scene_ShowcaseAudit(false,true,false,false,id));
 }

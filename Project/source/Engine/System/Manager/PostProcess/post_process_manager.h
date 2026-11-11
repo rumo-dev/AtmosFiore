@@ -95,6 +95,7 @@ public:
 	ChromaticAberration& GetChromaticAberration() { return *ca_effect; }
 	LensDistortion& GetLensDistortion() { return *lens_distortion; }
 	Vignetting& GetVignetting() { return *vignetting; }
+	Sky& GetSky() { return *skyer; }
 	DLSSManager& GetDLSS() { return *dlss; }
 
 	// ★ 新フォグアクセサ

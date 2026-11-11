@@ -20,6 +20,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -43,6 +44,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 8,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -66,6 +68,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -89,6 +92,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 8,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -112,6 +116,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 8,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -135,6 +140,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -158,6 +164,7 @@
     "sun": 80,
     "gi": true,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -181,6 +188,7 @@
     "sun": 80,
     "gi": true,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -204,6 +212,7 @@
     "sun": 80,
     "gi": true,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -227,6 +236,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -250,6 +260,7 @@
     "sun": 300,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": false
   },
   {
@@ -273,6 +284,7 @@
     "sun": 300,
     "gi": false,
     "focus": 8,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -296,30 +308,32 @@
     "sun": 300,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
     "id": "volumetric",
     "category": "Atmosphere",
     "title": "Froxel volumetric fog",
-    "description": "Beams and pillars interrupt light shafts through the fog.",
+    "description": "Warm and cool spotlights on each column pair aim toward the center aisle, making their crossing beams visible in the fog.",
     "model": "data/showcases/volumetric.gltf",
     "profile": "data/showcases/volumetric.json",
     "off_profile": "data/showcases/volumetric_off.json",
     "camera": [
       0,
-      2,
-      -8
+      2.1,
+      -7
     ],
     "target": [
       0,
       1.6,
-      8
+      9
     ],
-    "sun": 2000,
+    "sun": 15,
     "gi": false,
     "focus": 9,
-    "environment": true
+    "capture": "video",
+    "environment": false
   },
   {
     "id": "height",
@@ -342,6 +356,7 @@
     "sun": 2000,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -365,6 +380,7 @@
     "sun": 2000,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -388,6 +404,7 @@
     "sun": 2000,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -411,6 +428,7 @@
     "sun": 300,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": false
   },
   {
@@ -434,6 +452,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -457,6 +476,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
@@ -480,6 +500,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -503,6 +524,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 13,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -526,6 +548,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -549,6 +572,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -572,6 +596,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 8,
+    "capture": "slider",
     "environment": true
   },
   {
@@ -595,6 +620,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
@@ -618,13 +644,14 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
     "id": "frustum",
     "category": "Performance",
     "title": "Frustum culling",
-    "description": "Seven separate courts span the camera frustum. Compare rejected instances while turning the camera. Meshlet and occlusion culling are disabled.",
+    "description": "The cyan volume is the actual culling frustum, seen from a separate fixed view camera. Its moving magenta origin reveals which court instances are rejected. Meshlet and occlusion culling are disabled.",
     "model": "data/showcases/frustum.gltf",
     "profile": "data/showcases/frustum.json",
     "off_profile": "data/showcases/frustum_off.json",
@@ -641,76 +668,80 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
     "id": "meshlets",
     "category": "Performance",
     "title": "Spatial meshlet culling",
-    "description": "Turn away from parts of the dense court. Inspect skipped triangles and draw ranges; occlusion queries are disabled.",
+    "description": "The moving cyan frustum is the actual culling camera, separate from this view. Inspect skipped triangles and draw ranges; occlusion queries are disabled.",
     "model": "data/showcases/meshlets.gltf",
     "profile": "data/showcases/meshlets.json",
     "off_profile": "data/showcases/meshlets_off.json",
     "camera": [
-      2.4,
-      3.8,
-      -8
+      9,
+      5.2,
+      -2
     ],
     "target": [
       0,
-      1,
+      1.5,
       5
     ],
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
     "id": "occlusion",
     "category": "Performance",
     "title": "Hardware occlusion queries",
-    "description": "Stand still behind the large occluder for queries to settle, then move around it. Compare queries and skipped triangle counts.",
+    "description": "The moving cyan camera pauses for GPU depth queries behind and beside the wall. The fixed side observer reveals removed groups as magenta wire boxes.",
     "model": "data/showcases/occlusion.gltf",
     "profile": "data/showcases/occlusion.json",
     "off_profile": "data/showcases/occlusion_off.json",
     "camera": [
       2.4,
-      3.8,
-      -8
+      2.35,
+      -7
     ],
     "target": [
       0,
-      1,
+      1.5,
       5
     ],
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
     "id": "sky",
     "category": "Atmosphere",
-    "title": "Dynamic sky / sun",
-    "description": "Animated time of day changes sun direction and sky color.",
+    "title": "Painted dynamic sky",
+    "description": "Time-of-day palettes, directional color, cloud cover, sky-only vignette and fog-tinted horizon shape a distinct atmosphere.",
     "model": "data/showcases/sky.gltf",
     "profile": "data/showcases/sky.json",
     "off_profile": "data/showcases/sky_off.json",
     "camera": [
       0,
-      3.2,
-      -11
+      2.4,
+      -9
     ],
     "target": [
       0,
-      1.8,
-      1
+      4.2,
+      27
     ],
-    "sun": 6500,
+    "sun": 11000,
     "gi": false,
     "focus": 9,
-    "environment": true
+    "capture": "video",
+    "environment": false
   },
   {
     "id": "animation",
@@ -733,6 +764,7 @@
     "sun": 6500,
     "gi": false,
     "focus": 9,
+    "capture": "video",
     "environment": true
   },
   {
@@ -741,6 +773,19 @@
     "title": "glTF: Alpha Coverage",
     "description": "Alpha Coverage — CompareAlphaCoverage. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareAlphaCoverage/glTF-Binary/CompareAlphaCoverage.glb",
+    "display_model": "data/gltf_pbr/CompareAlphaCoverage/glTF-Binary/CompareAlphaCoverageRight.glb",
+    "display_bounds": {
+      "min": [
+        0.5932750105857849,
+        -0.3224358581367497,
+        -0.5042951314975026
+      ],
+      "max": [
+        1.6042499542236328,
+        0.5789047148679076,
+        0.5194344526319767
+      ]
+    },
     "missing_model": "data/gltf_pbr/alpha_missing.glb",
     "profile": "data/gltf_pbr/alpha.json",
     "off_profile": "data/gltf_pbr/alpha.json",
@@ -760,6 +805,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 1,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAlphaCoverage/"
   },
   {
@@ -768,6 +814,19 @@
     "title": "glTF: Ambient Occlusion",
     "description": "Ambient Occlusion — CompareAmbientOcclusion. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareAmbientOcclusion/glTF-Binary/CompareAmbientOcclusion.glb",
+    "display_model": "data/gltf_pbr/CompareAmbientOcclusion/glTF-Binary/CompareAmbientOcclusionRight.glb",
+    "display_bounds": {
+      "min": [
+        0.012056991457939148,
+        -0.10408181506085973,
+        -0.24217278974623735
+      ],
+      "max": [
+        0.30707214772701263,
+        0.25714780059454156,
+        0.171751479287785
+      ]
+    },
     "missing_model": "data/gltf_pbr/occlusion_missing.glb",
     "profile": "data/gltf_pbr/occlusion.json",
     "off_profile": "data/gltf_pbr/occlusion.json",
@@ -787,6 +846,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 2,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAmbientOcclusion/"
   },
   {
@@ -795,6 +855,19 @@
     "title": "glTF: Base Color",
     "description": "Base Color — CompareBaseColor. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareBaseColor/glTF-Binary/CompareBaseColor.glb",
+    "display_model": "data/gltf_pbr/CompareBaseColor/glTF-Binary/CompareBaseColorRight.glb",
+    "display_bounds": {
+      "min": [
+        0.5999208092689514,
+        -0.4901544968328353,
+        -0.5000792359982351
+      ],
+      "max": [
+        1.6000792384147644,
+        0.49015440742586813,
+        0.5000792359982391
+      ]
+    },
     "missing_model": "data/gltf_pbr/base_color_missing.glb",
     "profile": "data/gltf_pbr/base_color.json",
     "off_profile": "data/gltf_pbr/base_color.json",
@@ -814,6 +887,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 3,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareBaseColor/"
   },
   {
@@ -822,6 +896,19 @@
     "title": "glTF: Emissive",
     "description": "Emissive — CompareEmissiveStrength. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+    "display_model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrengthRight.glb",
+    "display_bounds": {
+      "min": [
+        -0.1571067849800869,
+        -0.5000000758761658,
+        -0.7071068727771816
+      ],
+      "max": [
+        1.2571068088219448,
+        0.5000000758761658,
+        0.7071068727771816
+      ]
+    },
     "missing_model": "data/gltf_pbr/emissive_missing.glb",
     "profile": "data/gltf_pbr/emissive.json",
     "off_profile": "data/gltf_pbr/emissive.json",
@@ -841,6 +928,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 4,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/"
   },
   {
@@ -849,6 +937,19 @@
     "title": "glTF: Metallic",
     "description": "Metallic — CompareMetallic. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareMetallic/glTF-Binary/CompareMetallic.glb",
+    "display_model": "data/gltf_pbr/CompareMetallic/glTF-Binary/CompareMetallicRight.glb",
+    "display_bounds": {
+      "min": [
+        0.050000011920928955,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.050000011920929,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/metallic_missing.glb",
     "profile": "data/gltf_pbr/metallic.json",
     "off_profile": "data/gltf_pbr/metallic.json",
@@ -868,6 +969,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 5,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareMetallic/"
   },
   {
@@ -876,6 +978,19 @@
     "title": "glTF: Normal",
     "description": "Normal — CompareNormal. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareNormal/glTF-Binary/CompareNormal.glb",
+    "display_model": "data/gltf_pbr/CompareNormal/glTF-Binary/CompareNormalRight.glb",
+    "display_bounds": {
+      "min": [
+        0.04992079734802246,
+        -0.4901544968328353,
+        -0.5000792359982351
+      ],
+      "max": [
+        1.0500792264938354,
+        0.49015440742586813,
+        0.5000792359982391
+      ]
+    },
     "missing_model": "data/gltf_pbr/normal_missing.glb",
     "profile": "data/gltf_pbr/normal.json",
     "off_profile": "data/gltf_pbr/normal.json",
@@ -895,6 +1010,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 6,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareNormal/"
   },
   {
@@ -903,6 +1019,19 @@
     "title": "glTF: Roughness",
     "description": "Roughness — CompareRoughness. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareRoughness/glTF-Binary/CompareRoughness.glb",
+    "display_model": "data/gltf_pbr/CompareRoughness/glTF-Binary/CompareRoughnessRight.glb",
+    "display_bounds": {
+      "min": [
+        0.050000011920928955,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.050000011920929,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/roughness_missing.glb",
     "profile": "data/gltf_pbr/roughness.json",
     "off_profile": "data/gltf_pbr/roughness.json",
@@ -922,6 +1051,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 7,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareRoughness/"
   },
   {
@@ -930,6 +1060,19 @@
     "title": "glTF: Anisotropy",
     "description": "Anisotropy — CompareAnisotropy. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareAnisotropy/glTF-Binary/CompareAnisotropy.glb",
+    "display_model": "data/gltf_pbr/CompareAnisotropy/glTF-Binary/CompareAnisotropyRight.glb",
+    "display_bounds": {
+      "min": [
+        -0.02216343988542291,
+        0.0037123640067875385,
+        -0.5885085135897612
+      ],
+      "max": [
+        1.0227319988650525,
+        0.9962881207466125,
+        0.5888367712697005
+      ]
+    },
     "missing_model": "data/gltf_pbr/anisotropy_missing.glb",
     "profile": "data/gltf_pbr/anisotropy.json",
     "off_profile": "data/gltf_pbr/anisotropy.json",
@@ -949,6 +1092,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 8,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareAnisotropy/"
   },
   {
@@ -957,6 +1101,19 @@
     "title": "glTF: Clearcoat",
     "description": "Clearcoat — CompareClearcoat. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareClearcoat/glTF-Binary/CompareClearcoat.glb",
+    "display_model": "data/gltf_pbr/CompareClearcoat/glTF-Binary/CompareClearcoatRight.glb",
+    "display_bounds": {
+      "min": [
+        0.6000000834465027,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.5999999642372131,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/clearcoat_missing.glb",
     "profile": "data/gltf_pbr/clearcoat.json",
     "off_profile": "data/gltf_pbr/clearcoat.json",
@@ -976,6 +1133,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 9,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareClearcoat/"
   },
   {
@@ -984,6 +1142,19 @@
     "title": "glTF: Dispersion",
     "description": "Dispersion — CompareDispersion. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareDispersion/glTF-Binary/CompareDispersion.glb",
+    "display_model": "data/gltf_pbr/CompareDispersion/glTF-Binary/CompareDispersionRight.glb",
+    "display_bounds": {
+      "min": [
+        0.05999998052849165,
+        -0.5,
+        -0.5000000218556941
+      ],
+      "max": [
+        1.06000002423988,
+        0.5,
+        0.5000000218556941
+      ]
+    },
     "missing_model": "data/gltf_pbr/dispersion_missing.glb",
     "profile": "data/gltf_pbr/dispersion.json",
     "off_profile": "data/gltf_pbr/dispersion.json",
@@ -1003,6 +1174,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 10,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareDispersion/"
   },
   {
@@ -1011,6 +1183,19 @@
     "title": "glTF: Emissive Strength",
     "description": "Emissive Strength — CompareEmissiveStrength. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrength.glb",
+    "display_model": "data/gltf_pbr/CompareEmissiveStrength/glTF-Binary/CompareEmissiveStrengthRight.glb",
+    "display_bounds": {
+      "min": [
+        -0.1571067849800869,
+        -0.5000000758761658,
+        -0.7071068727771816
+      ],
+      "max": [
+        1.2571068088219448,
+        0.5000000758761658,
+        0.7071068727771816
+      ]
+    },
     "missing_model": "data/gltf_pbr/emissive_strength_missing.glb",
     "profile": "data/gltf_pbr/emissive_strength.json",
     "off_profile": "data/gltf_pbr/emissive_strength.json",
@@ -1030,6 +1215,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 11,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareEmissiveStrength/"
   },
   {
@@ -1038,6 +1224,19 @@
     "title": "glTF: Index of Refraction",
     "description": "Index of Refraction — CompareIor. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareIor/glTF-Binary/CompareIor.glb",
+    "display_model": "data/gltf_pbr/CompareIor/glTF-Binary/CompareIorRight.glb",
+    "display_bounds": {
+      "min": [
+        0.050000011920928955,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.050000011920929,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/ior_missing.glb",
     "profile": "data/gltf_pbr/ior.json",
     "off_profile": "data/gltf_pbr/ior.json",
@@ -1057,6 +1256,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 12,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIor/"
   },
   {
@@ -1065,6 +1265,19 @@
     "title": "glTF: Iridescence",
     "description": "Iridescence — CompareIridescence. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareIridescence/glTF-Binary/CompareIridescence.glb",
+    "display_model": "data/gltf_pbr/CompareIridescence/glTF-Binary/CompareIridescenceRight.glb",
+    "display_bounds": {
+      "min": [
+        0.050000011920928955,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.050000011920929,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/iridescence_missing.glb",
     "profile": "data/gltf_pbr/iridescence.json",
     "off_profile": "data/gltf_pbr/iridescence.json",
@@ -1084,6 +1297,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 13,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareIridescence/"
   },
   {
@@ -1092,6 +1306,19 @@
     "title": "glTF: Sheen",
     "description": "Sheen — CompareSheen. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareSheen/glTF-Binary/CompareSheen.glb",
+    "display_model": "data/gltf_pbr/CompareSheen/glTF-Binary/CompareSheenRight.glb",
+    "display_bounds": {
+      "min": [
+        0.050000011920928955,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.050000011920929,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/sheen_missing.glb",
     "profile": "data/gltf_pbr/sheen.json",
     "off_profile": "data/gltf_pbr/sheen.json",
@@ -1111,6 +1338,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 14,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSheen/"
   },
   {
@@ -1119,6 +1347,19 @@
     "title": "glTF: Specular",
     "description": "Specular — CompareSpecular. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareSpecular/glTF-Binary/CompareSpecular.glb",
+    "display_model": "data/gltf_pbr/CompareSpecular/glTF-Binary/CompareSpecularRight.glb",
+    "display_bounds": {
+      "min": [
+        0.02499997615814209,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        1.024999976158142,
+        0.5,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/specular_missing.glb",
     "profile": "data/gltf_pbr/specular.json",
     "off_profile": "data/gltf_pbr/specular.json",
@@ -1138,6 +1379,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 15,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareSpecular/"
   },
   {
@@ -1146,6 +1388,19 @@
     "title": "glTF: Transmission",
     "description": "Transmission — CompareTransmission. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareTransmission/glTF-Binary/CompareTransmission.glb",
+    "display_model": "data/gltf_pbr/CompareTransmission/glTF-Binary/CompareTransmissionRight.glb",
+    "display_bounds": {
+      "min": [
+        0.02499997615814209,
+        -0.4493159353733063,
+        -0.5
+      ],
+      "max": [
+        1.024999976158142,
+        0.2760152220726013,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/transmission_missing.glb",
     "profile": "data/gltf_pbr/transmission.json",
     "off_profile": "data/gltf_pbr/transmission.json",
@@ -1165,6 +1420,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 16,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareTransmission/"
   },
   {
@@ -1173,6 +1429,19 @@
     "title": "glTF: Volume",
     "description": "Volume — CompareVolume. Official comparison asset from the Khronos PBR page. Toggle the feature without changing the camera.",
     "model": "data/gltf_pbr/CompareVolume/glTF-Binary/CompareVolume.glb",
+    "display_model": "data/gltf_pbr/CompareVolume/glTF-Binary/CompareVolumeRight.glb",
+    "display_bounds": {
+      "min": [
+        0.02499997615814209,
+        -0.4493159353733063,
+        -0.5
+      ],
+      "max": [
+        1.024999976158142,
+        0.2760152220726013,
+        0.5
+      ]
+    },
     "missing_model": "data/gltf_pbr/volume_missing.glb",
     "profile": "data/gltf_pbr/volume.json",
     "off_profile": "data/gltf_pbr/volume.json",
@@ -1192,6 +1461,7 @@
     "focus": 8,
     "pbr_asset": true,
     "pbr_feature": 17,
+    "capture": "slider",
     "source": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CompareVolume/"
   }
 ]

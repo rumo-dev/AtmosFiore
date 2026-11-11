@@ -294,6 +294,10 @@ public:
 		uint64_t occlusion_culled = 0;
 		uint64_t occlusion_skipped_triangles = 0;
 	};
+	struct culled_debug_box
+	{
+		DirectX::XMFLOAT3 minimum{}, maximum{};
+	};
 	struct occlusion_state
 	{
 		struct query_slot
@@ -302,6 +306,7 @@ public:
 			bool pending = false;
 			bool visible = true;
 			uint64_t generation = 0;
+			uint64_t resolved_generation = 0;
 		};
 		std::vector<query_slot> slots;
 		DirectX::XMFLOAT4X4 view_projection{};
@@ -311,6 +316,12 @@ public:
 		const Gltf_Model* model = nullptr;
 		UINT query_cursor = 0;
 	};
+	std::vector<culled_debug_box> collect_culled_debug_boxes(
+		const DirectX::XMFLOAT4X4& world,
+		const Frustum* frustum,
+		const occlusion_state* occlusion,
+		bool show_frustum_rejections,
+		bool show_occlusion_rejections) const;
 
 	void compute_instance_aabb(
 		const DirectX::XMFLOAT4X4& world,

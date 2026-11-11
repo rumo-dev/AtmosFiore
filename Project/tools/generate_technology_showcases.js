@@ -1,5 +1,6 @@
 // Rebuild the standalone glTF exhibits and deterministic comparison profiles.
-// Uses only Node.js built-ins; no external assets or downloads are needed.
+// Uses only Node.js built-ins. The separately maintained Khronos PBR assets
+// are kept in the catalog when this script regenerates procedural exhibits.
 const fs = require('fs');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
@@ -15,15 +16,27 @@ function geometry(layout, exhibit='') {
   const parts=[];let sphereCount=0;
   function quad(p,n,m=0){let a=p[0],b=p[1],c=p[2],u=b.map((v,i)=>v-a[i]),v=c.map((v,i)=>v-a[i]);let cross=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];parts.push({p,n:p.map(()=>n),uv:[[0,0],[1,0],[1,1],[0,1]],idx:cross.reduce((s,v,i)=>s+v*n[i],0)>0?[0,1,2,0,2,3]:[0,2,1,0,3,2],m});}
   function box(x,y,z,w,h,d,m=0){let l=x-w/2,r=x+w/2,b=y,t=y+h,f=z-d/2,k=z+d/2;quad([[l,b,f],[r,b,f],[r,t,f],[l,t,f]],[0,0,-1],m);quad([[l,b,k],[r,b,k],[r,t,k],[l,t,k]],[0,0,1],m);quad([[l,b,f],[l,b,k],[l,t,k],[l,t,f]],[-1,0,0],m);quad([[r,b,f],[r,b,k],[r,t,k],[r,t,f]],[1,0,0],m);quad([[l,t,f],[r,t,f],[r,t,k],[l,t,k]],[0,1,0],m);quad([[l,b,f],[r,b,f],[r,b,k],[l,b,k]],[0,-1,0],m);}
+  function column(x,y,z,r,h,m=0){const sides=16;let p=[],n=[],uv=[],idx=[];for(let j=0;j<=sides;j++){let a=j*Math.PI*2/sides,c=Math.cos(a),s=Math.sin(a);p.push([x+r*c,y,z+r*s],[x+r*c,y+h,z+r*s]);n.push([c,0,s],[c,0,s]);uv.push([j/sides,0],[j/sides,1]);if(j<sides){let k=j*2;idx.push(k,k+1,k+2,k+1,k+3,k+2);}}for(const top of [false,true]){const base=p.length;let yy=y+(top?h:0);p.push([x,yy,z]);n.push([0,top?1:-1,0]);uv.push([0.5,0.5]);for(let j=0;j<=sides;j++){let a=j*Math.PI*2/sides;p.push([x+r*Math.cos(a),yy,z+r*Math.sin(a)]);n.push([0,top?1:-1,0]);uv.push([(Math.cos(a)+1)/2,(Math.sin(a)+1)/2]);if(j<sides)top?idx.push(base,base+j+2,base+j+1):idx.push(base,base+j+1,base+j+2);}}parts.push({p,n,uv,idx,m});}
+  function ridge(z,heights,m){let p=[],n=[],uv=[],idx=[];for(let i=0;i<heights.length;i++){const x=(i-(heights.length-1)/2)*11;p.push([x,-0.2,z],[x,heights[i],z]);n.push([0,0,-1],[0,0,-1]);uv.push([i/(heights.length-1),0],[i/(heights.length-1),1]);if(i+1<heights.length){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2);}}parts.push({p,n,uv,idx,m});}
   function sphere(x,y,z,r,m){sphereCount++;let p=[],n=[],uv=[],idx=[];for(let j=0;j<=12;j++)for(let i=0;i<=24;i++){let a=j*Math.PI/12,b=i*2*Math.PI/24,q=[Math.sin(a)*Math.cos(b),Math.cos(a),Math.sin(a)*Math.sin(b)];p.push(q.map((v,k)=>v*r+[x,y,z][k]));n.push(q);uv.push([i/24,j/12]);}for(let j=0;j<12;j++)for(let i=0;i<24;i++){let k=j*25+i;idx.push(k,k+25,k+1,k+1,k+25,k+26);} // Fix winding to outward.
     for(let i=0;i<idx.length;i+=3){let a=p[idx[i]],b=p[idx[i+1]],c=p[idx[i+2]],u=b.map((v,k)=>v-a[k]),v=c.map((v,k)=>v-a[k]);if((u[1]*v[2]-u[2]*v[1])*n[idx[i]][0]+(u[2]*v[0]-u[0]*v[2])*n[idx[i]][1]+(u[0]*v[1]-u[1]*v[0])*n[idx[i]][2]<0)[idx[i+1],idx[i+2]]=[idx[i+2],idx[i+1]];}
     parts.push({p,n,uv,idx,m});}
   const corridor=['fog','height','distance','exponential','focus','temporal','culling'].includes(layout);
-  if(layout!=='actor')box(0,-0.15,corridor?12:1,14,0.15,corridor?40:16,layout==='reflection'?3:0);
-  if(corridor){for(let i=0;i<10;i++){let z=i*3;box(-3.5,0,z,0.3,3.8,0.3,i%2?1:2);box(3.5,0,z,0.3,3.8,0.3,i%2?2:1);if(layout==='fog')box(0,3.7,z,7,0.2,0.4);if(layout==='focus')sphere(i%2?1.1:-1.1,0.7,z,0.7,i%2?3:1);}
+  const skyGround=layout==='sky'?mats.push(material('Twilight plain',[0.10,0.13,0.18],0,0.9,[0.11,0.14,0.20]))-1:0;
+  if(layout!=='actor')box(0,-0.15,layout==='sky'?23:corridor?12:1,layout==='sky'?140:14,0.15,layout==='sky'?90:corridor?40:16,layout==='reflection'?3:skyGround);
+  if(corridor){for(let i=0;i<10;i++){let z=i*3;column(-3.5,0,z,0.22,3.8,i%2?1:2);column(3.5,0,z,0.22,3.8,i%2?2:1);if(layout==='fog')box(0,3.7,z,7,0.2,0.4);if(layout==='focus')sphere(i%2?1.1:-1.1,0.7,z,0.7,i%2?3:1);}
     if(layout==='temporal')for(let i=-40;i<=40;i++)box(i*0.15,0,1.3,0.025,3.3,0.025,3);
-    if(layout==='culling'){box(0,0,0,5.6,1.8,0.7);for(let z=0;z<16;z++)for(let x=-6;x<=6;x++)box(x*0.45,0,z*0.6+2,0.26,1+(z%4)*0.25,0.26,(z+x+60)%3);}
-  } else if(layout==='shadow'){for(let i=0;i<6;i++)box(-3+i*1.2,0,1+i*0.25,0.25,0.7+i*0.5,0.25);for(let i=0;i<5;i++)box(0,3.5,0.3+i,6,0.1,0.12);box(-4,0,2,0.2,5,8);}
+    if(layout==='culling'){box(0,0,0,5.6,exhibit==='occlusion'?3.4:1.8,0.7);for(let z=0;z<16;z++)for(let x=-6;x<=6;x++)box(x*0.45,0,z*0.6+2,0.26,1+(z%4)*0.25,0.26,(z+x+60)%3);}
+  } else if(layout==='shadow'){for(let i=0;i<6;i++)column(-3+i*1.2,0,1+i*0.25,0.23,0.7+i*0.5,i%2?1:2);for(let i=0;i<5;i++)box(0,3.5,0.3+i,6,0.1,0.12);box(-4,0,2,0.2,5,8);}
+  else if(layout==='sky'){
+    const far=mats.push(material('Distant violet ridge',[0.27,0.26,0.41],0,0.9,[0.42,0.31,0.46]))-1;
+    const mid=mats.push(material('Blue stone ridge',[0.17,0.22,0.31],0,0.9,[0.23,0.28,0.39]))-1;
+    const near=mats.push(material('Near dark ridge',[0.11,0.15,0.20],0,0.9,[0.10,0.14,0.21]))-1;
+    ridge(62,[2,4,3,6,7,4,8,5,3,7,5,3,2],far);
+    ridge(43,[1,3,5,4,8,6,3,5,9,6,4,2,1],mid);
+    ridge(27,[0.6,2,3,5,3,2,4,6,4,3,2,1,0.6],near);
+    column(-10,0,10,0.55,5,near);column(10,0,13,0.4,3.8,near);
+  }
   else if(layout==='ao'){box(0,0,4,10,4,0.2);box(-4,0,0,0.2,4,8);for(let i=0;i<6;i++)box(-2.5+i,0,1+(i%2)*0.6,0.8,0.3+i*0.25,0.8);}
   else if(layout==='gi'){box(-3,0,1,0.2,4,8,1);box(3,0,1,0.2,4,8,2);box(0,0,4.8,6,4,0.2);box(0,0,1.7,0.2,2.5,2);box(-2.1,1,4.6,1.4,1.8,0.05,4);box(2.1,1,4.6,1.4,1.8,0.05,5);sphere(-1.4,0.7,1,0.7,0);sphere(1.4,0.7,1,0.7,0);}
   else if(layout==='actor'){box(0,0,0,0.7,0.35,0.6,3);box(0,0.1,0,1.9,0.12,0.15,1);box(0,0.1,0,0.15,0.12,1.9,2);for(let x of [-0.8,0.8])for(let z of [-0.8,0.8]){box(x,0.25,z,0.85,0.04,0.1,3);}sphere(0,0.15,-0.32,0.13,4);}
@@ -67,7 +80,7 @@ const definitions=[
  ['point_shadow','Shadows','Point light shadows','shadow','A moving point light casts pillar shadows on the floor and walls.'],
  ['area','Lighting','Area lights','gallery','A large rectangular emitter produces a broad rectangular highlight on one moderately rough metal sphere.'],
  ['spot','Lighting','Spot lights','ao','Warm and cool cones reveal inner/outer cone falloff on the floor.'],
- ['volumetric','Atmosphere','Froxel volumetric fog','fog','Beams and pillars interrupt light shafts through the fog.'],
+ ['volumetric','Atmosphere','Froxel volumetric fog','fog','Warm and cool spotlights on each column pair aim toward the center aisle, making their crossing beams visible in the fog.'],
  ['height','Atmosphere','Height fog','height','Low fog hides pillar feet while upper portions stay clear.'],
  ['distance','Atmosphere','Distance fog','distance','Repeated pillars at known intervals fade between the start and end distance.'],
  ['exponential','Atmosphere','Exponential fog','exponential','The long corridor demonstrates progressive exponential extinction.'],
@@ -81,10 +94,10 @@ const definitions=[
  ['vignette','Lens','Vignetting','gallery','Compare center and corner brightness while keeping scene illumination fixed.'],
  ['taa','Reconstruction','Temporal anti-aliasing','temporal','Thin bars and a moving object expose shimmer and temporal history behavior.'],
  ['dlss','Reconstruction','DLSS reconstruction','temporal','Compare native TAA and DLSS Quality on the same fine geometry. Requires supported NVIDIA hardware.'],
- ['frustum','Performance','Frustum culling','culling','Seven separate courts span the camera frustum. Compare rejected instances while turning the camera. Meshlet and occlusion culling are disabled.'],
- ['meshlets','Performance','Spatial meshlet culling','culling','Turn away from parts of the dense court. Inspect skipped triangles and draw ranges; occlusion queries are disabled.'],
- ['occlusion','Performance','Hardware occlusion queries','culling','Stand still behind the large occluder for queries to settle, then move around it. Compare queries and skipped triangle counts.'],
- ['sky','Atmosphere','Dynamic sky / sun','shadow','Animated time of day changes sun direction and sky color.'],
+ ['frustum','Performance','Frustum culling','culling','The cyan volume is the actual culling frustum, seen from a separate fixed view camera. Its moving magenta origin reveals which court instances are rejected. Meshlet and occlusion culling are disabled.'],
+ ['meshlets','Performance','Spatial meshlet culling','culling','The moving cyan frustum is the actual culling camera, separate from this view. Inspect skipped triangles and draw ranges; occlusion queries are disabled.'],
+ ['occlusion','Performance','Hardware occlusion queries','culling','The moving cyan camera pauses for GPU depth queries behind and beside the wall. The fixed side observer reveals removed groups as magenta wire boxes.'],
+ ['sky','Atmosphere','Painted dynamic sky','sky','Time-of-day palettes, directional color, cloud cover, sky-only vignette and fog-tinted horizon shape a distinct atmosphere.'],
  ['animation','Animation','glTF node animation','animation','A generated rotorcraft plays its generated translation/rotation animation above a plinth. Pause motion to compare.']
 ];
 let baseline=JSON.parse(fs.readFileSync(path.join(root,'data/post_process_indoor.json')));
@@ -103,26 +116,33 @@ for(const [id,category,title,layout,description] of definitions){
  if(id==='dof')a.exposure.reference_ev100=4.88;
  if(id==='exposure')a.exposure.reference_ev100=8.4;
  if(id==='bloom'){a.bloom.intensity=0.9;a.bloom.threshold=0.8;}
+ if(id==='bloom'){a.enabled[1]=true;}
  if(id==='chromatic')a.chromatic_aberration.intensity=3;
+ if(id==='volumetric')a.volumetric_fog={...a.volumetric_fog,density:0.11,intensity:2.1,scattering:1.25,anisotropy:0.55,fog_far:28};
+ if(id==='sky'){a.enabled[5]=true;a.distance_fog={...a.distance_fog,start:14,end:76,density:0.76,intensity:1,color:[0.48,0.37,0.31]};}
  if(['point_shadow','area','spot','bloom','sun_shadow'].includes(id))a.enabled[0]=false;
  let b=structuredClone(a);if(effects[id]!=null)b.enabled[effects[id]]=false;if(['ssao','ssr','ssgi'].includes(id))b[id].enabled=false;if(id==='taa')b.taa.enabled=false;
  if(id==='ddgi_fog'){b.enabled[3]=true;b.volumetric_fog.gi_scattering=0;}
  fs.writeFileSync(path.join(out,id+'.json'),JSON.stringify(a,null,2)+'\n');fs.writeFileSync(path.join(out,id+'_off.json'),JSON.stringify(b,null,2)+'\n');
  fs.writeFileSync(path.join(out,id+'.gltf'),JSON.stringify(geometry(layout,id))+'\n');
  const gi=['voxel','ddgi','ddgi_fog'].includes(id), long=['fog','height','distance','exponential','focus','temporal','culling'].includes(layout);
- catalog.push({id,category,title,description,model:'data/showcases/'+id+'.gltf',profile:'data/showcases/'+id+'.json',off_profile:'data/showcases/'+id+'_off.json',camera:[0,long?2:3.2,long?-8:-11],target:[0,long?1.6:1.8,long?8:1],sun:gi?80:['point_shadow','area','spot'].includes(id)?40:6500,gi,focus:id==='dof'?13:9});
+ catalog.push({id,category,title,description,model:'data/showcases/'+id+'.gltf',profile:'data/showcases/'+id+'.json',off_profile:'data/showcases/'+id+'_off.json',camera:[0,long?2:3.2,long?-8:-11],target:[0,long?1.6:1.8,long?8:1],sun:gi?80:['point_shadow','area','spot'].includes(id)?40:6500,gi,focus:id==='dof'?13:9,capture:['point_shadow','adaptation','sky','animation','taa','dlss','frustum','meshlets','occlusion','volumetric'].includes(id)?'video':'slider'});
  catalog.at(-1).environment=!(gi||['ssgi','point_shadow','area','spot','sun_shadow','bloom'].includes(id));
  if(['point_shadow','area','spot','bloom'].includes(id))catalog.at(-1).sun=300;
  if(['height','distance','exponential','volumetric'].includes(id))catalog.at(-1).sun=2000;
+ if(id==='volumetric'){catalog.at(-1).sun=15;catalog.at(-1).environment=false;catalog.at(-1).camera=[0,2.1,-7];catalog.at(-1).target=[0,1.6,9];}
  if(['point_shadow','sun_shadow'].includes(id)){catalog.at(-1).camera=[0,2.8,-8];catalog.at(-1).target=[0,1,1];}
  if(['frustum','meshlets','occlusion'].includes(id)){catalog.at(-1).camera=[2.4,3.8,-8];catalog.at(-1).target=[0,1,5];}
+ if(id==='meshlets'){catalog.at(-1).camera=[9,5.2,-2];catalog.at(-1).target=[0,1.5,5];}
+ if(id==='occlusion'){catalog.at(-1).camera=[2.4,2.35,-7];catalog.at(-1).target=[0,1.5,5];}
+ if(id==='sky'){catalog.at(-1).camera=[0,2.4,-9];catalog.at(-1).target=[0,4.2,27];catalog.at(-1).sun=11000;catalog.at(-1).environment=false;}
  if(id==='animation'){catalog.at(-1).camera=[0,2.4,-5];catalog.at(-1).target=[0,1.5,0];}
  if(['ibl','ssr','reflection_probes','area','vignette'].includes(id)){catalog.at(-1).camera=[0,2.5,-7];catalog.at(-1).target=[0,1.2,1];catalog.at(-1).focus=8;}
 }
 // Keep separately maintained, downloaded Khronos exhibits when regenerating
 // the procedural technology models.
 const catalogPath=path.join(out,'catalog.json');
-if(fs.existsSync(catalogPath))catalog.push(...JSON.parse(fs.readFileSync(catalogPath)).filter(e=>e.pbr_asset));
+if(fs.existsSync(catalogPath))catalog.push(...JSON.parse(fs.readFileSync(catalogPath)).filter(e=>e.pbr_asset).map(e=>({...e,capture:'slider'})));
 fs.writeFileSync(catalogPath,JSON.stringify(catalog,null,2)+'\n');
 fs.writeFileSync(path.join(out,'actor.gltf'),JSON.stringify(geometry('actor'))+'\n');
 console.log('Generated '+catalog.length+' technology exhibits and ON/OFF profiles.');

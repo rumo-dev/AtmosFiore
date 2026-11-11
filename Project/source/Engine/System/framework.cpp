@@ -23,11 +23,16 @@ bool Frame_Work::initialize()
 	//ImGui_Util::set_theme(theme);
 
 	const bool pbr_audit = std::wstring(GetCommandLineW()).find(L"--pbr-audit") != std::wstring::npos;
+	const std::wstring command_line=GetCommandLineW();
+	const std::wstring scene_option=L"--capture-scene=";
+	const auto scene_begin=command_line.find(scene_option);
+	std::string selected_scene;
+	if(scene_begin!=std::wstring::npos){const auto first=scene_begin+scene_option.size();const auto last=command_line.find_first_of(L" \t\"",first);const auto value=command_line.substr(first,last==std::wstring::npos?std::wstring::npos:last-first);for(const wchar_t ch:value)if((ch>=L'a'&&ch<=L'z')||(ch>=L'0'&&ch<=L'9')||ch==L'_')selected_scene.push_back(static_cast<char>(ch));}
 	const bool capture_indoor = std::wstring(GetCommandLineW()).find(L"--capture-indoor") != std::wstring::npos;
-	const bool capture_all = capture_indoor || std::wstring(GetCommandLineW()).find(L"--capture-scenes") != std::wstring::npos;
+	const bool capture_all = capture_indoor || !selected_scene.empty() || std::wstring(GetCommandLineW()).find(L"--capture-scenes") != std::wstring::npos;
 	const bool showcase_audit = capture_all || pbr_audit || std::wstring(GetCommandLineW()).find(L"--showcase-audit") != std::wstring::npos;
 	_hide_imgui = showcase_audit;
-	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit(pbr_audit,capture_all,true,capture_indoor));
+	if (showcase_audit) Scene_Manager::instance().change_scene(new Scene_ShowcaseAudit(pbr_audit,capture_all,true,capture_indoor,selected_scene));
 	else Scene_Manager::instance().change_scene(new Scene_Splash());
 	Text::initialize();
 	Dashboard::Instance().InitializeUI();

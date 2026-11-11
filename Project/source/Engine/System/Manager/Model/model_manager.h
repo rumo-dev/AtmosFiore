@@ -199,6 +199,14 @@ public:
 	bool occlusion_culling_enabled() const { return occlusion_culling_enabled_; }
 	void set_meshlet_culling_enabled(bool enabled) { meshlet_culling_enabled_ = enabled; }
 	void set_occlusion_culling_enabled(bool enabled) { occlusion_culling_enabled_ = enabled; }
+	void set_camera_culling_frustum(const Frustum& frustum) { frozen_camera_frustum_ = frustum; camera_culling_frozen_ = true; }
+	void restore_camera_culling_frustum(bool frozen,const Frustum& frustum) { frozen_camera_frustum_ = frustum; camera_culling_frozen_ = frozen; }
+	bool camera_culling_frozen() const { return camera_culling_frozen_; }
+	const Frustum& frozen_camera_frustum() const { return frozen_camera_frustum_; }
+	const Gltf_Model::meshlet_culling_stats& camera_meshlet_stats() const { return camera_meshlet_stats_; }
+	UINT last_occlusion_queries_issued() const { return last_occlusion_queries_issued_; }
+	uint64_t total_occlusion_queries_issued() const { return total_occlusion_queries_issued_; }
+	UINT stationary_camera_frames() const { return stationary_camera_frames_; }
 
 	// culling stats
 	int last_culled_count = 0;
@@ -215,6 +223,7 @@ private:
 	Gltf_Model::meshlet_culling_stats camera_meshlet_stats_{};
 	Gltf_Model::meshlet_culling_stats directional_meshlet_stats_{};
 	UINT last_occlusion_queries_issued_ = 0;
+	uint64_t total_occlusion_queries_issued_ = 0;
 	DirectX::XMFLOAT4X4 previous_camera_view_projection_{};
 	bool have_previous_camera_view_projection_ = false;
 	UINT stationary_camera_frames_ = 0;
